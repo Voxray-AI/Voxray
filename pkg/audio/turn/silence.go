@@ -148,10 +148,18 @@ func (s *SilenceTurnAnalyzer) AnalyzeEndOfTurnAsync(ctx context.Context) <-chan 
 		s.mu.Lock()
 		state := s.lastState
 		s.mu.Unlock()
+
+		// If the context is already cancelled, prefer returning a cancelled result.
+		if err := ctx.Err(); err != nil {
+			ch <- EndOfTurnResult{State: Incomplete, Err: err}
+			return
+		}
+
 		select {
-		case ch <- EndOfTurnResult{State: state, Err: nil}:
 		case <-ctx.Done():
 			ch <- EndOfTurnResult{State: Incomplete, Err: ctx.Err()}
+		default:
+			ch <- EndOfTurnResult{State: state, Err: nil}
 		}
 	}()
 	return ch

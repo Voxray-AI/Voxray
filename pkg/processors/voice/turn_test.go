@@ -1,0 +1,167 @@
+package voice
+
+import (
+	"context"
+	"testing"
+
+	"voila-go/pkg/audio"
+	"voila-go/pkg/audio/turn"
+	"voila-go/pkg/frames"
+	"voila-go/pkg/processors"
+)
+
+type fakeVAD struct {
+	isSpeech bool
+}
+
+func (f *fakeVAD) IsSpeech(_ audio.Frame) (bool, error) {
+	return f.isSpeech, nil
+}
+
+type fakeAnalyzer struct {
+	state          turn.EndOfTurnState
+	speechTriggered bool
+	resultCh       chan turn.EndOfTurnResult
+}
+
+func (f *fakeAnalyzer) AppendAudio(_ []byte, _ bool) turn.EndOfTurnState {
+	f.speechTriggered = true
+	return f.state
+}
+
+func (f *fakeAnalyzer) AnalyzeEndOfTurn(ctx context.Context) (turn.EndOfTurnState, error) {
+	return f.state, nil
+}
+
+func (f *fakeAnalyzer) AnalyzeEndOfTurnAsync(ctx context.Context) <-chan turn.EndOfTurnResult {
+	if f.resultCh == nil {
+		f.resultCh = make(chan turn.EndOfTurnResult, 1)
+	}
+	return f.resultCh
+}
+
+func (f *fakeAnalyzer) SpeechTriggered() bool {
+	return f.speechTriggered
+}
+
+func (f *fakeAnalyzer) SetSampleRate(_ int) {}
+
+func (f *fakeAnalyzer) Clear() {
+	f.speechTriggered = false
+}
+
+func (f *fakeAnalyzer) UpdateVADStartSecs(_ float64) {}
+
+type collectProcessor struct {
+	received []frames.Frame
+}
+
+func (c *collectProcessor) ProcessFrame(_ context.Context, f frames.Frame, dir processors.Direction) error {
+	if dir == processors.Downstream {
+		c.received = append(c.received, f)
+	}
+	return nil
+}
+
+func (c *collectProcessor) SetNext(processors.Processor)  {}
+func (c *collectProcessor) SetPrev(processors.Processor)  {}
+func (c *collectProcessor) Setup(context.Context) error   { return nil }
+func (c *collectProcessor) Cleanup(context.Context) error { return nil }
+func (c *collectProcessor) Name() string                  { return "collector" }
+
+func TestTurnProcessorSyncModeEmitsOnComplete(t *testing.T) {
+	ctx := context.Background()
+	an := &fakeAnalyzer{state: turn.Complete}
+	v := &fakeVAD{isSpeech: true}
+	p := NewTurnProcessor("turn", v, an, 16000, 1, false)
+
+	col := &collectProcessor{}
+	p.SetNext(col)
+
+	audioData := []byte{0x00, 0x00, 0x01, 0x00}
+	frame := frames.NewAudioRawFrame(audioData, 16000, 1, 0)
+
+	if err := p.ProcessFrame(ctx, frame, processors.Downstream); err != nil {
+		t.Fatalf("ProcessFrame returned error: %v", err)
+	}
+
+	if len(col.received) != 1 {
+		t.Fatalf("expected 1 frame downstream, got %d", len(col.received))
+	}
+	out, ok := col.received[0].(*frames.AudioRawFrame)
+	if !ok {
+		t.Fatalf("expected AudioRawFrame, got %T", col.received[0])
+	}
+	if len(out.Audio) != len(audioData) {
+		t.Fatalf("expected audio length %d, got %d", len(audioData), len(out.Audio))
+	}
+}
+
+func TestTurnProcessorAsyncModeEmitsOnAsyncComplete(t *testing.T) {
+	ctx := context.Background()
+	an := &fakeAnalyzer{state: turn.Incomplete}
+	v := &fakeVAD{isSpeech: true}
+	p := NewTurnProcessor("turn", v, an, 16000, 1, true)
+
+	col := &collectProcessor{}
+	p.SetNext(col)
+
+	chunk1 := []byte{0x00, 0x00, 0x01, 0x00}
+	chunk2 := []byte{0x02, 0x00, 0x03, 0x00}
+
+	frame1 := frames.NewAudioRawFrame(chunk1, 16000, 1, 0)
+	if err := p.ProcessFrame(ctx, frame1, processors.Downstream); err != nil {
+		t.Fatalf("ProcessFrame(1) returned error: %v", err)
+	}
+
+	// At this point an async analysis should be pending; provide a complete result.
+	if an.resultCh == nil {
+		t.Fatalf("expected async result channel to be initialized")
+	}
+	an.resultCh <- turn.EndOfTurnResult{State: turn.Complete, Err: nil}
+
+	frame2 := frames.NewAudioRawFrame(chunk2, 16000, 1, 0)
+	if err := p.ProcessFrame(ctx, frame2, processors.Downstream); err != nil {
+		t.Fatalf("ProcessFrame(2) returned error: %v", err)
+	}
+
+	if len(col.received) != 1 {
+		t.Fatalf("expected 1 frame downstream, got %d", len(col.received))
+	}
+	out, ok := col.received[0].(*frames.AudioRawFrame)
+	if !ok {
+		t.Fatalf("expected AudioRawFrame, got %T", col.received[0])
+	}
+	expectedLen := len(chunk1) + len(chunk2)
+	if len(out.Audio) != expectedLen {
+		t.Fatalf("expected audio length %d, got %d", expectedLen, len(out.Audio))
+	}
+}
+
+func TestTurnProcessorCancelClearsState(t *testing.T) {
+	ctx := context.Background()
+	an := &fakeAnalyzer{state: turn.Incomplete}
+	v := &fakeVAD{isSpeech: true}
+	p := NewTurnProcessor("turn", v, an, 16000, 1, true)
+
+	col := &collectProcessor{}
+	p.SetNext(col)
+
+	frame := frames.NewAudioRawFrame([]byte{0x00, 0x00}, 16000, 1, 0)
+	if err := p.ProcessFrame(ctx, frame, processors.Downstream); err != nil {
+		t.Fatalf("ProcessFrame audio returned error: %v", err)
+	}
+
+	cancel := frames.NewCancelFrame("test")
+	if err := p.ProcessFrame(ctx, cancel, processors.Downstream); err != nil {
+		t.Fatalf("ProcessFrame cancel returned error: %v", err)
+	}
+
+	if len(col.received) == 0 {
+		t.Fatalf("expected at least one frame downstream")
+	}
+	if _, ok := col.received[len(col.received)-1].(*frames.CancelFrame); !ok {
+		t.Fatalf("expected last frame to be CancelFrame, got %T", col.received[len(col.received)-1])
+	}
+}
+

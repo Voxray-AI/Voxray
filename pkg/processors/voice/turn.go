@@ -23,10 +23,17 @@ type TurnProcessor struct {
 
 	// buffer accumulates audio for the current turn until Complete
 	buffer []byte
+
+	// useAsync toggles whether end-of-turn detection is driven via AnalyzeEndOfTurnAsync.
+	useAsync bool
+	// pendingResult holds the in-flight async analysis result channel, if any.
+	pendingResult <-chan turn.EndOfTurnResult
 }
 
 // NewTurnProcessor returns a processor that buffers audio and forwards one segment per turn.
-func NewTurnProcessor(name string, v vad.Detector, a turn.Analyzer, sampleRate, channels int) *TurnProcessor {
+// When useAsync is true, end-of-turn detection is driven via Analyzer.AnalyzeEndOfTurnAsync;
+// otherwise the synchronous AppendAudio return value is used.
+func NewTurnProcessor(name string, v vad.Detector, a turn.Analyzer, sampleRate, channels int, useAsync bool) *TurnProcessor {
 	if name == "" {
 		name = "Turn"
 	}
@@ -43,6 +50,7 @@ func NewTurnProcessor(name string, v vad.Detector, a turn.Analyzer, sampleRate, 
 		Analyzer:      a,
 		SampleRate:    sampleRate,
 		Channels:      channels,
+		useAsync:      useAsync,
 	}
 }
 
@@ -60,6 +68,9 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 	case *frames.CancelFrame:
 		p.buffer = nil
 		p.Analyzer.Clear()
+		// Drop any pending async analysis; any in-flight goroutine will observe ctx cancellation
+		// at the pipeline level and exit independently.
+		p.pendingResult = nil
 		return p.PushDownstream(ctx, f)
 	case *frames.AudioRawFrame:
 		// continue below
@@ -87,14 +98,54 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 	p.buffer = append(p.buffer, chunk...)
 	state := p.Analyzer.AppendAudio(chunk, isSpeech)
 
+	// Synchronous mode: preserve existing behavior.
+	if !p.useAsync {
+		if state == turn.Complete {
+			// Push accumulated audio as one AudioRawFrame for this turn
+			audioCopy := make([]byte, len(p.buffer))
+			copy(audioCopy, p.buffer)
+			out := frames.NewAudioRawFrame(audioCopy, p.SampleRate, p.Channels, 0)
+			p.buffer = nil
+			p.Analyzer.Clear()
+			return p.PushDownstream(ctx, out)
+		}
+		return nil
+	}
+
+	// Async mode: allow synchronous Complete as a fast path.
 	if state == turn.Complete {
-		// Push accumulated audio as one AudioRawFrame for this turn
 		audioCopy := make([]byte, len(p.buffer))
 		copy(audioCopy, p.buffer)
 		out := frames.NewAudioRawFrame(audioCopy, p.SampleRate, p.Channels, 0)
 		p.buffer = nil
 		p.Analyzer.Clear()
+		p.pendingResult = nil
 		return p.PushDownstream(ctx, out)
+	}
+
+	// Non-blocking check for a completed async result.
+	if p.pendingResult != nil {
+		select {
+		case res, ok := <-p.pendingResult:
+			if ok && res.Err == nil && res.State == turn.Complete {
+				audioCopy := make([]byte, len(p.buffer))
+				copy(audioCopy, p.buffer)
+				out := frames.NewAudioRawFrame(audioCopy, p.SampleRate, p.Channels, 0)
+				p.buffer = nil
+				p.Analyzer.Clear()
+				p.pendingResult = nil
+				return p.PushDownstream(ctx, out)
+			}
+			// On non-complete state, error, or closed channel, drop pending and continue.
+			p.pendingResult = nil
+		default:
+			// No result available yet.
+		}
+	}
+
+	// If analysis is active and there is no pending async call, start one.
+	if p.pendingResult == nil && p.Analyzer.SpeechTriggered() {
+		p.pendingResult = p.Analyzer.AnalyzeEndOfTurnAsync(ctx)
 	}
 
 	return nil

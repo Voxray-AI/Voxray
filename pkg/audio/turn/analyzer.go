@@ -40,14 +40,31 @@ type EndOfTurnResult struct {
 
 // Analyzer determines when a user has finished speaking (end of turn).
 // It matches the Python BaseTurnAnalyzer interface.
+//
+// Implementations should keep AppendAudio cheap and non-blocking; it is called
+// for every incoming audio chunk to update lightweight internal state and
+// bookkeeping. AnalyzeEndOfTurn returns a synchronous snapshot of the current
+// end-of-turn state derived from that internal state.
+//
+// AnalyzeEndOfTurnAsync exposes the same information via a goroutine-backed
+// channel. Implementations may perform heavier work inside the goroutine (for
+// example, ML-based models), but they must:
+//   - Send exactly one EndOfTurnResult on the returned channel, then close it.
+//   - Be safe to call repeatedly; implementations should internally deduplicate
+//     or cache work if repeated async calls would otherwise be expensive.
+//   - Respect ctx.Done(): if the context is cancelled before a result is sent,
+//     they should send a non-Complete state with Err set to ctx.Err().
 type Analyzer interface {
-	// AppendAudio adds audio and returns the current end-of-turn state.
+	// AppendAudio adds audio and returns the current end-of-turn state. It must
+	// be fast and non-blocking; callers may invoke this on every audio frame.
 	AppendAudio(buffer []byte, isSpeech bool) EndOfTurnState
-	// AnalyzeEndOfTurn returns the last state synchronously.
+	// AnalyzeEndOfTurn returns the last state synchronously as a cheap snapshot.
 	AnalyzeEndOfTurn(ctx context.Context) (EndOfTurnState, error)
-	// AnalyzeEndOfTurnAsync runs analysis in a goroutine and returns a channel that receives
-	// one result then closes. Caller can select on ctx.Done() and the channel. Useful for
-	// analyzers that do heavier work (e.g. ML); silence impl runs the same logic in a goroutine.
+	// AnalyzeEndOfTurnAsync runs analysis in a goroutine and returns a channel
+	// that receives one EndOfTurnResult then closes. Callers should select on
+	// ctx.Done() and the channel. This is intended for analyzers that do
+	// heavier work (e.g. ML); the silence implementation runs the same logic
+	// in a goroutine but still follows the same contract.
 	AnalyzeEndOfTurnAsync(ctx context.Context) <-chan EndOfTurnResult
 	// SpeechTriggered reports whether speech has been detected and analysis is active.
 	SpeechTriggered() bool

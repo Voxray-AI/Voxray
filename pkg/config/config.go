@@ -32,10 +32,11 @@ type Config struct {
 	// Turn detection (pipecat audio/turn): when to consider user finished speaking
 	TurnDetection       string  `json:"turn_detection,omitempty"`        // "none" | "silence"; default "none"
 	TurnStopSecs        float64 `json:"turn_stop_secs,omitempty"`        // silence after speech to end turn (default 3)
-	TurnPreSpeechMs     float64 `json:"turn_pre_speech_ms,omitempty"`  // pre-speech padding ms (default 500)
+	TurnPreSpeechMs     float64 `json:"turn_pre_speech_ms,omitempty"`   // pre-speech padding ms (default 500)
 	TurnMaxDurationSecs float64 `json:"turn_max_duration_secs,omitempty"` // max segment duration secs (default 8)
 	VADStartSecs        float64 `json:"vad_start_secs,omitempty"`        // VAD start trigger time for turn (default 0)
 	VadThreshold        float64 `json:"vad_threshold,omitempty"`         // EnergyDetector RMS threshold (default 0.02)
+	TurnAsync           bool    `json:"turn_async,omitempty"`            // use async AnalyzeEndOfTurn instead of sync AppendAudio
 }
 
 // GetAPIKey returns the API key for the given service, checking the config first,
