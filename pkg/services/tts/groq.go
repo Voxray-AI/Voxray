@@ -4,6 +4,11 @@ package tts
 import (
 	"context"
 	"io"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"time"
 
 	"voila-go/pkg/audio"
 	"voila-go/pkg/config"
@@ -64,6 +69,41 @@ func (s *GroqService) Speak(ctx context.Context, text string, sampleRate int) ([
 	if err != nil {
 		return nil, err
 	}
+
+	// #region agent log
+	func() {
+		ts := time.Now().UnixMilli()
+		id := fmt.Sprintf("log_%d_groq_tts_wav_header", ts)
+		headerLen := len(wavData)
+		if headerLen > 64 {
+			headerLen = 64
+		}
+		headerHex := hex.EncodeToString(wavData[:headerLen])
+		payload := map[string]any{
+			"sessionId": "5b8cd7",
+			"id":        id,
+			"timestamp": ts,
+			"location":  "pkg/services/tts/groq.go:Speak",
+			"message":   "Groq TTS WAV response header",
+			"runId":     "run1",
+			"hypothesisId": "H1",
+			"data": map[string]any{
+				"wavLen":    len(wavData),
+				"model":     s.model,
+				"voice":     s.voice,
+				"headerHex": headerHex,
+			},
+		}
+		f, err := os.OpenFile("d:\\Python\\pipecat_alt_go\\debug-5b8cd7.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		enc := json.NewEncoder(f)
+		_ = enc.Encode(payload)
+	}()
+	// #endregion
+
 	pcm, outRate, err := audio.DecodeWAVToPCM(wavData)
 	if err != nil {
 		return nil, err

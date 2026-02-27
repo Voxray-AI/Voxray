@@ -3,7 +3,12 @@ package audio
 
 import (
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
+	"time"
 )
 
 // DecodeWAVToPCM extracts raw 16-bit little-endian PCM and sample rate from WAV bytes.
@@ -11,10 +16,10 @@ import (
 // Supports standard PCM WAV with "fmt " and "data" chunks.
 func DecodeWAVToPCM(wav []byte) (pcm []byte, sampleRate int, err error) {
 	const (
-		riff = "RIFF"
-		wave = "WAVE"
-		fmt  = "fmt "
-		data = "data"
+		riff    = "RIFF"
+		wave    = "WAVE"
+		chunkFmt  = "fmt "
+		data    = "data"
 	)
 	if len(wav) < 44 {
 		return nil, 0, errors.New("wav: too short")
@@ -23,16 +28,25 @@ func DecodeWAVToPCM(wav []byte) (pcm []byte, sampleRate int, err error) {
 		return nil, 0, errors.New("wav: invalid RIFF/WAVE header")
 	}
 	pos := 12
+	sawFmt := false
+	sawData := false
+	lastChunkID := ""
 	for pos+8 <= len(wav) {
 		chunkID := string(wav[pos : pos+4])
 		chunkSize := binary.LittleEndian.Uint32(wav[pos+4 : pos+8])
 		pos += 8
+		// Be tolerant of incorrect or oversized chunk sizes by clamping
 		if pos+int(chunkSize) > len(wav) {
-			break
+			chunkSize = uint32(len(wav) - pos)
+		}
+		if chunkSize == 0 {
+			lastChunkID = chunkID
+			continue
 		}
 		payload := wav[pos : pos+int(chunkSize)]
 		switch chunkID {
-		case fmt:
+		case chunkFmt:
+			sawFmt = true
 			if chunkSize >= 16 {
 				// audio format (2), num channels (2), sample rate (4)
 				format := binary.LittleEndian.Uint16(payload[0:2])
@@ -42,12 +56,48 @@ func DecodeWAVToPCM(wav []byte) (pcm []byte, sampleRate int, err error) {
 				sampleRate = int(binary.LittleEndian.Uint32(payload[4:8]))
 			}
 		case data:
+			sawData = true
 			pcm = make([]byte, len(payload))
 			copy(pcm, payload)
 		}
+		lastChunkID = chunkID
 		pos += int(chunkSize)
 	}
 	if pcm == nil {
+		// #region agent log
+		func() {
+			ts := time.Now().UnixMilli()
+			id := fmt.Sprintf("log_%d_wav_no_data_chunk", ts)
+			headerLen := len(wav)
+			if headerLen > 64 {
+				headerLen = 64
+			}
+			headerHex := hex.EncodeToString(wav[:headerLen])
+			payload := map[string]any{
+				"sessionId": "5b8cd7",
+				"id":        id,
+				"timestamp": ts,
+				"location":  "pkg/audio/wav.go:DecodeWAVToPCM",
+				"message":   "DecodeWAVToPCM: no data chunk",
+				"runId":     "run1",
+				"hypothesisId": "H2",
+				"data": map[string]any{
+					"wavLen":      len(wav),
+					"sawFmt":      sawFmt,
+					"sawData":     sawData,
+					"lastChunkID": lastChunkID,
+					"headerHex":   headerHex,
+				},
+			}
+			f, err := os.OpenFile("d:\\Python\\pipecat_alt_go\\debug-5b8cd7.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+			if err != nil {
+				return
+			}
+			defer f.Close()
+			enc := json.NewEncoder(f)
+			_ = enc.Encode(payload)
+		}()
+		// #endregion
 		return nil, 0, errors.New("wav: no data chunk")
 	}
 	if sampleRate == 0 {
@@ -55,3 +105,4 @@ func DecodeWAVToPCM(wav []byte) (pcm []byte, sampleRate int, err error) {
 	}
 	return pcm, sampleRate, nil
 }
+

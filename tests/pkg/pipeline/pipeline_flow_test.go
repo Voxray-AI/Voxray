@@ -1,10 +1,11 @@
-package pipeline
+package pipeline_test
 
 import (
 	"context"
 	"testing"
 
 	"voila-go/pkg/frames"
+	"voila-go/pkg/pipeline"
 	"voila-go/pkg/processors"
 )
 
@@ -27,7 +28,7 @@ func (p *mockProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 }
 
 func TestPipeline_Flow(t *testing.T) {
-	p := New()
+	p := pipeline.New()
 
 	m1 := newMockProcessor("m1")
 	m2 := newMockProcessor("m2")
@@ -77,3 +78,4 @@ func TestPipeline_Flow(t *testing.T) {
 	// Test Cleanup
 	p.Cleanup(ctx)
 }
+

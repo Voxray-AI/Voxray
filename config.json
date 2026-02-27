@@ -1,16 +1,20 @@
 {
-    "host": "localhost",
-    "port": 8080,
-    "model": "llama-3.1-8b-instant",
-    "provider": "groq",
-    "plugins": [
-        "echo"
-    ],
-    "api_keys": {
-        "openai": "",
-        "deepgram": "",
-        "cartesia": "",
-        "daily_room_url": "",
-        "groq": "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"
-    }
+  "host": "localhost",
+  "port": 8080,
+  "model": "llama-3.1-8b-instant",
+  "provider": "groq",
+  "stt_provider": "",
+  "llm_provider": "",
+  "tts_provider": "",
+  "stt_model": "whisper-large-v3-turbo",
+  "tts_model": "canopylabs/orpheus-v1-english",
+  "tts_voice": "alloy",
+  "plugins": ["echo"],
+  "api_keys": {
+    "openai": "",
+    "deepgram": "",
+    "cartesia": "",
+    "daily_room_url": "",
+    "groq": "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"
+  }
 }

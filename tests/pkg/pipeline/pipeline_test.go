@@ -1,15 +1,16 @@
-package pipeline
+package pipeline_test
 
 import (
 	"context"
 	"testing"
 
 	"voila-go/pkg/frames"
+	"voila-go/pkg/pipeline"
 	"voila-go/pkg/processors/echo"
 )
 
 func TestPipeline_Add_Push(t *testing.T) {
-	pl := New()
+	pl := pipeline.New()
 	pl.Add(echo.New("e1"))
 	pl.Add(echo.New("e2"))
 	if len(pl.Processors()) != 2 {
@@ -36,3 +37,4 @@ func TestNewStartFrame(t *testing.T) {
 		t.Errorf("unexpected: %v", f)
 	}
 }
+

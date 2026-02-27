@@ -1,4 +1,4 @@
-package echo
+package echo_test
 
 import (
 	"context"
@@ -6,10 +6,11 @@ import (
 
 	"voila-go/pkg/frames"
 	"voila-go/pkg/processors"
+	"voila-go/pkg/processors/echo"
 )
 
 func TestEcho_ProcessFrame(t *testing.T) {
-	e := New("echo")
+	e := echo.New("echo")
 	ctx := context.Background()
 	f := frames.NewTextFrame("hello")
 	if err := e.ProcessFrame(ctx, f, processors.Downstream); err != nil {
@@ -19,8 +20,9 @@ func TestEcho_ProcessFrame(t *testing.T) {
 }
 
 func TestEcho_NewDefaultName(t *testing.T) {
-	e := New("")
+	e := echo.New("")
 	if e.Name() != "Echo" {
 		t.Errorf("default name: got %q", e.Name())
 	}
 }
+

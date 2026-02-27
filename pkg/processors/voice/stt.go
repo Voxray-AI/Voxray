@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"voila-go/pkg/frames"
+	"voila-go/pkg/logger"
 	"voila-go/pkg/processors"
 	"voila-go/pkg/services"
 )
@@ -54,6 +55,13 @@ func (p *STTProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pro
 		return nil
 	}
 	for _, tf := range tfs {
+		// Log that STT output is in expected format (TranscriptionFrame with Text, Finalized, optional Language).
+		preview := tf.Text
+		if len(preview) > 80 {
+			preview = preview[:80] + "..."
+		}
+		logger.Info("STT output (expected format): processor=%s textLen=%d finalized=%v language=%q preview=%q\n",
+			p.Name(), len(tf.Text), tf.Finalized, tf.Language, preview)
 		_ = p.PushDownstream(ctx, tf)
 	}
 	return nil

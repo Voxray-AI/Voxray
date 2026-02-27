@@ -11,18 +11,24 @@
 
 - **All tests for all features**
   - `go test ./...` (or `make test`)
-- **Only core package/unit tests**
-  - `go test ./pkg/...`
+- **Only core package/unit tests under `tests/pkg`**
+  - `go test ./tests/pkg/...`
 - **Only integration tests under `tests/integration`**
   - `go test ./tests/integration/...`
 - **Only e2e tests under `tests/e2e`** (once real e2e tests are added)
   - `go test ./tests/e2e/...`
 
+Sarvam-specific tests under `tests/pkg/services` are skipped automatically unless
+`SARVAM_API_KEY` is set in the environment. They exercise wiring Sarvam as the
+`provider`/`stt_provider`/`tts_provider` in `config.Config` and run a small
+smoke test against the live API.
+
 ### How tests are discovered
 
-- **Co-located unit tests**
-  - Add `*_test.go` files in the same package as the code (e.g. `pkg/audio/audio_test.go`, `pkg/adapters/schemas/toolschema_test.go`).
-  - `go test ./...` automatically finds and runs these tests; no extra wiring is needed.
+- **Centralized package/unit tests**
+  - Add `*_test.go` files under `tests/pkg/**`, mirroring the structure of `pkg/**` (e.g. `tests/pkg/pipeline/pipeline_test.go` for `pkg/pipeline`).
+  - Tests are written as external packages (e.g. `package pipeline_test`) that import the code under test via `voila-go/pkg/...`.
+  - `go test ./...` automatically finds and runs these tests because `tests` is part of the module tree.
 - **Top-level `tests/` folder**
   - Integration tests live under `tests/integration/`.
   - Future e2e/CLI-style tests live under `tests/e2e/`.

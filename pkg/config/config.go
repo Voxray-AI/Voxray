@@ -8,13 +8,21 @@ import (
 )
 
 // Config holds the server configuration, typically loaded from a JSON file.
+// Provider is the default for all tasks (STT, LLM, TTS); per-task providers override when set.
+// Model is the chat/LLM model; stt_model, tts_model, tts_voice are task-specific and optional.
 type Config struct {
-	Host     string            `json:"host"`
-	Port     int               `json:"port"`
-	Model    string            `json:"model"`
-	Provider string            `json:"provider,omitempty"` // "openai" or "groq"; empty defaults to openai
-	Plugins  []string          `json:"plugins"`
-	APIKeys  map[string]string `json:"api_keys,omitempty"`
+	Host        string            `json:"host"`
+	Port        int               `json:"port"`
+	Model       string            `json:"model"`
+	Provider    string            `json:"provider,omitempty"` // default for all tasks; "openai" or "groq"
+	SttProvider string            `json:"stt_provider,omitempty"`
+	LlmProvider string            `json:"llm_provider,omitempty"`
+	TtsProvider string            `json:"tts_provider,omitempty"`
+	STTModel   string            `json:"stt_model,omitempty"`
+	TTSModel   string            `json:"tts_model,omitempty"`
+	TTSVoice   string            `json:"tts_voice,omitempty"`
+	Plugins     []string          `json:"plugins"`
+	APIKeys     map[string]string `json:"api_keys,omitempty"`
 }
 
 // GetAPIKey returns the API key for the given service, checking the config first,
@@ -26,6 +34,30 @@ func (c *Config) GetAPIKey(service string, envVar string) string {
 		}
 	}
 	return os.Getenv(envVar)
+}
+
+// STTProvider returns the provider to use for STT (stt_provider if set, else provider).
+func (c *Config) STTProvider() string {
+	if c.SttProvider != "" {
+		return c.SttProvider
+	}
+	return c.Provider
+}
+
+// LLMProvider returns the provider to use for LLM (llm_provider if set, else provider).
+func (c *Config) LLMProvider() string {
+	if c.LlmProvider != "" {
+		return c.LlmProvider
+	}
+	return c.Provider
+}
+
+// TTSProvider returns the provider to use for TTS (tts_provider if set, else provider).
+func (c *Config) TTSProvider() string {
+	if c.TtsProvider != "" {
+		return c.TtsProvider
+	}
+	return c.Provider
 }
 
 // LoadConfig reads a JSON configuration file from the specified path and returns a Config struct.

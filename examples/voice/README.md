@@ -20,7 +20,7 @@ Use a config that sets `provider` and `model` so the server builds the voice pip
 }
 ```
 
-For Groq (faster, cheaper):
+For Groq (faster, cheaper), with optional task-specific models:
 
 ```json
 {
@@ -28,9 +28,14 @@ For Groq (faster, cheaper):
   "port": 8080,
   "model": "llama-3.1-8b-instant",
   "provider": "groq",
+  "stt_model": "whisper-large-v3-turbo",
+  "tts_model": "canopylabs/orpheus-v1-english",
+  "tts_voice": "alloy",
   "plugins": []
 }
 ```
+
+You can mix providers per task (e.g. OpenAI for STT, Groq for LLM and TTS) by setting `stt_provider`, `llm_provider`, and `tts_provider`; put the corresponding keys in `api_keys` (e.g. `openai`, `groq`).
 
 ## Run
 

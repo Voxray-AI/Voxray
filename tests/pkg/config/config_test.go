@@ -1,9 +1,11 @@
-package config
+package config_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"voila-go/pkg/config"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -13,7 +15,7 @@ func TestLoadConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := LoadConfig(path)
+	cfg, err := config.LoadConfig(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,15 +27,16 @@ func TestLoadConfig(t *testing.T) {
 func TestGetEnv(t *testing.T) {
 	os.Setenv("TEST_KEY", "val1")
 	defer os.Unsetenv("TEST_KEY")
-	if got := GetEnv("TEST_KEY", "def"); got != "val1" {
+	if got := config.GetEnv("TEST_KEY", "def"); got != "val1" {
 		t.Errorf("GetEnv(TEST_KEY) = %q want val1", got)
 	}
-	if got := GetEnv("MISSING_KEY", "def"); got != "def" {
+	if got := config.GetEnv("MISSING_KEY", "def"); got != "def" {
 		t.Errorf("GetEnv(MISSING_KEY) = %q want def", got)
 	}
 }
+
 func TestGetAPIKey(t *testing.T) {
-	cfg := &Config{
+	cfg := &config.Config{
 		APIKeys: map[string]string{
 			"openai": "config-key",
 		},
@@ -56,3 +59,4 @@ func TestGetAPIKey(t *testing.T) {
 		t.Errorf("GetAPIKey(missing) = %q, want empty string", got)
 	}
 }
+

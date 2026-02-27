@@ -1,11 +1,13 @@
-package frames
+package frames_test
 
 import (
 	"testing"
+
+	"voila-go/pkg/frames"
 )
 
 func TestNewStartFrame(t *testing.T) {
-	f := NewStartFrame()
+	f := frames.NewStartFrame()
 	if f.FrameType() != "StartFrame" {
 		t.Errorf("FrameType = %q", f.FrameType())
 	}
@@ -18,7 +20,7 @@ func TestNewStartFrame(t *testing.T) {
 }
 
 func TestNewTextFrame(t *testing.T) {
-	f := NewTextFrame("hello")
+	f := frames.NewTextFrame("hello")
 	if f.FrameType() != "TextFrame" {
 		t.Errorf("FrameType = %q", f.FrameType())
 	}
@@ -28,8 +30,9 @@ func TestNewTextFrame(t *testing.T) {
 }
 
 func TestNewCancelFrame(t *testing.T) {
-	f := NewCancelFrame("done")
+	f := frames.NewCancelFrame("done")
 	if f.FrameType() != "CancelFrame" || f.Reason != "done" {
 		t.Errorf("unexpected: %+v", f)
 	}
 }
+

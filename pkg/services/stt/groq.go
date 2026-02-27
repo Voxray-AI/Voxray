@@ -8,6 +8,7 @@ import (
 
 	"voila-go/pkg/config"
 	"voila-go/pkg/frames"
+	"voila-go/pkg/logger"
 	"voila-go/pkg/services/groq"
 
 	openai "github.com/sashabaranov/go-openai"
@@ -67,6 +68,22 @@ func (s *GroqService) Transcribe(ctx context.Context, audio []byte, sampleRate, 
 	resp, err := s.client.CreateTranscription(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+	// Log STT response to verify correct/expected format (Groq Whisper: text + optional language).
+	textLen := len(resp.Text)
+	language := resp.Language
+	if language == "" {
+		language = "(not set)"
+	}
+	logger.Info("STT response: model=%s audioBytes=%d textLen=%d language=%s\n", s.model, len(audio), textLen, language)
+	if textLen == 0 {
+		logger.Info("STT response has empty text (check audio length >= 0.01s, format wav/flac/mp3, or prompt)\n")
+	} else {
+		preview := resp.Text
+		if len(preview) > 120 {
+			preview = preview[:120] + "..."
+		}
+		logger.Info("STT text preview: %q\n", preview)
 	}
 	tf := frames.NewTranscriptionFrame(resp.Text, "user", "", true)
 	if resp.Language != "" {

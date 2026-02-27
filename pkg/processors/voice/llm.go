@@ -12,19 +12,26 @@ import (
 // LLMProcessor runs the LLM on transcription/context and streams LLMTextFrame downstream.
 type LLMProcessor struct {
 	*processors.BaseProcessor
-	LLM   services.LLMService
-	mu    sync.Mutex
-	msgs  []map[string]any
+	LLM          services.LLMService
+	SystemPrompt string // optional; when set, sent as system message so the LLM replies as assistant
+	mu           sync.Mutex
+	msgs         []map[string]any
 }
 
 // NewLLMProcessor returns a processor that runs the LLM and streams text downstream.
 func NewLLMProcessor(name string, llm services.LLMService) *LLMProcessor {
+	return NewLLMProcessorWithSystemPrompt(name, llm, "")
+}
+
+// NewLLMProcessorWithSystemPrompt returns a processor that runs the LLM with an optional system prompt (e.g. "You are a helpful voice assistant. Reply briefly.").
+func NewLLMProcessorWithSystemPrompt(name string, llm services.LLMService, systemPrompt string) *LLMProcessor {
 	if name == "" {
 		name = "LLM"
 	}
 	return &LLMProcessor{
 		BaseProcessor: processors.NewBaseProcessor(name),
 		LLM:           llm,
+		SystemPrompt:  systemPrompt,
 		msgs:          make([]map[string]any, 0),
 	}
 }
@@ -58,8 +65,14 @@ func (p *LLMProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pro
 }
 
 func (p *LLMProcessor) runLLM(ctx context.Context, messages []map[string]any) error {
+	msgsToSend := make([]map[string]any, 0, len(messages)+1)
+	if p.SystemPrompt != "" {
+		msgsToSend = append(msgsToSend, map[string]any{"role": "system", "content": p.SystemPrompt})
+	}
+	msgsToSend = append(msgsToSend, messages...)
+
 	var fullContent string
-	err := p.LLM.Chat(ctx, messages, func(tf *frames.LLMTextFrame) {
+	err := p.LLM.Chat(ctx, msgsToSend, func(tf *frames.LLMTextFrame) {
 		fullContent += tf.Text
 		_ = p.PushDownstream(ctx, tf)
 	})

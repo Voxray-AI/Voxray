@@ -1,4 +1,4 @@
-package logger
+package logger_test
 
 import (
 	"context"
@@ -6,10 +6,11 @@ import (
 
 	"voila-go/pkg/frames"
 	"voila-go/pkg/processors"
+	"voila-go/pkg/processors/logger"
 )
 
 func TestLogger_ProcessFrame(t *testing.T) {
-	p := New("log")
+	p := logger.New("log")
 	ctx := context.Background()
 	f := frames.NewTextFrame("test")
 	if err := p.ProcessFrame(ctx, f, processors.Downstream); err != nil {
@@ -18,8 +19,9 @@ func TestLogger_ProcessFrame(t *testing.T) {
 }
 
 func TestLogger_NewDefaultName(t *testing.T) {
-	p := New("")
+	p := logger.New("")
 	if p.Name() != "Logger" {
 		t.Errorf("default name: got %q", p.Name())
 	}
 }
+

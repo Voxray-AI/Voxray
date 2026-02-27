@@ -1,4 +1,4 @@
-package pipeline
+package pipeline_test
 
 import (
 	"context"
@@ -6,15 +6,16 @@ import (
 	"time"
 
 	"voila-go/pkg/frames"
+	"voila-go/pkg/pipeline"
 	"voila-go/pkg/processors/echo"
 )
 
 // TestEchoPipelineIntegration connects echo processor to a sink channel, pushes a frame, and asserts the same frame is received.
 func TestEchoPipelineIntegration(t *testing.T) {
 	outCh := make(chan frames.Frame, 4)
-	pl := New()
+	pl := pipeline.New()
 	pl.Add(echo.New("echo"))
-	pl.Add(NewSink("sink", outCh))
+	pl.Add(pipeline.NewSink("sink", outCh))
 
 	ctx := context.Background()
 	if err := pl.Setup(ctx); err != nil {
@@ -48,3 +49,4 @@ func TestEchoPipelineIntegration(t *testing.T) {
 	}
 	t.Fatal("timeout waiting for echoed TextFrame")
 }
+
