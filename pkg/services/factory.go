@@ -8,12 +8,13 @@ import (
 	"context"
 
 	"voila-go/pkg/config"
+	"voila-go/pkg/services/anthropic"
 	"voila-go/pkg/services/aws"
 	"voila-go/pkg/services/cerebras"
+	"voila-go/pkg/services/deepseek"
 	"voila-go/pkg/services/elevenlabs"
 	"voila-go/pkg/services/grok"
 	"voila-go/pkg/services/groq"
-	"voila-go/pkg/services/deepseek"
 	"voila-go/pkg/services/mistral"
 	"voila-go/pkg/services/openai"
 	"voila-go/pkg/services/sarvam"
@@ -31,10 +32,20 @@ const (
 	ProviderAWS        = "aws"
 	ProviderMistral    = "mistral"
 	ProviderDeepSeek   = "deepseek"
+	ProviderAnthropic  = "anthropic"
 )
 
 // SupportedLLMProviders lists provider keys that can be passed to NewLLMFromConfig.
-var SupportedLLMProviders = []string{ProviderOpenAI, ProviderGroq, ProviderGrok, ProviderCerebras, ProviderAWS, ProviderMistral, ProviderDeepSeek}
+var SupportedLLMProviders = []string{
+	ProviderOpenAI,
+	ProviderGroq,
+	ProviderGrok,
+	ProviderCerebras,
+	ProviderAWS,
+	ProviderMistral,
+	ProviderDeepSeek,
+	ProviderAnthropic,
+}
 
 // SupportedSTTProviders lists provider keys that can be passed to NewSTTFromConfig.
 var SupportedSTTProviders = []string{ProviderOpenAI, ProviderGroq, ProviderSarvam, ProviderElevenLabs, ProviderAWS}
@@ -48,6 +59,8 @@ var SupportedRealtimeProviders = []string{ProviderOpenAI}
 // apiKeyForProvider returns the API key for the given provider (e.g. openai -> OPENAI_API_KEY, groq -> GROQ_API_KEY).
 func apiKeyForProvider(cfg *config.Config, provider string) string {
 	switch provider {
+	case ProviderAnthropic:
+		return cfg.GetAPIKey("anthropic", "ANTHROPIC_API_KEY")
 	case ProviderGroq:
 		return cfg.GetAPIKey("groq", "GROQ_API_KEY")
 	case ProviderSarvam:
@@ -84,6 +97,8 @@ func getAWSRegion(cfg *config.Config) string {
 func NewLLMFromConfig(cfg *config.Config, provider, model string) LLMService {
 	apiKey := apiKeyForProvider(cfg, provider)
 	switch provider {
+	case ProviderAnthropic:
+		return anthropic.NewLLMService(apiKey, model)
 	case ProviderGroq:
 		return groq.NewLLMService(apiKey, model)
 	case ProviderGrok:

@@ -9,21 +9,96 @@ This package provides LLM, STT, TTS, and realtime service abstractions aligned w
 - **TTSService** — text-to-speech (`Speak(ctx, text, sampleRate)`). Optional **TTSStreamingService** adds `SpeakStream`.
 - **RealtimeService** — creates **RealtimeSession** (SendText, SendAudio, Events, Close). Use `realtime.NewFromConfig(cfg, provider)` to construct (lives in `pkg/realtime` to avoid import cycles).
 
-## Supported providers
+## Supported providers (Go implementation)
 
-| Provider   | LLM | STT | TTS | Realtime |
-|-----------|-----|-----|-----|----------|
-| openai    | ✓   | ✓   | ✓   | ✓        |
-| groq      | ✓   | ✓   | ✓   | —        |
-| sarvam    | —   | ✓   | ✓   | —        |
-| grok      | ✓   | —   | —   | —        |
-| cerebras  | ✓   | —   | —   | —        |
-| elevenlabs| —   | ✓   | ✓   | —        |
-| aws       | ✓   | ✓   | ✓   | —        |
-| mistral   | ✓   | —   | —   | —        |
-| deepseek  | ✓   | —   | —   | —        |
+These are the providers currently implemented in this Go port.
+
+| Provider    | LLM | STT | TTS | Realtime |
+|------------|-----|-----|-----|----------|
+| openai     | ✓   | ✓   | ✓   | ✓        |
+| groq       | ✓   | ✓   | ✓   | —        |
+| sarvam     | —   | ✓   | ✓   | —        |
+| grok       | ✓   | —   | —   | —        |
+| cerebras   | ✓   | —   | —   | —        |
+| elevenlabs | —   | ✓   | ✓   | —        |
+| aws        | ✓   | ✓   | ✓   | —        |
+| mistral    | ✓   | —   | —   | —        |
+| deepseek   | ✓   | —   | —   | —        |
 
 Constants: `ProviderOpenAI`, `ProviderGroq`, `ProviderSarvam`, `ProviderGrok`, `ProviderCerebras`, `ProviderElevenLabs`, `ProviderAWS`, `ProviderMistral`, `ProviderDeepSeek`. Realtime: `SupportedRealtimeProviders` (currently `"openai"`).
+
+## Upstream Pipecat providers and Go coverage
+
+The Python Pipecat project exposes many more providers under
+[`src/pipecat/services`](https://github.com/pipecat-ai/pipecat/tree/main/src/pipecat/services).
+The table below inventories those providers by capability and indicates whether they
+currently have a Go implementation in this repository.
+
+Legend:
+
+- **✓** — capability provided by the upstream Python services.
+- **—** — capability not provided (or not primary) for that provider.
+- **Go** — whether this capability is implemented in the Go services layer.
+
+| Provider             | Upstream LLM | Upstream STT | Upstream TTS | Upstream Realtime | Go LLM | Go STT | Go TTS | Go Realtime |
+|----------------------|--------------|--------------|--------------|-------------------|--------|--------|--------|-------------|
+| anthropic            | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| assemblyai           | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| asyncai              | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| aws                  | ✓            | ✓            | ✓            | —                 | ✓      | ✓      | ✓      | —           |
+| aws_nova_sonic       | ✓            | —            | ✓            | —                 | —      | —      | —      | —           |
+| azure                | ✓            | ✓            | ✓            | —                 | —      | —      | —      | —           |
+| camb                 | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| cartesia             | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+| cerebras             | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
+| deepgram             | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| deepseek             | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
+| elevenlabs           | —            | ✓            | ✓            | —                 | —      | ✓      | ✓      | —           |
+| fal                  | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| fireworks            | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| fish                 | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| gemini_multimodal_live | ✓          | ✓            | ✓            | ✓                 | —      | —      | —      | —           |
+| gladia               | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| google               | ✓            | ✓            | ✓            | ✓                 | —      | —      | —      | —           |
+| gradium              | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| grok                 | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
+| groq                 | ✓            | ✓            | ✓            | —                 | ✓      | ✓      | ✓      | —           |
+| hathora              | —            | —            | —            | ✓                 | —      | —      | —      | —           |
+| heygen               | —            | —            | ✓            | ✓                 | —      | —      | —      | —           |
+| hume                 | —            | —            | ✓            | ✓                 | —      | —      | —      | —           |
+| inworld              | ✓            | —            | ✓            | ✓                 | —      | —      | —      | —           |
+| kokoro               | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+| lmnt                 | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+| mem0                 | —            | —            | —            | —                 | —      | —      | —      | —           |
+| minimax              | ✓            | —            | ✓            | —                 | —      | —      | —      | —           |
+| mistral              | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
+| moondream            | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| neuphonic            | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+| nim                  | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| nvidia               | ✓            | ✓            | ✓            | —                 | —      | —      | —      | —           |
+| ollama               | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| openai               | ✓            | ✓            | ✓            | ✓                 | ✓      | ✓      | ✓      | ✓           |
+| openai_realtime      | ✓            | ✓            | ✓            | ✓                 | —      | —      | —      | —           |
+| openai_realtime_beta | ✓            | ✓            | ✓            | ✓                 | —      | —      | —      | —           |
+| openpipe             | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| openrouter           | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| perplexity           | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| piper                | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+| qwen                 | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| resembleai           | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+| rime                 | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| riva                 | —            | ✓            | ✓            | —                 | —      | —      | —      | —           |
+| sambanova            | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| sarvam               | —            | ✓            | ✓            | —                 | —      | ✓      | ✓      | —           |
+| simli                | —            | —            | ✓            | ✓                 | —      | —      | —      | —           |
+| soniox               | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| speechmatics         | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| tavus                | —            | —            | ✓            | ✓                 | —      | —      | —      | —           |
+| together             | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| ultravox             | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+| whisper              | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| xtts                 | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+
 
 ## Configuration
 
