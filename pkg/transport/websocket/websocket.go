@@ -138,6 +138,9 @@ type Server struct {
 	Port int
 	// OnConn is called for each new connection; it receives the transport which should be linked to a pipeline.
 	OnConn func(ctx context.Context, tr *ConnTransport)
+	// RegisterHandlers, if non-nil, is called with the HTTP mux before the server
+	// starts to allow registration of additional HTTP handlers (e.g. WebRTC signaling).
+	RegisterHandlers func(mux *http.ServeMux)
 }
 
 // ListenAndServe starts the HTTP server and blocks.
@@ -154,6 +157,9 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			go s.OnConn(ctx, tr)
 		}
 	})
+	if s.RegisterHandlers != nil {
+		s.RegisterHandlers(mux)
+	}
 
 	port := s.Port
 	if port == 0 {

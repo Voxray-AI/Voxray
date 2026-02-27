@@ -8,7 +8,8 @@ This example runs a **voice agent** pipeline: STT → LLM → TTS → transport.
 
 ## Config
 
-Use a config that sets `provider` and `model` so the server builds the voice pipeline:
+Use a config that sets `provider` and `model` so the server builds the voice pipeline. By default,
+the network transport is a WebSocket server on `/ws`:
 
 ```json
 {
@@ -16,7 +17,8 @@ Use a config that sets `provider` and `model` so the server builds the voice pip
   "port": 8080,
   "model": "gpt-3.5-turbo",
   "provider": "openai",
-  "plugins": []
+  "plugins": [],
+  "transport": "websocket"
 }
 ```
 
@@ -31,11 +33,32 @@ For Groq (faster, cheaper), with optional task-specific models:
   "stt_model": "whisper-large-v3-turbo",
   "tts_model": "canopylabs/orpheus-v1-english",
   "tts_voice": "alloy",
-  "plugins": []
+  "plugins": [],
+  "transport": "websocket"
 }
 ```
 
 You can mix providers per task (e.g. OpenAI for STT, Groq for LLM and TTS) by setting `stt_provider`, `llm_provider`, and `tts_provider`; put the corresponding keys in `api_keys` (e.g. `openai`, `groq`).
+
+To enable SmallWebRTC signaling (mirroring Pipecat’s `small_webrtc` network transport), set:
+
+```json
+{
+  "transport": "both",
+  "webrtc_ice_servers": ["stun:stun.l.google.com:19302"]
+}
+```
+
+This will keep the WebSocket endpoint at `/ws` and also expose a WebRTC offer/answer endpoint at
+`/webrtc/offer` that accepts a JSON body like:
+
+```json
+{
+  "offer": "{ \"type\": \"offer\", \"sdp\": \"...\" }"
+}
+```
+
+The response contains an `answer` field with the JSON SDP to use as the remote description on the client.
 
 ## Run
 

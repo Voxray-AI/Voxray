@@ -7,14 +7,6 @@ import (
 	"os"
 )
 
-// Config holds the server configuration, typically loaded from a JSON file or environment.
-// It aligns with the Pipecat Python settings concept (see pipecat/services/settings.py): provider
-// and model per task, with optional stt_model, tts_model, tts_voice. API keys are resolved via
-// APIKeys map or environment (e.g. OPENAI_API_KEY, GROQ_API_KEY). Use GetAPIKey(service, envVar)
-// for provider-specific lookup; the services factory uses this for construction.
-//
-// Provider is the default for all tasks (STT, LLM, TTS); stt_provider, llm_provider, tts_provider override when set.
-// Model is the chat/LLM model; stt_model, tts_model, tts_voice are task-specific and optional.
 type Config struct {
 	Host        string            `json:"host"`
 	Port        int               `json:"port"`
@@ -29,6 +21,16 @@ type Config struct {
 	Plugins     []string          `json:"plugins"`
 	APIKeys     map[string]string `json:"api_keys,omitempty"`
 
+	// Transport selects which network transports are enabled for the server.
+	// Supported values:
+	//   - "" or "websocket": only WebSocket (/ws).
+	//   - "smallwebrtc": only SmallWebRTC signaling (/webrtc/offer).
+	//   - "both": enable both WebSocket and SmallWebRTC on the same HTTP server.
+	Transport string `json:"transport,omitempty"`
+	// WebRTCICEServers lists ICE server URLs (e.g. STUN/TURN) for the SmallWebRTC transport.
+	// When empty, a sensible default STUN server is used.
+	WebRTCICEServers []string `json:"webrtc_ice_servers,omitempty"`
+
 	// Turn detection (pipecat audio/turn): when to consider user finished speaking
 	TurnDetection       string  `json:"turn_detection,omitempty"`        // "none" | "silence"; default "none"
 	TurnStopSecs        float64 `json:"turn_stop_secs,omitempty"`        // silence after speech to end turn (default 3)
@@ -37,6 +39,14 @@ type Config struct {
 	VADStartSecs        float64 `json:"vad_start_secs,omitempty"`        // VAD start trigger time for turn (default 0)
 	VadThreshold        float64 `json:"vad_threshold,omitempty"`         // EnergyDetector RMS threshold (default 0.02)
 	TurnAsync           bool    `json:"turn_async,omitempty"`            // use async AnalyzeEndOfTurn instead of sync AppendAudio
+
+	// VAD analyzer configuration (pipecat audio/vad). When unset, defaults
+	// match the Python VADParams defaults.
+	VADType       string  `json:"vad_type,omitempty"`       // "energy" (default), "silero", "aic" (future)
+	VADConfidence float64 `json:"vad_confidence,omitempty"` // default 0.7
+	VADStartSecsVAD  float64 `json:"vad_start_secs_vad,omitempty"` // default 0.2
+	VADStopSecs      float64 `json:"vad_stop_secs,omitempty"`      // default 0.2
+	VADMinVolume  float64 `json:"vad_min_volume,omitempty"` // default 0.6
 }
 
 // GetAPIKey returns the API key for the given service, checking the config first,
@@ -77,6 +87,33 @@ func (c *Config) TTSProvider() string {
 // TurnEnabled returns true when turn detection is set to "silence".
 func (c *Config) TurnEnabled() bool {
 	return c.TurnDetection == "silence"
+}
+
+// VADBackendOrDefault returns the configured VAD backend, defaulting to "energy".
+func (c *Config) VADBackendOrDefault() string {
+	if c.VADType == "" {
+		return "energy"
+	}
+	return c.VADType
+}
+
+// VADParams returns a simple struct with the configured VAD parameters.
+// Zero-values are allowed; the consumer (audio/vad) applies its own defaults.
+func (c *Config) VADParams() (p struct {
+	Confidence float64
+	StartSecs  float64
+	StopSecs   float64
+	MinVolume  float64
+}) {
+	p.Confidence = c.VADConfidence
+	if c.VADStartSecsVAD != 0 {
+		p.StartSecs = c.VADStartSecsVAD
+	}
+	if c.VADStopSecs != 0 {
+		p.StopSecs = c.VADStopSecs
+	}
+	p.MinVolume = c.VADMinVolume
+	return p
 }
 
 // LoadConfig reads a JSON configuration file from the specified path and returns a Config struct.

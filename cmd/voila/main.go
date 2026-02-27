@@ -19,8 +19,9 @@ import (
 	"voila-go/pkg/processors/echo"
 	proclog "voila-go/pkg/processors/logger"
 	"voila-go/pkg/processors/voice"
+	"voila-go/pkg/server"
 	"voila-go/pkg/services"
-	"voila-go/pkg/transport/websocket"
+	"voila-go/pkg/transport"
 )
 
 func main() {
@@ -80,61 +81,79 @@ func run(configPath string) error {
 		port = 8080
 	}
 
-	// Prefer voice pipeline if config has provider/model (LLM/STT/TTS); otherwise echo pipeline from plugins
+	// Prefer voice pipeline if config has provider/model (LLM/STT/TTS); otherwise echo pipeline from plugins.
 	useVoice := cfg.Provider != "" && cfg.Model != ""
 
-	wsServer := &websocket.Server{
-		Host: cfg.Host,
-		Port: port,
-		OnConn: func(ctx context.Context, tr *websocket.ConnTransport) {
-			var pl *pipeline.Pipeline
-			if useVoice {
-				llm, sttSvc, ttsSvc := services.NewServicesFromConfig(cfg)
-				pl = pipeline.New()
-				if cfg.TurnEnabled() {
-					vadDetector := vad.NewEnergyDetector()
+	buildPipeline := func(tr pipeline.Transport) *pipeline.Pipeline {
+		var pl *pipeline.Pipeline
+		if useVoice {
+			llm, sttSvc, ttsSvc := services.NewServicesFromConfig(cfg)
+			pl = pipeline.New()
+			if cfg.TurnEnabled() {
+				// Construct VAD based on config.
+				var vadDetector vad.Detector
+				switch cfg.VADBackendOrDefault() {
+				case "silero":
+					if a, err := vad.NewSileroAnalyzer(vad.Params{
+						Confidence: cfg.VADParams().Confidence,
+						StartSecs:  cfg.VADParams().StartSecs,
+						StopSecs:   cfg.VADParams().StopSecs,
+						MinVolume:  cfg.VADParams().MinVolume,
+					}, 16000); err == nil {
+						vadDetector = &vad.AnalyzerDetector{Analyzer: a}
+					} else {
+						logger.Info("silero VAD unavailable (%v), falling back to energy VAD", err)
+					}
+				}
+				if vadDetector == nil {
+					ed := vad.NewEnergyDetector()
 					if cfg.VadThreshold > 0 {
-						vadDetector.Threshold = cfg.VadThreshold
+						ed.Threshold = cfg.VadThreshold
 					}
-					turnParams := turn.Params{
-						StopSecs:        cfg.TurnStopSecs,
-						PreSpeechMs:     cfg.TurnPreSpeechMs,
-						MaxDurationSecs: cfg.TurnMaxDurationSecs,
-					}
-					if turnParams.StopSecs <= 0 {
-						turnParams.StopSecs = turn.DefaultStopSecs
-					}
-					if turnParams.PreSpeechMs <= 0 {
-						turnParams.PreSpeechMs = turn.DefaultPreSpeechMs
-					}
-					if turnParams.MaxDurationSecs <= 0 {
-						turnParams.MaxDurationSecs = turn.DefaultMaxDurationSecs
-					}
-					analyzer := turn.NewSilenceTurnAnalyzer(turnParams)
-					if cfg.VADStartSecs != 0 {
-						analyzer.UpdateVADStartSecs(cfg.VADStartSecs)
-					}
-					pl.Add(voice.NewTurnProcessor("turn", vadDetector, analyzer, 16000, 1, cfg.TurnAsync))
+					vadDetector = ed
 				}
-				pl.Add(voice.NewSTTProcessor("stt", sttSvc, 16000, 1))
-				pl.Add(voice.NewLLMProcessor("llm", llm))
-				pl.Add(voice.NewTTSProcessor("tts", ttsSvc, 24000))
-				pl.Add(pipeline.NewSink("sink", tr.Output()))
-			} else {
-				pl = pipeline.New()
-				if err := pl.AddFromConfig(cfg); err != nil {
-					// Fallback to echo if plugin names unknown
-					pl.Add(echo.New("echo"))
+				turnParams := turn.Params{
+					StopSecs:        cfg.TurnStopSecs,
+					PreSpeechMs:     cfg.TurnPreSpeechMs,
+					MaxDurationSecs: cfg.TurnMaxDurationSecs,
 				}
-				pl.Add(pipeline.NewSink("sink", tr.Output()))
+				if turnParams.StopSecs <= 0 {
+					turnParams.StopSecs = turn.DefaultStopSecs
+				}
+				if turnParams.PreSpeechMs <= 0 {
+					turnParams.PreSpeechMs = turn.DefaultPreSpeechMs
+				}
+				if turnParams.MaxDurationSecs <= 0 {
+					turnParams.MaxDurationSecs = turn.DefaultMaxDurationSecs
+				}
+				analyzer := turn.NewSilenceTurnAnalyzer(turnParams)
+				if cfg.VADStartSecs != 0 {
+					analyzer.UpdateVADStartSecs(cfg.VADStartSecs)
+				}
+				pl.Add(voice.NewTurnProcessor("turn", vadDetector, analyzer, 16000, 1, cfg.TurnAsync))
 			}
-			runner := pipeline.NewRunner(pl, tr)
-			go func() {
-				_ = runner.Run(ctx)
-			}()
-		},
+			pl.Add(voice.NewSTTProcessor("stt", sttSvc, 16000, 1))
+			pl.Add(voice.NewLLMProcessor("llm", llm))
+			pl.Add(voice.NewTTSProcessor("tts", ttsSvc, 24000))
+			pl.Add(pipeline.NewSink("sink", tr.Output()))
+		} else {
+			pl = pipeline.New()
+			if err := pl.AddFromConfig(cfg); err != nil {
+				// Fallback to echo if plugin names unknown
+				pl.Add(echo.New("echo"))
+			}
+			pl.Add(pipeline.NewSink("sink", tr.Output()))
+		}
+		return pl
 	}
 
-	logger.Info("starting WebSocket server on %s:%d", cfg.Host, port)
-	return wsServer.ListenAndServe(ctx)
+	onTransport := func(ctx context.Context, tr transport.Transport) {
+		pl := buildPipeline(tr)
+		runner := pipeline.NewRunner(pl, tr)
+		go func() {
+			_ = runner.Run(ctx)
+		}()
+	}
+
+	return server.StartServers(ctx, cfg, onTransport)
 }

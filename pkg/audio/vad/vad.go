@@ -12,38 +12,91 @@ type Detector interface {
 	IsSpeech(f audio.Frame) (bool, error)
 }
 
-// EnergyDetector is a very simple VAD that classifies speech based on RMS energy.
-// It is intended as a baseline implementation and can be replaced with a more
-// sophisticated detector later (e.g. ML-based VAD).
-type EnergyDetector struct {
-	// Threshold is the minimum RMS energy (0..1, relative to int16 max) to be
-	// considered speech.
+// EnergyAnalyzerBackend is a simple confidence backend based on RMS energy.
+type EnergyAnalyzerBackend struct {
 	Threshold float64
+}
+
+// numFramesRequired returns a 10ms window at the given sample rate.
+func (b *EnergyAnalyzerBackend) numFramesRequired(sampleRate int) int {
+	if sampleRate <= 0 {
+		return 160
+	}
+	return sampleRate / 100
+}
+
+// voiceConfidence returns an energy-based confidence in [0,1].
+func (b *EnergyAnalyzerBackend) voiceConfidence(buf []byte, _ int) (float64, error) {
+	if len(buf) < 2 {
+		return 0, nil
+	}
+	var sumSquares float64
+	samples := 0
+	for i := 0; i+1 < len(buf); i += 2 {
+		sample := int16(uint16(buf[i]) | uint16(buf[i+1])<<8)
+		fs := float64(sample) / 32768.0
+		sumSquares += fs * fs
+		samples++
+	}
+	if samples == 0 {
+		return 0, nil
+	}
+	rms := math.Sqrt(sumSquares / float64(samples))
+	// Map RMS threshold to confidence: below threshold -> 0, above -> clamp to 1.
+	if b.Threshold <= 0 {
+		return rms, nil
+	}
+	conf := rms / b.Threshold
+	if conf > 1 {
+		conf = 1
+	}
+	if conf < 0 {
+		conf = 0
+	}
+	return conf, nil
+}
+
+// NewEnergyAnalyzer returns an Analyzer that uses EnergyAnalyzerBackend.
+func NewEnergyAnalyzer(p Params) Analyzer {
+	p = p.normalize()
+	backend := &EnergyAnalyzerBackend{
+		Threshold: 0.02,
+	}
+	a := newBaseAnalyzer(backend)
+	a.params = p
+	return a
+}
+
+// EnergyDetector is preserved for compatibility; it wraps an AnalyzerDetector
+// using an internal EnergyAnalyzer.
+type EnergyDetector struct {
+	Threshold float64
+	detector  *AnalyzerDetector
 }
 
 // NewEnergyDetector creates an EnergyDetector with a reasonable default threshold.
 func NewEnergyDetector() *EnergyDetector {
-	return &EnergyDetector{Threshold: 0.02} // small but above typical background noise
+	return NewEnergyDetectorWithParams(Params{})
 }
 
-// IsSpeech returns true if the frame's RMS energy exceeds the configured threshold.
+// NewEnergyDetectorWithParams allows callers to override Params; zero-values pick defaults.
+func NewEnergyDetectorWithParams(p Params) *EnergyDetector {
+	a := NewEnergyAnalyzer(p)
+	// Use a default sample rate; callers that care can call SetSampleRate on
+	// the underlying Analyzer via type assertions if needed, but the usual
+	// usage path (TurnProcessor) only relies on IsSpeech().
+	a.SetSampleRate(audio.DefaultInSampleRate)
+	return &EnergyDetector{
+		Threshold: 0.02,
+		detector:  &AnalyzerDetector{Analyzer: a},
+	}
+}
+
+// IsSpeech delegates to the internal AnalyzerDetector.
 func (e *EnergyDetector) IsSpeech(f audio.Frame) (bool, error) {
-	if len(f.Data) < 2 {
+	if e == nil || e.detector == nil {
 		return false, nil
 	}
-	// Interpret bytes as little-endian int16 samples.
-	var sumSquares float64
-	sampleCount := 0
-	for i := 0; i+1 < len(f.Data); i += 2 {
-		sample := int16(uint16(f.Data[i]) | uint16(f.Data[i+1])<<8)
-		fs := float64(sample) / 32768.0
-		sumSquares += fs * fs
-		sampleCount++
-	}
-	if sampleCount == 0 {
-		return false, nil
-	}
-	rms := math.Sqrt(sumSquares / float64(sampleCount))
-	return rms >= e.Threshold, nil
+	return e.detector.IsSpeech(f)
 }
 
