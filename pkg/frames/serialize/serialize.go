@@ -92,6 +92,48 @@ func DecodeByType(typ string, data []byte) (frames.Frame, error) {
 			return nil, err
 		}
 		return &f, nil
+	case "LLMContextFrame":
+		var f frames.LLMContextFrame
+		f.DataFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "LLMMessagesUpdateFrame":
+		var f frames.LLMMessagesUpdateFrame
+		f.DataFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "LLMMessagesAppendFrame":
+		var f frames.LLMMessagesAppendFrame
+		f.DataFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "LLMSetToolsFrame":
+		var f frames.LLMSetToolsFrame
+		f.DataFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "LLMSetToolChoiceFrame":
+		var f frames.LLMSetToolChoiceFrame
+		f.DataFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "FunctionCallResultFrame":
+		var f frames.FunctionCallResultFrame
+		f.DataFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
 	default:
 		return nil, fmt.Errorf("unknown frame type: %s", typ)
 	}

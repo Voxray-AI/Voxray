@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -28,6 +30,11 @@ type ConnTransport struct {
 	outCh  chan frames.Frame
 	closed chan struct{}
 	once   sync.Once
+
+	// lastActivity holds the last time we saw activity on this connection
+	// (either a successfully read frame from the client or a successfully
+	// written frame to the client), stored as Unix nano time.
+	lastActivity atomic.Int64
 }
 
 // NewConnTransport creates a transport for an already-upgraded WebSocket connection.
@@ -38,12 +45,16 @@ func NewConnTransport(conn *websocket.Conn, inBuf, outBuf int) *ConnTransport {
 	if outBuf <= 0 {
 		outBuf = 64
 	}
-	return &ConnTransport{
+	t := &ConnTransport{
 		conn:   conn,
 		inCh:   make(chan frames.Frame, inBuf),
 		outCh:  make(chan frames.Frame, outBuf),
 		closed: make(chan struct{}),
 	}
+	// Initialize last activity to now so that newly created transports
+	// are considered active until we see the first message.
+	t.touch()
+	return t
 }
 
 // Input returns the channel of frames received from the client.
@@ -51,6 +62,24 @@ func (t *ConnTransport) Input() <-chan frames.Frame { return t.inCh }
 
 // Output returns the channel to send frames to the client.
 func (t *ConnTransport) Output() chan<- frames.Frame { return t.outCh }
+
+// Done returns a channel that is closed when the transport is closed.
+func (t *ConnTransport) Done() <-chan struct{} { return t.closed }
+
+// LastActivity returns the last recorded activity time for this connection.
+// If no activity has been recorded yet, it returns the zero time.
+func (t *ConnTransport) LastActivity() time.Time {
+	ns := t.lastActivity.Load()
+	if ns == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, ns)
+}
+
+// touch records the current time as the last activity time.
+func (t *ConnTransport) touch() {
+	t.lastActivity.Store(time.Now().UnixNano())
+}
 
 // Start starts the read and write loops. It returns once the connection is set up (no error).
 // The provided context is used to drive shutdown; when it is canceled, the transport is closed.
@@ -100,6 +129,9 @@ func (t *ConnTransport) readLoop() {
 			logger.Error("decode frame: %v", err)
 			continue
 		}
+		// We successfully received and decoded a frame from the client,
+		// so update last-activity time.
+		t.touch()
 		select {
 		case <-t.closed:
 			return
@@ -127,15 +159,25 @@ func (t *ConnTransport) writeLoop() {
 				logger.Error("websocket write: %v", err)
 				return
 			}
+			// Frame successfully written to the client; update last-activity time.
+			t.touch()
 		}
 	}
 }
+
+// DefaultSessionTimeout is the default inactivity timeout for a WebSocket
+// connection before it is closed by the server. A value of zero disables
+// inactivity-based session timeouts.
+const DefaultSessionTimeout = 5 * time.Minute
 
 // Server is a specialized HTTP server that upgrades incoming connections to WebSockets
 // and initializes a ConnTransport for each session.
 type Server struct {
 	Host string
 	Port int
+	// SessionTimeout controls how long a connection may remain idle before
+	// it is closed. If zero or negative, no inactivity timeout is enforced.
+	SessionTimeout time.Duration
 	// OnConn is called for each new connection; it receives the transport which should be linked to a pipeline.
 	OnConn func(ctx context.Context, tr *ConnTransport)
 	// RegisterHandlers, if non-nil, is called with the HTTP mux before the server
@@ -153,6 +195,11 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			return
 		}
 		tr := NewConnTransport(conn, 64, 64)
+		// Start monitoring this connection for inactivity if a session timeout
+		// has been configured.
+		if s.SessionTimeout > 0 {
+			go s.monitorSession(ctx, tr, s.SessionTimeout)
+		}
 		if s.OnConn != nil {
 			go s.OnConn(ctx, tr)
 		}
@@ -181,4 +228,36 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		return fmt.Errorf("websocket server listen: %w", err)
 	}
 	return nil
+}
+
+// monitorSession periodically checks the last-activity time of the given
+// connection transport and closes it if it has been idle for at least
+// timeout. It exits when the context is canceled or the transport is closed.
+func (s *Server) monitorSession(ctx context.Context, tr *ConnTransport, timeout time.Duration) {
+	// Poll at half the timeout interval to balance responsiveness and overhead.
+	interval := timeout / 2
+	if interval <= 0 {
+		interval = timeout
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tr.Done():
+			return
+		case <-ticker.C:
+			last := tr.LastActivity()
+			if last.IsZero() {
+				continue
+			}
+			if time.Since(last) >= timeout {
+				logger.Info("websocket session timeout after %s; closing connection", timeout)
+				_ = tr.Close()
+				return
+			}
+		}
+	}
 }

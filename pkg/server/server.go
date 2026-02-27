@@ -34,8 +34,9 @@ func StartServers(ctx context.Context, cfg *config.Config, onTransport func(ctx 
 	}
 
 	server := &ws.Server{
-		Host: cfg.Host,
-		Port: port,
+		Host:           cfg.Host,
+		Port:           port,
+		SessionTimeout: ws.DefaultSessionTimeout,
 		OnConn: func(c context.Context, tr *ws.ConnTransport) {
 			if onTransport != nil {
 				onTransport(c, tr)
