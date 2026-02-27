@@ -5,48 +5,144 @@ import (
 	"testing"
 	"time"
 
+	"voila-go/pkg/audio"
+	"voila-go/pkg/audio/vad"
 	"voila-go/pkg/frames"
 	"voila-go/pkg/pipeline"
-	"voila-go/pkg/processors/echo"
+	"voila-go/pkg/processors"
+	"voila-go/pkg/processors/voice"
+	"voila-go/pkg/audio/turn"
 )
 
-// TestEchoPipelineIntegration connects echo processor to a sink channel, pushes a frame, and asserts the same frame is received.
-func TestEchoPipelineIntegration(t *testing.T) {
-	outCh := make(chan frames.Frame, 4)
-	pl := pipeline.New()
-	pl.Add(echo.New("echo"))
-	pl.Add(pipeline.NewSink("sink", outCh))
+// sinkCollector is a simple sink processor used to collect frames at the end of
+// an integration pipeline.
+type sinkCollector struct {
+	*processors.BaseProcessor
+	collected []frames.Frame
+}
 
+func newSinkCollector() *sinkCollector {
+	return &sinkCollector{
+		BaseProcessor: processors.NewBaseProcessor("sink"),
+		collected:     make([]frames.Frame, 0),
+	}
+}
+
+func (s *sinkCollector) ProcessFrame(ctx context.Context, f frames.Frame, dir processors.Direction) error {
+	if dir == processors.Downstream {
+		s.collected = append(s.collected, f)
+	}
+	return s.BaseProcessor.ProcessFrame(ctx, f, dir)
+}
+
+// voiceTestAnalyzer is a minimal implementation of turn.Analyzer used only for
+// this integration test. It treats the first few appended chunks as ongoing
+// speech and reports completion once a fixed threshold has been reached.
+type voiceTestAnalyzer struct {
+	samples int
+}
+
+func (a *voiceTestAnalyzer) AppendAudio(buf []byte, _ bool) turn.EndOfTurnState {
+	const threshold = 4
+	if len(buf) == 0 {
+		return turn.Incomplete
+	}
+	a.samples++
+	if a.samples >= threshold {
+		return turn.Complete
+	}
+	return turn.Incomplete
+}
+
+func (*voiceTestAnalyzer) AnalyzeEndOfTurn(context.Context) (turn.EndOfTurnState, error) {
+	return turn.Complete, nil
+}
+
+func (*voiceTestAnalyzer) AnalyzeEndOfTurnAsync(context.Context) <-chan turn.EndOfTurnResult {
+	ch := make(chan turn.EndOfTurnResult, 1)
+	ch <- turn.EndOfTurnResult{State: turn.Complete}
+	return ch
+}
+
+func (a *voiceTestAnalyzer) SpeechTriggered() bool {
+	return a.samples > 0
+}
+
+func (*voiceTestAnalyzer) SetSampleRate(int) {}
+func (a *voiceTestAnalyzer) Clear()          { a.samples = 0 }
+func (*voiceTestAnalyzer) UpdateVADStartSecs(float64) {
+}
+
+// TestVoiceTurnIntegration builds a small pipeline using TurnProcessor that
+// receives audio frames, performs VAD + user turn analysis, and emits a single
+// concatenated AudioRawFrame when the turn completes, along with high-level
+// user turn control frames. This mirrors the style of upstream pipeline tests
+// that exercise multi-processor flows end-to-end.
+func TestVoiceTurnIntegration(t *testing.T) {
 	ctx := context.Background()
+
+	// Use the default energy-based VAD and a simple analyzer.
+	detector := vad.NewEnergyDetector()
+	analyzer := &voiceTestAnalyzer{}
+
+	turnProc := voice.NewTurnProcessor("turn", detector, analyzer, audio.DefaultInSampleRate, 1, false)
+	sink := newSinkCollector()
+
+	pl := pipeline.New()
+	pl.Link(turnProc, sink)
+
 	if err := pl.Setup(ctx); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Setup failed: %v", err)
 	}
 	defer pl.Cleanup(ctx)
+
 	if err := pl.Start(ctx, frames.NewStartFrame()); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Start failed: %v", err)
 	}
 
-	tf := frames.NewTextFrame("hello")
-	if err := pl.Push(ctx, tf); err != nil {
-		t.Fatal(err)
+	// Push several small audio chunks that should be treated as continuous speech.
+	chunk := make([]byte, 320)
+	for i := 0; i < len(chunk); i += 2 {
+		chunk[i] = 0xFF
+		chunk[i+1] = 0x7F
 	}
 
-	// Sink receives StartFrame first, then echoed TextFrame
-	var got frames.Frame
-	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); {
-		select {
-		case got = <-outCh:
-			if _, ok := got.(*frames.TextFrame); ok {
-				if out := got.(*frames.TextFrame); out.Text != "hello" {
-					t.Errorf("TextFrame.Text = %q", out.Text)
-				}
-				return
-			}
-			// else discard StartFrame or other
-		case <-time.After(100 * time.Millisecond):
-			continue
+	for i := 0; i < 3; i++ {
+		if err := pl.Push(ctx, frames.NewAudioRawFrame(chunk, audio.DefaultInSampleRate, 1, 0)); err != nil {
+			t.Fatalf("Push audio chunk %d failed: %v", i, err)
 		}
 	}
-	t.Fatal("timeout waiting for echoed TextFrame")
+
+	// Push a final chunk and then allow the analyzer to mark the turn complete.
+	if err := pl.Push(ctx, frames.NewAudioRawFrame(chunk, audio.DefaultInSampleRate, 1, 0)); err != nil {
+		t.Fatalf("Push final audio chunk failed: %v", err)
+	}
+
+	// Wait for the sink to receive the concatenated AudioRawFrame.
+	deadline := time.Now().Add(2 * time.Second)
+	var gotAudio *frames.AudioRawFrame
+	for time.Now().Before(deadline) {
+		for _, f := range sink.collected {
+			if af, ok := f.(*frames.AudioRawFrame); ok {
+				gotAudio = af
+			}
+		}
+		if gotAudio != nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if gotAudio == nil {
+		t.Fatal("expected concatenated AudioRawFrame at sink")
+	}
+	if gotAudio.SampleRate != audio.DefaultInSampleRate {
+		t.Fatalf("unexpected SampleRate: got %d", gotAudio.SampleRate)
+	}
+	// We pushed 4 chunks; each should have the same length.
+	expectedLen := len(chunk) * 4
+	if len(gotAudio.Audio) != expectedLen {
+		t.Fatalf("expected concatenated audio length %d, got %d", expectedLen, len(gotAudio.Audio))
+	}
 }
 

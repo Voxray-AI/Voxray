@@ -98,3 +98,79 @@ func TestWebsocketServer_StartAndEcho(t *testing.T) {
 	}
 }
 
+// TestWebsocketServer_ServerToClient verifies that frames sent via the
+// ConnTransport.Output channel are serialized and delivered to the WebSocket
+// client, mirroring the server-to-client direction covered in the upstream
+// Python tests for the websocket transport.
+func TestWebsocketServer_ServerToClient(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var tr *ws.ConnTransport
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/ws" {
+			http.NotFound(w, r)
+			return
+		}
+		conn, err := websocket.Upgrade(w, r, nil, 1024, 1024)
+		if err != nil {
+			t.Fatalf("upgrade: %v", err)
+		}
+		tr = ws.NewConnTransport(conn, 64, 64)
+		if err := tr.Start(ctx); err != nil {
+			t.Fatalf("start ConnTransport: %v", err)
+		}
+	}))
+	defer ts.Close()
+
+	conn, closeConn := newTestWebSocketClient(t, ts)
+	defer closeConn()
+
+	// Wait briefly for transport to be initialized.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && tr == nil {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if tr == nil {
+		t.Fatalf("expected ConnTransport to be initialized")
+	}
+
+	// Send a TextFrame from the server side and verify the client receives it.
+	tf := frames.NewTextFrame("from server")
+	data, err := serialize.Encoder(tf)
+	if err != nil {
+		t.Fatalf("encode TextFrame: %v", err)
+	}
+
+	tr.Output() <- tf
+
+	_, msg, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("client ReadMessage: %v", err)
+	}
+	if string(msg) != string(data) {
+		t.Fatalf("unexpected payload from server: got %q, want %q", string(msg), string(data))
+	}
+}
+
+// newTestWebSocketClient dials the given httptest.Server over WebSocket and
+// returns the live connection and a cancel func to close it. This is a small
+// helper used to express additional websocket transport scenarios succinctly.
+func newTestWebSocketClient(t *testing.T, ts *httptest.Server) (*websocket.Conn, func()) {
+	t.Helper()
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatalf("parse test server URL: %v", err)
+	}
+	u.Scheme = "ws"
+	u.Path = "/ws"
+
+	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		t.Fatalf("dial websocket server: %v", err)
+	}
+	cancel := func() { _ = conn.Close() }
+	return conn, cancel
+}
+

@@ -3,6 +3,7 @@ package voice
 import (
 	"context"
 	"testing"
+	"time"
 
 	"voila-go/pkg/audio"
 	"voila-go/pkg/audio/turn"
@@ -68,6 +69,16 @@ func (c *collectProcessor) SetPrev(processors.Processor)  {}
 func (c *collectProcessor) Setup(context.Context) error   { return nil }
 func (c *collectProcessor) Cleanup(context.Context) error { return nil }
 func (c *collectProcessor) Name() string                  { return "collector" }
+
+// findFrame searches the collected frames for the first instance of the given type.
+func (c *collectProcessor) findFrame(target func(frames.Frame) bool) frames.Frame {
+	for _, f := range c.received {
+		if target(f) {
+			return f
+		}
+	}
+	return nil
+}
 
 func TestTurnProcessorSyncModeEmitsOnComplete(t *testing.T) {
 	ctx := context.Background()
@@ -187,15 +198,81 @@ func TestTurnProcessorEmitsUserTurnFrames(t *testing.T) {
 		t.Fatalf("ProcessFrame returned error: %v", err)
 	}
 
-	foundStart := false
-	for _, f := range col.received {
-		switch f.(type) {
-		case *frames.UserStartedSpeakingFrame:
-			foundStart = true
-		}
-	}
-	if !foundStart {
+	if col.findFrame(func(f frames.Frame) bool {
+		_, ok := f.(*frames.UserStartedSpeakingFrame)
+		return ok
+	}) == nil {
 		t.Fatal("expected UserStartedSpeakingFrame downstream")
+	}
+}
+
+// TestTurnProcessorUserStopAndIdleTimeout mirrors the behavior verified by the
+// upstream Python user turn controller tests in a simplified form: when VAD
+// reports speech, a UserStartedSpeakingFrame is emitted; when speech stops and
+// the stop timeout elapses, a UserStoppedSpeakingFrame is emitted; if the bot
+// has finished speaking and the idle timeout elapses with no further user
+// speech, a UserIdleFrame is emitted.
+func TestTurnProcessorUserStopAndIdleTimeout(t *testing.T) {
+	ctx := context.Background()
+	an := &fakeAnalyzer{state: turn.Incomplete}
+	v := &fakeVAD{isSpeech: true}
+
+	// Use short timeouts so the test completes quickly.
+	const stopTimeout = 0.1
+	const idleTimeout = 0.1
+
+	p := NewTurnProcessorWithUserTurn("turn", v, an, 16000, 1, false, stopTimeout, idleTimeout)
+
+	col := &collectProcessor{}
+	p.SetNext(col)
+
+	// While user is speaking, only UserStartedSpeakingFrame should appear.
+	audioData := []byte{0x00, 0x00, 0x01, 0x00}
+	frame := frames.NewAudioRawFrame(audioData, 16000, 1, 0)
+	if err := p.ProcessFrame(ctx, frame, processors.Downstream); err != nil {
+		t.Fatalf("ProcessFrame(speaking) returned error: %v", err)
+	}
+	if col.findFrame(func(f frames.Frame) bool {
+		_, ok := f.(*frames.UserStartedSpeakingFrame)
+		return ok
+	}) == nil {
+		t.Fatal("expected UserStartedSpeakingFrame while speaking")
+	}
+	if col.findFrame(func(f frames.Frame) bool {
+		_, ok := f.(*frames.UserStoppedSpeakingFrame)
+		return ok
+	}) != nil {
+		t.Fatal("did not expect UserStoppedSpeakingFrame while still speaking")
+	}
+
+	// User stops speaking: flip VAD to false and wait for stop timeout.
+	v.isSpeech = false
+	if err := p.ProcessFrame(ctx, frame, processors.Downstream); err != nil {
+		t.Fatalf("ProcessFrame(quiet) returned error: %v", err)
+	}
+
+	time.Sleep(time.Duration(stopTimeout*float64(time.Second)) + 20*time.Millisecond)
+
+	if col.findFrame(func(f frames.Frame) bool {
+		_, ok := f.(*frames.UserStoppedSpeakingFrame)
+		return ok
+	}) == nil {
+		t.Fatal("expected UserStoppedSpeakingFrame after stop timeout")
+	}
+
+	// Simulate bot finishing speaking so idle timeout can trigger.
+	if p.userTurnController == nil {
+		t.Fatal("expected userTurnController to be initialized")
+	}
+	p.userTurnController.NotifyBotStoppedSpeaking(ctx)
+
+	time.Sleep(time.Duration(idleTimeout*float64(time.Second)) + 20*time.Millisecond)
+
+	if col.findFrame(func(f frames.Frame) bool {
+		_, ok := f.(*frames.UserIdleFrame)
+		return ok
+	}) == nil {
+		t.Fatal("expected UserIdleFrame after idle timeout")
 	}
 }
 
