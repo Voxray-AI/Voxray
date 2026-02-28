@@ -30,12 +30,12 @@ const docTemplate = `{
                 "summary": "Submit WebRTC offer",
                 "parameters": [
                     {
-                        "description": "JSON body with 'offer' (SDP offer string)",
+                        "description": "SDP offer string",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "object"
+                            "$ref": "#/definitions/pkg_server.webrtcOfferRequest"
                         }
                     }
                 ],
@@ -47,7 +47,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid offer or handling failed",
+                        "description": "Invalid offer payload",
                         "schema": {
                             "type": "string"
                         }
@@ -57,12 +57,40 @@ const docTemplate = `{
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    "500": {
+                        "description": "Failed to start transport",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable (e.g. Opus encoder unavailable)",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_server.webrtcErrorResponse"
+                        }
                     }
                 }
             }
         }
     },
     "definitions": {
+        "pkg_server.webrtcErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "pkg_server.webrtcOfferRequest": {
+            "type": "object",
+            "properties": {
+                "offer": {
+                    "type": "string"
+                }
+            }
+        },
         "pkg_server.webrtcOfferResponse": {
             "type": "object",
             "properties": {

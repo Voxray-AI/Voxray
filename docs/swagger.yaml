@@ -1,5 +1,15 @@
 basePath: /
 definitions:
+  pkg_server.webrtcErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  pkg_server.webrtcOfferRequest:
+    properties:
+      offer:
+        type: string
+    type: object
   pkg_server.webrtcOfferResponse:
     properties:
       answer:
@@ -19,12 +29,12 @@ paths:
       description: Accepts a WebRTC SDP offer and returns an SDP answer. Available
         when transport is smallwebrtc or both.
       parameters:
-      - description: JSON body with 'offer' (SDP offer string)
+      - description: SDP offer string
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/pkg_server.webrtcOfferRequest'
       produces:
       - application/json
       responses:
@@ -33,13 +43,21 @@ paths:
           schema:
             $ref: '#/definitions/pkg_server.webrtcOfferResponse'
         "400":
-          description: Invalid offer or handling failed
+          description: Invalid offer payload
           schema:
             type: string
         "405":
           description: Method not allowed
           schema:
             type: string
+        "500":
+          description: Failed to start transport
+          schema:
+            type: string
+        "503":
+          description: Service unavailable (e.g. Opus encoder unavailable)
+          schema:
+            $ref: '#/definitions/pkg_server.webrtcErrorResponse'
       summary: Submit WebRTC offer
       tags:
       - webrtc
