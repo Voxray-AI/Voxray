@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"voila-go/pkg/frames"
+	"voila-go/pkg/logger"
 	"voila-go/pkg/processors"
 )
 
@@ -52,7 +53,9 @@ func (p *Pipeline) Processors() []processors.Processor {
 
 // Setup calls Setup on all processors.
 func (p *Pipeline) Setup(ctx context.Context) error {
-	for _, proc := range p.Processors() {
+	list := p.Processors()
+	logger.Info("pipeline: setup with %d processors", len(list))
+	for _, proc := range list {
 		if err := proc.Setup(ctx); err != nil {
 			return err
 		}
@@ -63,6 +66,7 @@ func (p *Pipeline) Setup(ctx context.Context) error {
 // Cleanup calls Cleanup on all processors (reverse order).
 func (p *Pipeline) Cleanup(ctx context.Context) {
 	list := p.Processors()
+	logger.Info("pipeline: cleanup (%d processors)", len(list))
 	for i := len(list) - 1; i >= 0; i-- {
 		_ = list[i].Cleanup(ctx)
 	}
@@ -74,7 +78,20 @@ func (p *Pipeline) Push(ctx context.Context, f frames.Frame) error {
 	if len(list) == 0 {
 		return nil
 	}
+	// Log non-audio frames only to avoid flooding (audio frames are pushed at high rate).
+	if f != nil && !isHighVolumeFrame(f) {
+		logger.Info("pipeline: push frame type=%s id=%d", f.FrameType(), f.ID())
+	}
 	return list[0].ProcessFrame(ctx, f, processors.Downstream)
+}
+
+func isHighVolumeFrame(f frames.Frame) bool {
+	switch f.(type) {
+	case *frames.AudioRawFrame, *frames.TTSAudioRawFrame:
+		return true
+	default:
+		return false
+	}
 }
 
 // Start pushes a StartFrame and stores it for reference; call once before feeding frames.
@@ -85,6 +102,7 @@ func (p *Pipeline) Start(ctx context.Context, start *frames.StartFrame) error {
 	p.mu.Lock()
 	p.startFrame = start
 	p.mu.Unlock()
+	logger.Info("pipeline: start (StartFrame pushed)")
 	return p.Push(ctx, start)
 }
 

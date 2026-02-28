@@ -3,12 +3,14 @@ package voice
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"voila-go/pkg/audio"
 	"voila-go/pkg/audio/turn"
 	"voila-go/pkg/audio/vad"
 	"voila-go/pkg/frames"
+	"voila-go/pkg/logger"
 	"voila-go/pkg/processors"
 )
 
@@ -32,6 +34,9 @@ type TurnProcessor struct {
 	// userTurnController manages high-level user turn/idle events and emits
 	// UserStartedSpeakingFrame, UserStoppedSpeakingFrame, and UserIdleFrame.
 	userTurnController *turn.UserTurnController
+
+	firstAudioLog   sync.Once
+	audioChunkCount uint64
 }
 
 // NewTurnProcessor returns a processor that buffers audio and forwards one segment per turn.
@@ -118,6 +123,14 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 		return nil
 	}
 
+	p.firstAudioLog.Do(func() {
+		logger.Info("pipeline (turn): first audio chunk received from transport, %d bytes", len(chunk))
+	})
+	p.audioChunkCount++
+	if p.audioChunkCount%25 == 0 {
+		logger.Info("pipeline (turn): audio chunks received so far: %d (buffering until turn complete)", p.audioChunkCount)
+	}
+
 	af := audio.Frame{
 		Data:        chunk,
 		SampleRate:  p.SampleRate,
@@ -146,6 +159,7 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 			out := frames.NewAudioRawFrame(audioCopy, p.SampleRate, p.Channels, 0)
 			p.buffer = nil
 			p.Analyzer.Clear()
+			logger.Info("pipeline (turn): turn complete, pushing %d bytes to STT", len(audioCopy))
 			return p.PushDownstream(ctx, out)
 		}
 		return nil
@@ -159,6 +173,7 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 		p.buffer = nil
 		p.Analyzer.Clear()
 		p.pendingResult = nil
+		logger.Info("pipeline (turn): turn complete, pushing %d bytes to STT", len(audioCopy))
 		return p.PushDownstream(ctx, out)
 	}
 
@@ -173,6 +188,7 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 				p.buffer = nil
 				p.Analyzer.Clear()
 				p.pendingResult = nil
+				logger.Info("pipeline (turn): turn complete (async), pushing %d bytes to STT", len(audioCopy))
 				return p.PushDownstream(ctx, out)
 			}
 			// On non-complete state, error, or closed channel, drop pending and continue.

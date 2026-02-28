@@ -13,6 +13,7 @@ import (
 	"voila-go/pkg/audio"
 	"voila-go/pkg/config"
 	"voila-go/pkg/frames"
+	"voila-go/pkg/logger"
 )
 
 // DefaultSarvamTTSModel is the default Sarvam TTS model (bulbul v2).
@@ -78,6 +79,7 @@ func (s *SarvamTTSService) Speak(ctx context.Context, text string, sampleRate in
 	if sampleRate <= 0 {
 		sampleRate = defaultSampleRateForModel(s.model)
 	}
+	logger.Info("Sarvam TTS: request: text=%d chars, model=%s, voice=%s", len(text), s.model, s.voice)
 
 	payload := map[string]any{
 		"text":                 text,
@@ -147,6 +149,7 @@ func (s *SarvamTTSService) Speak(ctx context.Context, text string, sampleRate in
 	} else {
 		pcm = audioData
 	}
+	logger.Info("Sarvam TTS: response: received audio %d bytes", len(pcm))
 
 	f := frames.NewTTSAudioRawFrame(pcm, outRate)
 	return []*frames.TTSAudioRawFrame{f}, nil

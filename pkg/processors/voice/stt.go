@@ -89,7 +89,7 @@ func (p *STTProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pro
 		return nil
 	}
 
-	logger.Info("STT: sending %d bytes to STT (%d Hz, %d ch)", len(toSend), p.SampleRate, p.Channels)
+	logger.Info("STT: audio packet received for transcription: %d bytes (%d Hz, %d ch), sending to STT API", len(toSend), p.SampleRate, p.Channels)
 	tfs, err := p.STT.Transcribe(ctx, toSend, p.SampleRate, p.Channels)
 	if err != nil {
 		_ = p.PushDownstream(ctx, frames.NewErrorFrame(err.Error(), false, p.Name()))
@@ -106,7 +106,7 @@ func (p *STTProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pro
 		if len(preview) > 80 {
 			preview = preview[:80] + "..."
 		}
-		logger.Info("STT output: processor=%s textLen=%d finalized=%v language=%q preview=%q",
+		logger.Info("STT output (to LLM): processor=%s textLen=%d finalized=%v language=%q preview=%q",
 			p.Name(), len(text), tf.Finalized, tf.Language, preview)
 		_ = p.PushDownstream(ctx, tf)
 	}

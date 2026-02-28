@@ -19,6 +19,35 @@ import (
 	"voila-go/pkg/logger"
 )
 
+// inboundOpusDecoder decodes a single Opus RTP payload to 48 kHz mono PCM (S16LE).
+// When built with cgo, gopus is used and supports all Opus config modes; otherwise pion/opus is used (limited modes).
+type inboundOpusDecoder interface {
+	Decode(payload []byte) (pcm48kMono []byte, err error)
+}
+
+// newInboundOpusDecoder is set by opus_inbound_cgo.go when cgo is available (gopus, full Opus support).
+var newInboundOpusDecoder func() (inboundOpusDecoder, error) = newPionInboundOpusDecoder
+
+func newPionInboundOpusDecoder() (inboundOpusDecoder, error) {
+	return &pionInboundDecoder{dec: opusdec.NewDecoder()}, nil
+}
+
+type pionInboundDecoder struct {
+	dec opusdec.Decoder
+}
+
+func (p *pionInboundDecoder) Decode(payload []byte) ([]byte, error) {
+	if len(payload) == 0 {
+		return nil, nil
+	}
+	buf := make([]byte, 640)
+	_, _, err := p.dec.Decode(payload, buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf[:640], nil
+}
+
 const (
 	// Pipeline expects 16 kHz mono PCM for STT.
 	sttSampleRate = 16000
@@ -32,12 +61,14 @@ const (
 // Transport implements transport.Transport for WebRTC: frames from the pipeline are sent over a local track,
 // and frames received from the remote track are pushed to Input.
 type Transport struct {
-	cfg    *Config
-	pc     *webrtc.PeerConnection
-	inCh   chan frames.Frame
-	outCh  chan frames.Frame
-	closed chan struct{}
-	once   sync.Once
+	cfg              *Config
+	pc               *webrtc.PeerConnection
+	inCh             chan frames.Frame
+	outCh            chan frames.Frame
+	closed           chan struct{}
+	once             sync.Once
+	firstInboundLog  sync.Once
+	inboundChunkCount uint64 // total audio chunks pushed to pipeline (for STT)
 }
 
 // Config holds SmallWebRTC transport configuration.
@@ -63,10 +94,12 @@ func (t *Transport) Output() chan<- frames.Frame { return t.outCh }
 
 // HandleOffer sets the remote description from the client's offer, creates an answer, and sets up the peer connection.
 // Returns the SDP answer to send back to the client. Must be called before Start.
+// When Opus encoder is unavailable (e.g. build without cgo), the connection is still accepted; mic audio is processed
+// and the pipeline runs (STT → LLM → TTS), but TTS audio is drained and not sent to the client.
 func (t *Transport) HandleOffer(offerSDP string) (answerSDP string, err error) {
 	logger.Info("webrtc: offer received from client")
 	if !OutboundEncoderAvailable() {
-		return "", fmt.Errorf("opus encoder unavailable (build without cgo); TTS audio cannot be sent. Rebuild with CGO_ENABLED=1 and a C compiler (e.g. MinGW on Windows) for voice output")
+		logger.Info("webrtc: Opus encoder unavailable (build without cgo); accepting connection but TTS audio will not be sent. Rebuild with CGO_ENABLED=1 and a C compiler for voice output.")
 	}
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
@@ -148,16 +181,22 @@ func (t *Transport) HandleOffer(offerSDP string) (answerSDP string, err error) {
 
 // handleInboundTrack reads RTP from the remote track, decodes Opus to PCM 16 kHz, and pushes AudioRawFrame to inCh.
 func (t *Transport) handleInboundTrack(track *webrtc.TrackRemote) {
-	decoder := opusdec.NewDecoder()
-	// Decoder output: 320 samples per frame (S16LE) = 640 bytes; Opus can be 8/12/16/24/48 kHz bandwidth.
-	// We resample to 16 kHz for the pipeline.
-	pcmBuf := make([]byte, 640)
+	logger.Info("webrtc: inbound track started (reading mic RTP)")
+	decoder, err := newInboundOpusDecoder()
+	if err != nil {
+		logger.Info("webrtc: inbound Opus decoder init failed: %v", err)
+		return
+	}
+	const opusOutSampleRate = 48000
 	var pcmAccum []byte
-	const opusOutSampleRate = 48000 // decoder output is typically 48k or less; treat as 48k for resample
+	var rtpCount, decodeCount uint64
+	firstRTP, firstDecode := true, true
+	var firstDecodeFail sync.Once
 
 	for {
 		pkt, _, err := track.ReadRTP()
 		if err != nil {
+			logger.Info("webrtc: inbound track ReadRTP ended: %v", err)
 			return
 		}
 		select {
@@ -168,20 +207,43 @@ func (t *Transport) handleInboundTrack(track *webrtc.TrackRemote) {
 		if len(pkt.Payload) == 0 {
 			continue
 		}
-		_, _, decodeErr := decoder.Decode(pkt.Payload, pcmBuf)
-		if decodeErr != nil {
-			// Unsupported frame (e.g. non-SILK); skip
+		rtpCount++
+		if firstRTP {
+			logger.Info("webrtc: first RTP packet received from mic (%d bytes payload)", len(pkt.Payload))
+			firstRTP = false
+		}
+		if rtpCount%50 == 0 {
+			logger.Info("webrtc: RTP packets received so far: %d", rtpCount)
+		}
+		decoded, decodeErr := decoder.Decode(pkt.Payload)
+		if decodeErr != nil || len(decoded) == 0 {
+			firstDecodeFail.Do(func() {
+				if decodeErr != nil {
+					logger.Info("webrtc: Opus decode failed (mic audio not reaching pipeline): %v", decodeErr)
+				} else {
+					logger.Info("webrtc: Opus decode returned no audio (mic audio not reaching pipeline)")
+				}
+			})
 			continue
 		}
-		// Pion opus Decoder outputs 320 samples = 640 bytes S16LE per frame.
-		decoded := pcmBuf[:640]
+		decodeCount++
+		if firstDecode {
+			logger.Info("webrtc: first Opus decode succeeded, buffering for pipeline")
+			firstDecode = false
+		}
 		resampled := audio.Resample16MonoAlloc(decoded, opusOutSampleRate, sttSampleRate)
 		pcmAccum = append(pcmAccum, resampled...)
-		// Push in reasonable chunks to avoid tiny frames (e.g. 20ms at 16kHz = 640 bytes)
 		if len(pcmAccum) >= 640 {
 			toSend := pcmAccum
 			pcmAccum = nil
 			ar := frames.NewAudioRawFrame(toSend, sttSampleRate, 1, 0)
+			t.firstInboundLog.Do(func() {
+				logger.Info("webrtc: first mic audio pushed to pipeline (for STT), %d bytes", len(toSend))
+			})
+			t.inboundChunkCount++
+			if t.inboundChunkCount%25 == 0 {
+				logger.Info("webrtc: audio packets for STT: %d chunks received, latest %d bytes", t.inboundChunkCount, len(toSend))
+			}
 			select {
 			case <-t.closed:
 				return
@@ -198,6 +260,28 @@ var outboundEncoderAvailable bool
 
 // OutboundEncoderAvailable reports whether TTS can be sent over the outbound track (requires cgo build).
 func OutboundEncoderAvailable() bool { return outboundEncoderAvailable }
+
+// drainTTSFramesUntilNonTTS reads from outCh and discards TTSAudioRawFrame (and duplicate UserStartedSpeakingFrame).
+// Returns the first non-TTS frame so the caller can process it; returns nil if channel closed or closed signal.
+func drainTTSFramesUntilNonTTS(outCh <-chan frames.Frame, closed <-chan struct{}) frames.Frame {
+	for {
+		select {
+		case <-closed:
+			return nil
+		case f, ok := <-outCh:
+			if !ok {
+				return nil
+			}
+			if _, isTTS := f.(*frames.TTSAudioRawFrame); isTTS {
+				continue
+			}
+			if _, isBargeIn := f.(*frames.UserStartedSpeakingFrame); isBargeIn {
+				continue
+			}
+			return f
+		}
+	}
+}
 
 // runOutboundDrain drains outCh without sending (used when Opus encoder is not available, e.g. without cgo).
 func runOutboundDrain(_ *webrtc.TrackLocalStaticSample, outCh <-chan frames.Frame, closed <-chan struct{}) {

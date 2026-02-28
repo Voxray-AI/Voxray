@@ -68,6 +68,7 @@ func (s *SarvamSTTService) Transcribe(ctx context.Context, audio []byte, sampleR
 	if len(audio) == 0 {
 		return nil, nil
 	}
+	logger.Info("Sarvam STT: received audio from pipeline, %d bytes, sending to API", len(audio))
 	// Detect WAV (RIFF header) vs raw PCM. Sarvam API requires correct format/codec.
 	isWAV := len(audio) >= 12 && bytes.Equal(audio[0:4], []byte("RIFF")) && bytes.Equal(audio[8:12], []byte("WAVE"))
 	fileName := "audio.pcm"

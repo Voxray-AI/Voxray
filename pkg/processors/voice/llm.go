@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"voila-go/pkg/frames"
+	"voila-go/pkg/logger"
 	"voila-go/pkg/processors"
 	"voila-go/pkg/services"
 )
@@ -47,6 +48,11 @@ func (p *LLMProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pro
 
 	switch t := f.(type) {
 	case *frames.TranscriptionFrame:
+		preview := t.Text
+		if len(preview) > 80 {
+			preview = preview[:80] + "..."
+		}
+		logger.Info("LLM: transcript received from STT: %d chars, preview=%q", len(t.Text), preview)
 		p.mu.Lock()
 		p.msgs = append(p.msgs, map[string]any{"role": "user", "content": t.Text})
 		msgs := make([]map[string]any, len(p.msgs))
@@ -80,9 +86,16 @@ func (p *LLMProcessor) runLLM(ctx context.Context, messages []map[string]any) er
 		return err
 	}
 	if fullContent != "" {
+		preview := fullContent
+		if len(preview) > 80 {
+			preview = preview[:80] + "..."
+		}
+		logger.Info("LLM: response complete, sending to TTS: %d chars, preview=%q", len(fullContent), preview)
 		p.mu.Lock()
 		p.msgs = append(p.msgs, map[string]any{"role": "assistant", "content": fullContent})
 		p.mu.Unlock()
+		// Signal TTS to flush any buffered text (sentence batching)
+		_ = p.PushDownstream(ctx, frames.NewTTSSpeakFrame(""))
 	}
 	return nil
 }

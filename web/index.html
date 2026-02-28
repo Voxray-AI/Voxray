@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Voila WebRTC Voice Client</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; max-width: 980px; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+      button { padding: 10px 14px; border-radius: 10px; border: 1px solid #6666; cursor: pointer; }
+      input { padding: 10px 12px; border-radius: 10px; border: 1px solid #6666; min-width: 320px; }
+      .card { border: 1px solid #6663; border-radius: 14px; padding: 14px; margin-top: 14px; }
+      .muted { opacity: 0.75; }
+      pre { white-space: pre-wrap; word-break: break-word; }
+      .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; border: 1px solid #6666; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h2>WebRTC Voice Client (DataChannel)</h2>
+    <div class="row">
+      <label class="muted" for="baseUrl">Backend URL</label>
+      <input id="baseUrl" value="" placeholder="(leave blank for same origin)" aria-label="Backend URL (leave blank for same origin)" />
+      <button id="connectBtn" aria-label="Connect to voice backend">Connect</button>
+      <button id="disconnectBtn" disabled aria-label="Disconnect from voice backend">Disconnect</button>
+      <span id="status" class="pill" aria-live="polite">idle</span>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button id="micBtn" disabled aria-label="Start microphone">Start mic</button>
+        <button id="stopMicBtn" disabled aria-label="Stop microphone">Stop mic</button>
+        <span class="muted">Pipeline: mic → STT → LLM → TTS → speaker. Mic sent as 16kHz mono PCM on <code>audio-in</code>; TTS received as 48kHz mono PCM on <code>audio-out</code>.</span>
+      </div>
+      <div class="row" style="margin-top: 10px">
+        <span class="muted">Log</span>
+      </div>
+      <pre id="log" class="muted"></pre>
+    </div>
+
+    <script>
+      const el = (id) => document.getElementById(id);
+      const logEl = el("log");
+      const statusEl = el("status");
+      const connectBtn = el("connectBtn");
+      const disconnectBtn = el("disconnectBtn");
+      const micBtn = el("micBtn");
+      const stopMicBtn = el("stopMicBtn");
+      const baseUrlInput = el("baseUrl");
+
+      function setStatus(s) { statusEl.textContent = s; }
+      function logTime() {
+        const d = new Date();
+        return d.toTimeString().slice(0, 12) + "." + String(d.getMilliseconds()).padStart(3, "0");
+      }
+      function log(...args) {
+        const line = "[" + logTime() + "] " + args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+        logEl.textContent = (logEl.textContent + line + "\n").slice(-12000);
+      }
+
+      let pc = null;
+      let dcIn = null;
+      let dcOut = null;
+      let audioCtx = null;
+      let captureNode = null;
+      let playbackNode = null;
+      let mediaStream = null;
+
+      function buildAudioMsg(typeByte, sampleRate, channels, pcmInt16Buffer) {
+        const pcmBytes = new Uint8Array(pcmInt16Buffer);
+        const out = new Uint8Array(4 + pcmBytes.length);
+        out[0] = typeByte;
+        out[1] = sampleRate & 0xff;
+        out[2] = (sampleRate >> 8) & 0xff;
+        out[3] = channels & 0xff;
+        out.set(pcmBytes, 4);
+        return out.buffer;
+      }
+
+      function parseAudioMsg(buf) {
+        const u8 = new Uint8Array(buf);
+        if (u8.length < 4) return null;
+        const type = u8[0];
+        const sampleRate = u8[1] | (u8[2] << 8);
+        const channels = u8[3];
+        const payload = u8.buffer.slice(4);
+        return { type, sampleRate, channels, payload };
+      }
+
+      async function ensureAudioGraph() {
+        if (audioCtx) return;
+
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+        const workletSrc = `
+class CaptureProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.targetRate = 16000;
+    this.inRate = sampleRate;
+    this.ratio = this.inRate / this.targetRate;
+    this.phase = 0;
+    this.out = new Int16Array(0);
+    this.chunkSamples = 320; // 20ms at 16k
+    this.tmp = new Int16Array(this.chunkSamples);
+    this.tmpFill = 0;
+  }
+  process(inputs) {
+    const input = inputs[0];
+    if (!input || !input[0] || input[0].length === 0) return true;
+    const x = input[0]; // Float32Array
+    for (let i = 0; i < x.length; i++) {
+      this.phase += 1;
+      if (this.phase >= this.ratio) {
+        this.phase -= this.ratio;
+        let s = x[i];
+        if (s > 1) s = 1;
+        if (s < -1) s = -1;
+        this.tmp[this.tmpFill++] = (s * 32767) | 0;
+        if (this.tmpFill === this.chunkSamples) {
+          const buf = this.tmp.buffer.slice(0);
+          this.port.postMessage(buf, [buf]);
+          this.tmpFill = 0;
+        }
+      }
+    }
+    return true;
+  }
+}
+
+class PlaybackProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.queue = [];
+    this.qOffset = 0;
+    this.port.onmessage = (ev) => {
+      const buf = ev.data;
+      if (!(buf instanceof ArrayBuffer)) return;
+      const i16 = new Int16Array(buf);
+      const f32 = new Float32Array(i16.length);
+      for (let i = 0; i < i16.length; i++) f32[i] = i16[i] / 32768.0;
+      this.queue.push(f32);
+    };
+  }
+  process(inputs, outputs) {
+    const out = outputs[0][0];
+    let o = 0;
+    while (o < out.length) {
+      if (this.queue.length === 0) {
+        for (; o < out.length; o++) out[o] = 0;
+        return true;
+      }
+      const cur = this.queue[0];
+      const remaining = cur.length - this.qOffset;
+      const n = Math.min(remaining, out.length - o);
+      out.set(cur.subarray(this.qOffset, this.qOffset + n), o);
+      o += n;
+      this.qOffset += n;
+      if (this.qOffset >= cur.length) {
+        this.queue.shift();
+        this.qOffset = 0;
+      }
+    }
+    return true;
+  }
+}
+
+registerProcessor('capture-processor', CaptureProcessor);
+registerProcessor('playback-processor', PlaybackProcessor);
+`;
+        const blobUrl = URL.createObjectURL(new Blob([workletSrc], { type: "application/javascript" }));
+        await audioCtx.audioWorklet.addModule(blobUrl);
+        URL.revokeObjectURL(blobUrl);
+
+        playbackNode = new AudioWorkletNode(audioCtx, "playback-processor", {
+          numberOfInputs: 0,
+          numberOfOutputs: 1,
+          outputChannelCount: [1],
+        });
+        playbackNode.connect(audioCtx.destination);
+      }
+
+      async function startMic() {
+        if (!pc || !dcIn || dcIn.readyState !== "open") {
+          log("Mic: not connected.");
+          return;
+        }
+        await ensureAudioGraph();
+        if (audioCtx.state !== "running") await audioCtx.resume();
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const src = audioCtx.createMediaStreamSource(mediaStream);
+
+        captureNode = new AudioWorkletNode(audioCtx, "capture-processor", {
+          numberOfInputs: 1,
+          numberOfOutputs: 0,
+          channelCount: 1,
+        });
+        let micChunkCount = 0;
+        captureNode.port.onmessage = (ev) => {
+          const buf = ev.data;
+          if (!(buf instanceof ArrayBuffer)) return;
+          const msg = buildAudioMsg(1, 16000, 1, buf);
+          try { dcIn.send(msg); } catch (e) {}
+          micChunkCount++;
+          if (micChunkCount === 1) log("Mic: first chunk sent to server.");
+          else if (micChunkCount === 50) log("Mic: 50 chunks sent.");
+          else if (micChunkCount > 50 && micChunkCount % 100 === 0) log("Mic: " + micChunkCount + " chunks sent.");
+        };
+        src.connect(captureNode);
+        log("Mic started, capturing from device.");
+        micBtn.disabled = true;
+        stopMicBtn.disabled = false;
+      }
+
+      function stopMic() {
+        if (captureNode) {
+          try { captureNode.disconnect(); } catch {}
+          captureNode = null;
+        }
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(t => t.stop());
+          mediaStream = null;
+        }
+        micBtn.disabled = false;
+        stopMicBtn.disabled = true;
+        log("Mic stopped.");
+      }
+
+      async function connect() {
+        const baseUrl = baseUrlInput.value.trim();
+        const offerUrl = (baseUrl ? baseUrl.replace(/\/$/, "") : "") + "/webrtc/offer";
+        log("Connecting to", offerUrl || "(same origin)/webrtc/offer");
+        const isLocal = !baseUrl || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(baseUrl);
+        const iceServers = isLocal ? [] : [{ urls: ["stun:stun.l.google.com:19302"] }];
+
+        pc = new RTCPeerConnection({
+          iceServers,
+        });
+
+        pc.onconnectionstatechange = () => {
+          setStatus(pc.connectionState);
+          log("pc state:", pc.connectionState);
+        };
+
+        pc.ondatachannel = (ev) => {
+          if (!ev.channel) return;
+          if (ev.channel.label === "audio-out") {
+            dcOut = ev.channel;
+            dcOut.binaryType = "arraybuffer";
+            let ttsChunkCount = 0;
+            dcOut.onmessage = (ev2) => {
+              const parsed = parseAudioMsg(ev2.data);
+              if (!parsed || parsed.type !== 2) return;
+              if (parsed.sampleRate !== 48000 || parsed.channels !== 1) return;
+              ttsChunkCount++;
+              if (ttsChunkCount === 1) log("First TTS chunk received, playing audio.");
+              if (playbackNode) playbackNode.port.postMessage(parsed.payload, [parsed.payload]);
+            };
+            dcOut.onopen = () => log("Pipeline ready: STT → LLM → TTS. audio-out open, ready to receive TTS.");
+            dcOut.onclose = () => log("dcOut closed");
+          }
+        };
+
+        dcIn = pc.createDataChannel("audio-in");
+        dcIn.binaryType = "arraybuffer";
+        dcIn.onopen = () => {
+          log("audio-in open (mic → STT → LLM → TTS). Start mic to talk.");
+          micBtn.disabled = false;
+        };
+        dcIn.onclose = () => log("dcIn closed");
+
+        await ensureAudioGraph();
+        if (audioCtx.state !== "running") await audioCtx.resume();
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        // Wait for ICE gathering so the offer SDP includes our candidates; otherwise the server cannot reach us and ICE fails.
+        if (pc.iceGatheringState !== "complete") {
+          const gatheringDone = new Promise((resolve) => {
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
+              pc.removeEventListener("icegatheringstatechange", onComplete);
+              resolve();
+            };
+            const onComplete = () => { if (pc.iceGatheringState === "complete") finish(); };
+            pc.addEventListener("icegatheringstatechange", onComplete);
+            if (pc.iceGatheringState === "complete") finish();
+            else setTimeout(() => { if (pc.iceGatheringState === "complete") finish(); }, 0);
+          });
+          const timeout = (ms) => new Promise((r) => setTimeout(r, ms));
+          await Promise.race([gatheringDone, timeout(5000)]);
+        }
+        log("Offer created (ICE gathered), sending to server...");
+
+        const resp = await fetch(offerUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offer: JSON.stringify(pc.localDescription) }),
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error("Offer failed: " + resp.status + " " + text);
+        }
+        const { answer } = await resp.json();
+        log("Answer received, setting remote description...");
+        await pc.setRemoteDescription(JSON.parse(answer));
+
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = false;
+        setStatus(pc.connectionState || "connecting");
+        log("Answer set; waiting for ICE (status will show 'connected' when ready).");
+        // Mic button enabled when dcIn.onopen fires (after ICE connects).
+      }
+
+      function disconnect() {
+        stopMic();
+        if (dcIn) { try { dcIn.close(); } catch {} dcIn = null; }
+        if (dcOut) { try { dcOut.close(); } catch {} dcOut = null; }
+        if (pc) { try { pc.close(); } catch {} pc = null; }
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        micBtn.disabled = true;
+        stopMicBtn.disabled = true;
+        setStatus("idle");
+        log("Disconnected.");
+      }
+
+      connectBtn.onclick = async () => {
+        connectBtn.disabled = true;
+        try {
+          setStatus("connecting");
+          await connect();
+        } catch (e) {
+          log("Connect error:", String(e));
+          disconnect();
+        }
+      };
+      disconnectBtn.onclick = () => disconnect();
+      micBtn.onclick = async () => startMic();
+      stopMicBtn.onclick = () => stopMic();
+    </script>
+  </body>
+</html>

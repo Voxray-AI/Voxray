@@ -1,4 +1,4 @@
-//go:build cgo
+//go:build !cgo
 
 package smallwebrtc
 
@@ -6,9 +6,9 @@ import (
 	"encoding/binary"
 	"time"
 
+	"github.com/godeps/opus"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
-	"layeh.com/gopus"
 
 	"voila-go/pkg/audio"
 	"voila-go/pkg/frames"
@@ -21,13 +21,14 @@ func init() {
 }
 
 func runOutboundEncode(track *webrtc.TrackLocalStaticSample, outCh <-chan frames.Frame, closed <-chan struct{}) {
-	enc, err := gopus.NewEncoder(opusSampleRate, 1, gopus.Audio)
+	enc, err := opus.NewEncoder(opusSampleRate, 1, opus.AppVoIP)
 	if err != nil {
 		logger.Error("smallwebrtc: opus encoder: %v", err)
 		runOutboundDrain(track, outCh, closed)
 		return
 	}
 	var pcm48 []byte
+	encodeBuf := make([]byte, 1500) // max output size per frame
 	firstLog := true
 	var next frames.Frame
 	for {
@@ -69,7 +70,7 @@ func runOutboundEncode(track *webrtc.TrackLocalStaticSample, outCh <-chan frames
 			continue
 		}
 		if firstLog {
-			logger.Info("webrtc: first TTS audio frame received, sending to remote track, %d bytes", len(tts.Audio))
+			logger.Info("webrtc: first TTS audio frame received, sending to remote track (godeps/opus), %d bytes", len(tts.Audio))
 			firstLog = false
 		}
 		if sr != opusSampleRate {
@@ -79,20 +80,21 @@ func runOutboundEncode(track *webrtc.TrackLocalStaticSample, outCh <-chan frames
 			}
 			pcm = pcm48
 		}
-		const frameDuration = 20 * time.Millisecond
 		for len(pcm) >= opusFrameSize {
 			frame := pcm[:opusFrameSize]
 			pcm = pcm[opusFrameSize:]
 			samples := bytesToSamples(frame)
-			encoded, err := enc.Encode(samples, opusFrameSamples, 1500)
+			n, err := enc.Encode(samples, encodeBuf)
 			if err != nil {
 				logger.Error("smallwebrtc: opus encode: %v", err)
 				continue
 			}
-			if len(encoded) == 0 {
+			if n == 0 {
 				continue
 			}
-			err = track.WriteSample(media.Sample{Data: encoded, Duration: frameDuration})
+			encoded := make([]byte, n)
+			copy(encoded, encodeBuf[:n])
+			err = track.WriteSample(media.Sample{Data: encoded, Duration: 20 * time.Millisecond})
 			if err != nil {
 				select {
 				case <-closed:
@@ -100,12 +102,6 @@ func runOutboundEncode(track *webrtc.TrackLocalStaticSample, outCh <-chan frames
 				default:
 					logger.Error("smallwebrtc: write sample: %v", err)
 				}
-			}
-			// Pace at real-time so the client's jitter buffer doesn't underrun or get overwhelmed (reduces stutter)
-			select {
-			case <-closed:
-				return
-			case <-time.After(frameDuration):
 			}
 		}
 	}

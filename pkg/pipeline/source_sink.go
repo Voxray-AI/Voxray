@@ -2,8 +2,10 @@ package pipeline
 
 import (
 	"context"
+	"sync"
 
 	"voila-go/pkg/frames"
+	"voila-go/pkg/logger"
 	"voila-go/pkg/processors"
 )
 
@@ -39,7 +41,8 @@ func (s *Source) Run(ctx context.Context) {
 // Sink is a processor that forwards all frames to a channel (for transport output).
 type Sink struct {
 	*processors.BaseProcessor
-	Out chan<- frames.Frame
+	Out     chan<- frames.Frame
+	ttsLogOnce sync.Once
 }
 
 // NewSink returns a Sink that writes to ch.
@@ -57,6 +60,13 @@ func (s *Sink) ProcessFrame(ctx context.Context, f frames.Frame, dir processors.
 			return s.Prev().ProcessFrame(ctx, f, dir)
 		}
 		return nil
+	}
+	if f != nil {
+		if _, ok := f.(*frames.TTSAudioRawFrame); ok {
+			s.ttsLogOnce.Do(func() { logger.Info("pipeline (sink): first TTS audio frame to transport") })
+		} else {
+			logger.Info("pipeline (sink): forwarding to transport frame type=%s id=%d", f.FrameType(), f.ID())
+		}
 	}
 	if s.Out != nil {
 		select {
