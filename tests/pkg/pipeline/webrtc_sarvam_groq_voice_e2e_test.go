@@ -239,7 +239,7 @@ func TestWebRTCSignaling_SarvamGroq(t *testing.T) {
 		pl.Add(voice.NewLLMProcessorWithSystemPrompt("llm", llm, "You are a helpful assistant. Reply briefly."))
 		pl.Add(voice.NewTTSProcessor("tts", tts, 24000))
 		pl.Add(pipeline.NewSink("sink", tr.Output()))
-		runner := pipeline.NewRunner(pl, tr)
+		runner := pipeline.NewRunner(pl, tr, nil)
 		go func() { _ = runner.Run(ctx) }()
 	}
 

@@ -16,6 +16,7 @@ const defaultConfig = `{
   "plugins": ["echo"],
   "transport": "websocket",
   "webrtc_ice_servers": [],
+  "allow_interruptions": true,
   "turn_detection": "none",
   "turn_stop_secs": 3,
   "turn_pre_speech_ms": 500,
@@ -25,8 +26,10 @@ const defaultConfig = `{
   "vad_type": "energy",
   "vad_confidence": 0.7,
   "vad_start_secs_vad": 0.2,
-  "vad_stop_secs": 0.2,
-  "vad_min_volume": 0.6
+  "vad_stop_secs": 0.5,
+  "vad_min_volume": 0.6,
+  "interruption_strategy": "keyword",
+  "min_words": 3
 }
 `
 

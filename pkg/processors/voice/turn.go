@@ -128,7 +128,7 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 	})
 	p.audioChunkCount++
 	if p.audioChunkCount%25 == 0 {
-		logger.Info("pipeline (turn): audio chunks received so far: %d (buffering until turn complete)", p.audioChunkCount)
+		logger.Debug("pipeline (turn): audio chunks received so far: %d (buffering until turn complete)", p.audioChunkCount)
 	}
 
 	af := audio.Frame{

@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/bedrockruntime v1.50.0
 	github.com/aws/aws-sdk-go-v2/service/polly v1.54.11
 	github.com/aws/aws-sdk-go-v2/service/transcribestreaming v1.33.7
+	github.com/godeps/opus v1.0.3
 	github.com/gorilla/websocket v1.5.3
 	github.com/pion/opus v0.0.0-20260219180131-abe26becac00
 	github.com/pion/webrtc/v3 v3.3.6
@@ -37,7 +38,6 @@ require (
 	github.com/go-openapi/jsonreference v0.20.0 // indirect
 	github.com/go-openapi/spec v0.20.6 // indirect
 	github.com/go-openapi/swag v0.19.15 // indirect
-	github.com/godeps/opus v1.0.3 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect

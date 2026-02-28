@@ -25,8 +25,8 @@ if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
 }
 Set-Location $PSScriptRoot\..
 $env:CGO_ENABLED = "1"
-# Suppress known harmless warnings from gopus vendored Opus/Silk C code
-if (-not $env:CGO_CFLAGS) { $env:CGO_CFLAGS = "-Wno-stringop-overread" }
+# Enable optimization for Opus C code (otherwise it's very slow) and suppress known harmless warnings
+if (-not $env:CGO_CFLAGS) { $env:CGO_CFLAGS = "-O2 -Wno-stringop-overread" }
 go build -o voila.exe ./cmd/voila
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "Built voila.exe with Opus (CGO). Run: .\voila.exe -config config.json"

@@ -22,15 +22,17 @@ type Transport interface {
 
 // Runner builds a pipeline from processors and runs it with a transport.
 type Runner struct {
-	Pipeline  *Pipeline
-	Transport Transport
-	done      chan struct{}
-	mu        sync.Mutex
+	Pipeline   *Pipeline
+	Transport  Transport
+	StartFrame *frames.StartFrame // optional; if nil, NewStartFrame() is used in Run
+	done       chan struct{}
+	mu         sync.Mutex
 }
 
 // NewRunner returns a Runner that will run the given pipeline with the transport.
-func NewRunner(pl *Pipeline, tr Transport) *Runner {
-	return &Runner{Pipeline: pl, Transport: tr, done: make(chan struct{})}
+// If start is non-nil, it is pushed as the StartFrame when Run starts; otherwise frames.NewStartFrame() is used.
+func NewRunner(pl *Pipeline, tr Transport, start *frames.StartFrame) *Runner {
+	return &Runner{Pipeline: pl, Transport: tr, StartFrame: start, done: make(chan struct{})}
 }
 
 // Run starts the pipeline and transport, feeds input frames into the pipeline, and sends pipeline output to transport.
@@ -55,7 +57,11 @@ func (r *Runner) Run(ctx context.Context) error {
 	defer r.Transport.Close()
 
 	// Push StartFrame
-	if err := r.Pipeline.Start(ctx, frames.NewStartFrame()); err != nil {
+	startFrame := r.StartFrame
+	if startFrame == nil {
+		startFrame = frames.NewStartFrame()
+	}
+	if err := r.Pipeline.Start(ctx, startFrame); err != nil {
 		return err
 	}
 

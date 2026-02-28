@@ -59,8 +59,12 @@ func (b *EnergyAnalyzerBackend) voiceConfidence(buf []byte, _ int) (float64, err
 // NewEnergyAnalyzer returns an Analyzer that uses EnergyAnalyzerBackend.
 func NewEnergyAnalyzer(p Params) Analyzer {
 	p = p.normalize()
+	thresh := p.Threshold
+	if thresh <= 0 {
+		thresh = defaultThreshold
+	}
 	backend := &EnergyAnalyzerBackend{
-		Threshold: 0.02,
+		Threshold: thresh,
 	}
 	a := newBaseAnalyzer(backend)
 	a.params = p
@@ -81,13 +85,18 @@ func NewEnergyDetector() *EnergyDetector {
 
 // NewEnergyDetectorWithParams allows callers to override Params; zero-values pick defaults.
 func NewEnergyDetectorWithParams(p Params) *EnergyDetector {
+	p = p.normalize()
+	thresh := p.Threshold
+	if thresh <= 0 {
+		thresh = defaultThreshold
+	}
 	a := NewEnergyAnalyzer(p)
 	// Use a default sample rate; callers that care can call SetSampleRate on
 	// the underlying Analyzer via type assertions if needed, but the usual
 	// usage path (TurnProcessor) only relies on IsSpeech().
 	a.SetSampleRate(audio.DefaultInSampleRate)
 	return &EnergyDetector{
-		Threshold: 0.02,
+		Threshold: thresh,
 		detector:  &AnalyzerDetector{Analyzer: a},
 	}
 }

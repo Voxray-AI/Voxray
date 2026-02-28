@@ -18,6 +18,7 @@ import (
 	"voila-go/pkg/audio/turn"
 	"voila-go/pkg/audio/vad"
 	"voila-go/pkg/config"
+	"voila-go/pkg/frames"
 	"voila-go/pkg/logger"
 	"voila-go/pkg/pipeline"
 	"voila-go/pkg/processors"
@@ -174,7 +175,9 @@ func run(configPath string) error {
 
 	onTransport := func(ctx context.Context, tr transport.Transport) {
 		pl := buildPipeline(tr)
-		runner := pipeline.NewRunner(pl, tr)
+		startFrame := frames.NewStartFrame()
+		startFrame.AllowInterruptions = cfg.AllowInterruptions
+		runner := pipeline.NewRunner(pl, tr, startFrame)
 		go func() {
 			_ = runner.Run(ctx)
 		}()

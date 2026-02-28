@@ -213,7 +213,7 @@ func (t *Transport) handleInboundTrack(track *webrtc.TrackRemote) {
 			firstRTP = false
 		}
 		if rtpCount%50 == 0 {
-			logger.Info("webrtc: RTP packets received so far: %d", rtpCount)
+			logger.Debug("webrtc: RTP packets received so far: %d", rtpCount)
 		}
 		decoded, decodeErr := decoder.Decode(pkt.Payload)
 		if decodeErr != nil || len(decoded) == 0 {
@@ -242,7 +242,7 @@ func (t *Transport) handleInboundTrack(track *webrtc.TrackRemote) {
 			})
 			t.inboundChunkCount++
 			if t.inboundChunkCount%25 == 0 {
-				logger.Info("webrtc: audio packets for STT: %d chunks received, latest %d bytes", t.inboundChunkCount, len(toSend))
+				logger.Debug("webrtc: audio packets for STT: %d chunks received, latest %d bytes", t.inboundChunkCount, len(toSend))
 			}
 			select {
 			case <-t.closed:
