@@ -134,6 +134,48 @@ func DecodeByType(typ string, data []byte) (frames.Frame, error) {
 			return nil, err
 		}
 		return &f, nil
+	case "TransportMessageFrame", "MessageFrame":
+		var f frames.TransportMessageFrame
+		f.DataFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "BotStartedSpeakingFrame":
+		var f frames.BotStartedSpeakingFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "BotStoppedSpeakingFrame":
+		var f frames.BotStoppedSpeakingFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "VADParamsUpdateFrame":
+		var f frames.VADParamsUpdateFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "AggregatedTextFrame":
+		var f frames.AggregatedTextFrame
+		f.TextFrame.DataFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "OutputDTMFUrgentFrame":
+		var f frames.OutputDTMFUrgentFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
 	default:
 		return nil, fmt.Errorf("unknown frame type: %s", typ)
 	}

@@ -5,7 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,19 +20,42 @@ import (
 	"voila-go/pkg/logger"
 )
 
+// checkOrigin allows same-origin, same-host, or localhost/127.0.0.1 for development.
+// For production, restrict to your front-end origin to avoid cross-site WebSocket abuse.
+func checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	originURL, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	originHost := strings.ToLower(originURL.Hostname())
+	if originHost == "localhost" || originHost == "127.0.0.1" {
+		return true
+	}
+	reqHost := r.Host
+	if idx := strings.Index(reqHost, ":"); idx != -1 {
+		reqHost = reqHost[:idx]
+	}
+	return strings.ToLower(reqHost) == originHost
+}
+
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: checkOrigin,
 }
 
 // ConnTransport handles a single WebSocket connection as a Voila transport.
 // It manages the bidirectional flow of frames between the server and the client,
-// handling serialization and deserialization automatically.
+// handling serialization and deserialization via the configured Serializer.
 type ConnTransport struct {
-	conn   *websocket.Conn
-	inCh   chan frames.Frame
-	outCh  chan frames.Frame
-	closed chan struct{}
-	once   sync.Once
+	conn       *websocket.Conn
+	serializer serialize.Serializer
+	inCh       chan frames.Frame
+	outCh      chan frames.Frame
+	closed     chan struct{}
+	once       sync.Once
 
 	// lastActivity holds the last time we saw activity on this connection
 	// (either a successfully read frame from the client or a successfully
@@ -38,18 +64,23 @@ type ConnTransport struct {
 }
 
 // NewConnTransport creates a transport for an already-upgraded WebSocket connection.
-func NewConnTransport(conn *websocket.Conn, inBuf, outBuf int) *ConnTransport {
+// If serializer is nil, JSONSerializer is used (JSON envelope over text messages).
+func NewConnTransport(conn *websocket.Conn, inBuf, outBuf int, serializer serialize.Serializer) *ConnTransport {
 	if inBuf <= 0 {
 		inBuf = 64
 	}
 	if outBuf <= 0 {
 		outBuf = 64
 	}
+	if serializer == nil {
+		serializer = serialize.JSONSerializer{}
+	}
 	t := &ConnTransport{
-		conn:   conn,
-		inCh:   make(chan frames.Frame, inBuf),
-		outCh:  make(chan frames.Frame, outBuf),
-		closed: make(chan struct{}),
+		conn:       conn,
+		serializer: serializer,
+		inCh:       make(chan frames.Frame, inBuf),
+		outCh:      make(chan frames.Frame, outBuf),
+		closed:     make(chan struct{}),
 	}
 	// Initialize last activity to now so that newly created transports
 	// are considered active until we see the first message.
@@ -124,7 +155,7 @@ func (t *ConnTransport) readLoop() {
 			}
 			return
 		}
-		f, err := serialize.Decoder(data)
+		f, err := t.serializer.Deserialize(data)
 		if err != nil {
 			logger.Error("decode frame: %v", err)
 			continue
@@ -142,6 +173,10 @@ func (t *ConnTransport) readLoop() {
 
 func (t *ConnTransport) writeLoop() {
 	defer func() { _ = t.Close() }()
+	msgType := websocket.TextMessage
+	if _, ok := t.serializer.(serialize.ProtobufSerializer); ok {
+		msgType = websocket.BinaryMessage
+	}
 	for {
 		select {
 		case <-t.closed:
@@ -150,12 +185,16 @@ func (t *ConnTransport) writeLoop() {
 			if !ok {
 				return
 			}
-			data, err := serialize.Encoder(f)
+			data, err := t.serializer.Serialize(f)
 			if err != nil {
 				logger.Error("encode frame: %v", err)
 				continue
 			}
-			if err := t.conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			if data == nil {
+				// Serializer skipped this frame type (e.g. protobuf does not support it)
+				continue
+			}
+			if err := t.conn.WriteMessage(msgType, data); err != nil {
 				logger.Error("websocket write: %v", err)
 				return
 			}
@@ -194,7 +233,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			logger.Error("upgrade: %v", err)
 			return
 		}
-		tr := NewConnTransport(conn, 64, 64)
+		tr := NewConnTransport(conn, 64, 64, nil)
 		// Start monitoring this connection for inactivity if a session timeout
 		// has been configured.
 		if s.SessionTimeout > 0 {
@@ -214,9 +253,14 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}
 	addr := fmt.Sprintf(":%d", port)
 	if s.Host != "" {
-		addr = fmt.Sprintf("%s:%d", s.Host, port)
+		host := s.Host
+		// Bind to IPv4 loopback when host is "localhost" so browsers connecting to
+		// http://localhost (often resolved to 127.0.0.1) can reach the server on Windows.
+		if host == "localhost" {
+			host = "127.0.0.1"
+		}
+		addr = fmt.Sprintf("%s:%d", host, port)
 	}
-
 	srv := &http.Server{Addr: addr, Handler: mux}
 	go func() {
 		<-ctx.Done()
@@ -226,6 +270,40 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}()
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("websocket server listen: %w", err)
+	}
+	return nil
+}
+
+// ServeWithListener starts the HTTP server using the provided listener. It uses the same
+// handler setup as ListenAndServe (including RegisterHandlers). Useful for tests that need
+// a dynamic port (e.g. listen on ":0" and get the port from listener.Addr()).
+func (s *Server) ServeWithListener(ctx context.Context, listener net.Listener) error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			logger.Error("upgrade: %v", err)
+			return
+		}
+		tr := NewConnTransport(conn, 64, 64, nil)
+		if s.SessionTimeout > 0 {
+			go s.monitorSession(ctx, tr, s.SessionTimeout)
+		}
+		if s.OnConn != nil {
+			go s.OnConn(ctx, tr)
+		}
+	})
+	if s.RegisterHandlers != nil {
+		s.RegisterHandlers(mux)
+	}
+
+	srv := &http.Server{Handler: mux}
+	go func() {
+		<-ctx.Done()
+		_ = srv.Shutdown(context.Background())
+	}()
+	if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("websocket server serve: %w", err)
 	}
 	return nil
 }

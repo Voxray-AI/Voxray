@@ -31,6 +31,9 @@ type Params struct {
 	// MinVolume is the minimum smoothed volume (0..1) required to treat audio
 	// as speech. This is a second gate in addition to Confidence.
 	MinVolume float64
+	// Threshold is the RMS energy threshold for energy-based VAD (e.g. 0.02).
+	// Used by EnergyAnalyzerBackend; zero means use default.
+	Threshold float64
 }
 
 const (
@@ -38,6 +41,7 @@ const (
 	defaultStartSecs  = 0.2
 	defaultStopSecs   = 0.2
 	defaultMinVolume  = 0.6
+	defaultThreshold  = 0.02
 )
 
 // normalize ensures zero-values pick reasonable defaults.
@@ -53,6 +57,9 @@ func (p Params) normalize() Params {
 	}
 	if p.MinVolume <= 0 {
 		p.MinVolume = defaultMinVolume
+	}
+	if p.Threshold <= 0 {
+		p.Threshold = defaultThreshold
 	}
 	return p
 }

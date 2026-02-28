@@ -74,4 +74,6 @@ type Analyzer interface {
 	Clear()
 	// UpdateVADStartSecs updates the VAD start trigger time (for pre-speech padding).
 	UpdateVADStartSecs(secs float64)
+	// UpdateParams updates turn parameters (e.g. StopSecs for IVR mode). Used when receiving VADParamsUpdateFrame.
+	UpdateParams(p Params)
 }

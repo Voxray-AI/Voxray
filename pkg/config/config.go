@@ -15,9 +15,10 @@ type Config struct {
 	SttProvider string            `json:"stt_provider,omitempty"`
 	LlmProvider string            `json:"llm_provider,omitempty"`
 	TtsProvider string            `json:"tts_provider,omitempty"`
-	STTModel   string            `json:"stt_model,omitempty"`
-	TTSModel   string            `json:"tts_model,omitempty"`
-	TTSVoice   string            `json:"tts_voice,omitempty"`
+	STTModel    string            `json:"stt_model,omitempty"`
+	STTLanguage string            `json:"stt_language,omitempty"` // e.g. "hi-IN", "en-IN"; empty = auto-detect (Sarvam)
+	TTSModel    string            `json:"tts_model,omitempty"`
+	TTSVoice    string            `json:"tts_voice,omitempty"`
 	Plugins     []string          `json:"plugins"`
 	APIKeys     map[string]string `json:"api_keys,omitempty"`
 
@@ -32,13 +33,13 @@ type Config struct {
 	WebRTCICEServers []string `json:"webrtc_ice_servers,omitempty"`
 
 	// Turn detection: when to consider user finished speaking
-	TurnDetection       string  `json:"turn_detection,omitempty"`        // "none" | "silence"; default "none"
-	TurnStopSecs        float64 `json:"turn_stop_secs,omitempty"`        // silence after speech to end turn (default 3)
-	TurnPreSpeechMs     float64 `json:"turn_pre_speech_ms,omitempty"`   // pre-speech padding ms (default 500)
+	TurnDetection       string  `json:"turn_detection,omitempty"`         // "none" | "silence"; default "none"
+	TurnStopSecs        float64 `json:"turn_stop_secs,omitempty"`         // silence after speech to end turn (default 3)
+	TurnPreSpeechMs     float64 `json:"turn_pre_speech_ms,omitempty"`     // pre-speech padding ms (default 500)
 	TurnMaxDurationSecs float64 `json:"turn_max_duration_secs,omitempty"` // max segment duration secs (default 8)
-	VADStartSecs        float64 `json:"vad_start_secs,omitempty"`        // VAD start trigger time for turn (default 0)
-	VadThreshold        float64 `json:"vad_threshold,omitempty"`         // EnergyDetector RMS threshold (default 0.02)
-	TurnAsync           bool    `json:"turn_async,omitempty"`            // use async AnalyzeEndOfTurn instead of sync AppendAudio
+	VADStartSecs        float64 `json:"vad_start_secs,omitempty"`         // VAD start trigger time for turn (default 0)
+	VadThreshold        float64 `json:"vad_threshold,omitempty"`          // EnergyDetector RMS threshold (default 0.02)
+	TurnAsync           bool    `json:"turn_async,omitempty"`             // use async AnalyzeEndOfTurn instead of sync AppendAudio
 
 	// User turn / idle lifecycle.
 	// When zero, UserTurnStopTimeoutSecs falls back to TurnStopSecs; when both
@@ -50,11 +51,16 @@ type Config struct {
 
 	// VAD analyzer configuration. When unset, defaults
 	// match the Python VADParams defaults.
-	VADType       string  `json:"vad_type,omitempty"`       // "energy" (default), "silero", "aic" (future)
-	VADConfidence float64 `json:"vad_confidence,omitempty"` // default 0.7
-	VADStartSecsVAD  float64 `json:"vad_start_secs_vad,omitempty"` // default 0.2
-	VADStopSecs      float64 `json:"vad_stop_secs,omitempty"`      // default 0.2
-	VADMinVolume  float64 `json:"vad_min_volume,omitempty"` // default 0.6
+	VADType         string  `json:"vad_type,omitempty"`           // "energy" (default), "silero", "aic" (future)
+	VADConfidence   float64 `json:"vad_confidence,omitempty"`     // default 0.7
+	VADStartSecsVAD float64 `json:"vad_start_secs_vad,omitempty"` // default 0.2
+	VADStopSecs     float64 `json:"vad_stop_secs,omitempty"`      // default 0.2
+	VADMinVolume    float64 `json:"vad_min_volume,omitempty"`     // default 0.6
+
+	// Interruption: allow user to interrupt bot; strategy (e.g. "keyword") and min_words for future use.
+	AllowInterruptions  bool   `json:"allow_interruptions,omitempty"`
+	InterruptionStrategy string `json:"interruption_strategy,omitempty"`
+	MinWords            int    `json:"min_words,omitempty"`
 }
 
 // GetAPIKey returns the API key for the given service, checking the config first,

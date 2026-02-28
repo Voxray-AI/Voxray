@@ -3,12 +3,14 @@ package voice
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"voila-go/pkg/audio"
 	"voila-go/pkg/audio/turn"
 	"voila-go/pkg/audio/vad"
 	"voila-go/pkg/frames"
+	"voila-go/pkg/logger"
 	"voila-go/pkg/processors"
 )
 
@@ -32,6 +34,9 @@ type TurnProcessor struct {
 	// userTurnController manages high-level user turn/idle events and emits
 	// UserStartedSpeakingFrame, UserStoppedSpeakingFrame, and UserIdleFrame.
 	userTurnController *turn.UserTurnController
+
+	firstAudioLog   sync.Once
+	audioChunkCount uint64
 }
 
 // NewTurnProcessor returns a processor that buffers audio and forwards one segment per turn.
@@ -90,11 +95,33 @@ func NewTurnProcessorWithUserTurn(
 
 // ProcessFrame buffers AudioRawFrame, runs VAD and turn detection; on turn complete pushes audio downstream.
 func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir processors.Direction) error {
+	if dir == processors.Upstream {
+		if vf, ok := f.(*frames.VADParamsUpdateFrame); ok {
+			p.Analyzer.UpdateParams(turn.Params{StopSecs: vf.StopSecs})
+			if vf.StartSecs != 0 {
+				p.Analyzer.UpdateVADStartSecs(vf.StartSecs)
+			}
+			return nil
+		}
+		if p.Prev() != nil {
+			return p.Prev().ProcessFrame(ctx, f, dir)
+		}
+		return nil
+	}
 	if dir != processors.Downstream {
 		if p.Prev() != nil {
 			return p.Prev().ProcessFrame(ctx, f, dir)
 		}
 		return nil
+	}
+
+	// Apply VAD params update when received downstream (e.g. from pipeline config) or upstream (from IVR).
+	if vf, ok := f.(*frames.VADParamsUpdateFrame); ok {
+		p.Analyzer.UpdateParams(turn.Params{StopSecs: vf.StopSecs})
+		if vf.StartSecs != 0 {
+			p.Analyzer.UpdateVADStartSecs(vf.StartSecs)
+		}
+		return p.PushDownstream(ctx, f)
 	}
 
 	// Pass through non-audio frames; on cancel clear turn state
@@ -116,6 +143,14 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 	chunk := ar.Audio
 	if len(chunk) == 0 {
 		return nil
+	}
+
+	p.firstAudioLog.Do(func() {
+		logger.Info("pipeline (turn): first audio chunk received from transport, %d bytes", len(chunk))
+	})
+	p.audioChunkCount++
+	if p.audioChunkCount%25 == 0 {
+		logger.Debug("pipeline (turn): audio chunks received so far: %d (buffering until turn complete)", p.audioChunkCount)
 	}
 
 	af := audio.Frame{
@@ -146,6 +181,7 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 			out := frames.NewAudioRawFrame(audioCopy, p.SampleRate, p.Channels, 0)
 			p.buffer = nil
 			p.Analyzer.Clear()
+			logger.Info("pipeline (turn): turn complete, pushing %d bytes to STT", len(audioCopy))
 			return p.PushDownstream(ctx, out)
 		}
 		return nil
@@ -159,6 +195,7 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 		p.buffer = nil
 		p.Analyzer.Clear()
 		p.pendingResult = nil
+		logger.Info("pipeline (turn): turn complete, pushing %d bytes to STT", len(audioCopy))
 		return p.PushDownstream(ctx, out)
 	}
 
@@ -173,6 +210,7 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 				p.buffer = nil
 				p.Analyzer.Clear()
 				p.pendingResult = nil
+				logger.Info("pipeline (turn): turn complete (async), pushing %d bytes to STT", len(audioCopy))
 				return p.PushDownstream(ctx, out)
 			}
 			// On non-complete state, error, or closed channel, drop pending and continue.
