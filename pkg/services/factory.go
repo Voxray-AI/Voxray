@@ -17,10 +17,13 @@ import (
 	"voila-go/pkg/services/grok"
 	"voila-go/pkg/services/groq"
 	"voila-go/pkg/services/mistral"
+	"voila-go/pkg/services/ollama"
 	"voila-go/pkg/services/openai"
+	"voila-go/pkg/services/qwen"
 	"voila-go/pkg/services/sarvam"
 	"voila-go/pkg/services/stt"
 	"voila-go/pkg/services/tts"
+	"voila-go/pkg/services/whisper"
 )
 
 const (
@@ -36,6 +39,9 @@ const (
 	ProviderAnthropic     = "anthropic"
 	ProviderGoogle        = "google"
 	ProviderGoogleVertex  = "google_vertex"
+	ProviderOllama        = "ollama"
+	ProviderQwen          = "qwen"
+	ProviderWhisper       = "whisper"
 )
 
 // SupportedLLMProviders lists provider keys that can be passed to NewLLMFromConfig.
@@ -50,10 +56,12 @@ var SupportedLLMProviders = []string{
 	ProviderAnthropic,
 	ProviderGoogle,
 	ProviderGoogleVertex,
+	ProviderOllama,
+	ProviderQwen,
 }
 
 // SupportedSTTProviders lists provider keys that can be passed to NewSTTFromConfig.
-var SupportedSTTProviders = []string{ProviderOpenAI, ProviderGroq, ProviderSarvam, ProviderElevenLabs, ProviderAWS, ProviderGoogle}
+var SupportedSTTProviders = []string{ProviderOpenAI, ProviderGroq, ProviderSarvam, ProviderElevenLabs, ProviderAWS, ProviderGoogle, ProviderWhisper}
 
 // SupportedTTSProviders lists provider keys that can be passed to NewTTSFromConfig.
 var SupportedTTSProviders = []string{ProviderOpenAI, ProviderGroq, ProviderSarvam, ProviderElevenLabs, ProviderAWS, ProviderGoogle}
@@ -88,6 +96,20 @@ func apiKeyForProvider(cfg *config.Config, provider string) string {
 		return cfg.GetAPIKey("google", "GOOGLE_API_KEY")
 	case ProviderGoogleVertex:
 		return "" // Vertex uses ADC, no API key
+	case ProviderOllama:
+		return cfg.GetAPIKey("ollama", "OLLAMA_API_KEY")
+	case ProviderQwen:
+		key := cfg.GetAPIKey("qwen", "DASHSCOPE_API_KEY")
+		if key == "" {
+			key = cfg.GetAPIKey("qwen", "QWEN_API_KEY")
+		}
+		return key
+	case ProviderWhisper:
+		key := cfg.GetAPIKey("whisper", "WHISPER_API_KEY")
+		if key == "" {
+			key = cfg.GetAPIKey("openai", "OPENAI_API_KEY")
+		}
+		return key
 	default:
 		return cfg.GetAPIKey(provider, "OPENAI_API_KEY")
 	}
@@ -155,6 +177,10 @@ func NewLLMFromConfig(cfg *config.Config, provider, model string) LLMService {
 			return nil
 		}
 		return svc
+	case ProviderOllama:
+		return ollama.NewLLMService(apiKey, model)
+	case ProviderQwen:
+		return qwen.NewLLMService(apiKey, model)
 	case ProviderOpenAI:
 		fallthrough
 	default:
@@ -188,6 +214,8 @@ func NewSTTFromConfig(cfg *config.Config, provider string) STTService {
 			return nil
 		}
 		return svc
+	case ProviderWhisper:
+		return whisper.NewService(apiKey, config.GetEnv("WHISPER_BASE_URL", ""))
 	case ProviderOpenAI:
 		fallthrough
 	default:
