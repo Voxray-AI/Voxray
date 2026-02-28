@@ -82,6 +82,21 @@ func (s *SilenceTurnAnalyzer) UpdateVADStartSecs(secs float64) {
 	s.vadStartSecs = secs
 }
 
+// UpdateParams updates turn parameters (e.g. from VADParamsUpdateFrame).
+func (s *SilenceTurnAnalyzer) UpdateParams(p Params) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if p.StopSecs > 0 {
+		s.params.StopSecs = p.StopSecs
+	}
+	if p.PreSpeechMs > 0 {
+		s.params.PreSpeechMs = p.PreSpeechMs
+	}
+	if p.MaxDurationSecs > 0 {
+		s.params.MaxDurationSecs = p.MaxDurationSecs
+	}
+}
+
 func (s *SilenceTurnAnalyzer) SpeechTriggered() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

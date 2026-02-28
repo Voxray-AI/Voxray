@@ -95,11 +95,33 @@ func NewTurnProcessorWithUserTurn(
 
 // ProcessFrame buffers AudioRawFrame, runs VAD and turn detection; on turn complete pushes audio downstream.
 func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir processors.Direction) error {
+	if dir == processors.Upstream {
+		if vf, ok := f.(*frames.VADParamsUpdateFrame); ok {
+			p.Analyzer.UpdateParams(turn.Params{StopSecs: vf.StopSecs})
+			if vf.StartSecs != 0 {
+				p.Analyzer.UpdateVADStartSecs(vf.StartSecs)
+			}
+			return nil
+		}
+		if p.Prev() != nil {
+			return p.Prev().ProcessFrame(ctx, f, dir)
+		}
+		return nil
+	}
 	if dir != processors.Downstream {
 		if p.Prev() != nil {
 			return p.Prev().ProcessFrame(ctx, f, dir)
 		}
 		return nil
+	}
+
+	// Apply VAD params update when received downstream (e.g. from pipeline config) or upstream (from IVR).
+	if vf, ok := f.(*frames.VADParamsUpdateFrame); ok {
+		p.Analyzer.UpdateParams(turn.Params{StopSecs: vf.StopSecs})
+		if vf.StartSecs != 0 {
+			p.Analyzer.UpdateVADStartSecs(vf.StartSecs)
+		}
+		return p.PushDownstream(ctx, f)
 	}
 
 	// Pass through non-audio frames; on cancel clear turn state

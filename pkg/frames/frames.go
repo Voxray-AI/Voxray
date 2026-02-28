@@ -167,6 +167,23 @@ func NewTextFrame(text string) *TextFrame {
 	return t
 }
 
+// AggregatedTextFrame is text emitted after aggregation (e.g. by IVR pattern aggregator); AggregatedBy names the aggregation type.
+type AggregatedTextFrame struct {
+	TextFrame
+	AggregatedBy string `json:"aggregated_by,omitempty"`
+}
+
+func (*AggregatedTextFrame) FrameType() string { return "AggregatedTextFrame" }
+
+// NewAggregatedTextFrame creates an AggregatedTextFrame.
+func NewAggregatedTextFrame(text, aggregatedBy string) *AggregatedTextFrame {
+	t := &AggregatedTextFrame{
+		TextFrame:     TextFrame{DataFrame: DataFrame{Base: NewBase()}, Text: text, AppendToContext: true},
+		AggregatedBy:  aggregatedBy,
+	}
+	return t
+}
+
 // TranscriptionFrame is STT output (user speech).
 type TranscriptionFrame struct {
 	TextFrame

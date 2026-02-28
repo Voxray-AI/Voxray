@@ -84,6 +84,33 @@ type LLMTextFrame struct {
 
 func (*LLMTextFrame) FrameType() string { return "LLMTextFrame" }
 
+// LLMFullResponseStartFrame marks the start of a complete LLM response stream.
+// Used by extensions (e.g. voicemail classifier, IVR) to know when to begin
+// aggregating tokens.
+type LLMFullResponseStartFrame struct {
+	DataFrame
+}
+
+func (*LLMFullResponseStartFrame) FrameType() string { return "LLMFullResponseStartFrame" }
+
+// NewLLMFullResponseStartFrame creates a LLMFullResponseStartFrame.
+func NewLLMFullResponseStartFrame() *LLMFullResponseStartFrame {
+	return &LLMFullResponseStartFrame{DataFrame: DataFrame{Base: NewBase()}}
+}
+
+// LLMFullResponseEndFrame marks the end of a complete LLM response stream.
+// Processors that aggregate LLM text should flush on this frame.
+type LLMFullResponseEndFrame struct {
+	DataFrame
+}
+
+func (*LLMFullResponseEndFrame) FrameType() string { return "LLMFullResponseEndFrame" }
+
+// NewLLMFullResponseEndFrame creates a LLMFullResponseEndFrame.
+func NewLLMFullResponseEndFrame() *LLMFullResponseEndFrame {
+	return &LLMFullResponseEndFrame{DataFrame: DataFrame{Base: NewBase()}}
+}
+
 // TTSSpeakFrame asks TTS to speak the given text.
 type TTSSpeakFrame struct {
 	DataFrame

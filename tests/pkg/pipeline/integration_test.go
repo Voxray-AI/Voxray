@@ -70,8 +70,8 @@ func (a *voiceTestAnalyzer) SpeechTriggered() bool {
 
 func (*voiceTestAnalyzer) SetSampleRate(int) {}
 func (a *voiceTestAnalyzer) Clear()          { a.samples = 0 }
-func (*voiceTestAnalyzer) UpdateVADStartSecs(float64) {
-}
+func (*voiceTestAnalyzer) UpdateVADStartSecs(float64) {}
+func (*voiceTestAnalyzer) UpdateParams(turn.Params)   {}
 
 // TestVoiceTurnIntegration builds a small pipeline using TurnProcessor that
 // receives audio frames, performs VAD + user turn analysis, and emits a single
