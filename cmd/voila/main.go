@@ -35,6 +35,10 @@ import (
 func main() {
 	configPath := flag.String("config", "config.json", "Path to config file")
 	initCmd := flag.Bool("init", false, "Scaffold config.json and dirs (plugins, logs) then exit")
+	runnerTransport := flag.String("transport", "", "Runner transport type: webrtc, daily, twilio, telnyx, plivo, exotel (overrides config)")
+	runnerPort := flag.Int("port", 0, "Server port (overrides config; default 8080)")
+	proxyHost := flag.String("proxy", "", "Public proxy hostname for telephony webhook XML (e.g. mybot.ngrok.io)")
+	dialin := flag.Bool("dialin", false, "Enable Daily PSTN dial-in webhook (requires transport=daily)")
 	flag.Parse()
 	// Support subcommand: Voila init [config path]
 	if len(flag.Args()) >= 1 && flag.Arg(0) == "init" {
@@ -56,16 +60,41 @@ func main() {
 		return
 	}
 
-	if err := run(*configPath); err != nil {
+	if err := run(*configPath, runFlags{
+		transport: *runnerTransport,
+		port:      *runnerPort,
+		proxy:     *proxyHost,
+		dialin:    *dialin,
+	}); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(configPath string) error {
+type runFlags struct {
+	transport string
+	port      int
+	proxy     string
+	dialin    bool
+}
+
+func run(configPath string, flags runFlags) error {
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
+	}
+	// Apply runner flags over config
+	if flags.transport != "" {
+		cfg.RunnerTransport = flags.transport
+	}
+	if flags.port > 0 {
+		cfg.Port = flags.port
+	}
+	if flags.proxy != "" {
+		cfg.ProxyHost = flags.proxy
+	}
+	if flags.dialin {
+		cfg.Dialin = true
 	}
 
 	// Register built-in processors for plugin registry (dynamic loading from config)

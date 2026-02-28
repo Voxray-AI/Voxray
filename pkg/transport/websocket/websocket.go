@@ -46,6 +46,12 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: checkOrigin,
 }
 
+// Upgrade upgrades the HTTP connection to WebSocket and returns the connection.
+// Used by server for custom handlers (e.g. telephony) that need to read handshake messages before creating ConnTransport.
+func Upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
+	return upgrader.Upgrade(w, r, nil)
+}
+
 // ConnTransport handles a single WebSocket connection as a Voila transport.
 // It exposes Input (frames from client) and Output (frames to client) and closes when the connection ends or Close is called.
 // Safe for multiple goroutines reading Input, writing to Output, or calling Done; Close is idempotent and must not be called concurrently with Send (sending on Output after Close may panic).
