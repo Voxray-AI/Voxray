@@ -1,4 +1,10 @@
 // Package main is the Voila Go server entrypoint.
+//
+// @title Voila API
+// @version 1.0
+// @description Voila voice pipeline server: WebSocket and WebRTC transport endpoints.
+// @host localhost:8080
+// @BasePath /
 package main
 
 import (

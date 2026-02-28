@@ -1,0 +1,69 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Voila voice pipeline server: WebSocket and WebRTC transport endpoints.",
+        "title": "Voila API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/webrtc/offer": {
+            "post": {
+                "description": "Accepts a WebRTC SDP offer and returns an SDP answer. Available when transport is smallwebrtc or both.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webrtc"
+                ],
+                "summary": "Submit WebRTC offer",
+                "parameters": [
+                    {
+                        "description": "JSON body with 'offer' (SDP offer string)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_server.webrtcOfferResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid offer or handling failed",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "pkg_server.webrtcOfferResponse": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

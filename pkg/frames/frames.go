@@ -27,6 +27,11 @@ func NewBase() Base {
 	return Base{id: nextID(), metadata: make(map[string]any)}
 }
 
+// NewBaseWithID returns a Base with the given ID (e.g. when restoring from wire).
+func NewBaseWithID(id uint64) Base {
+	return Base{id: id, metadata: make(map[string]any)}
+}
+
 // ID returns the frame ID.
 func (b *Base) ID() uint64 { return b.id }
 
@@ -191,4 +196,21 @@ func NewTTSAudioRawFrame(audio []byte, sampleRate int) *TTSAudioRawFrame {
 	n := len(audio) / 2
 	base := NewAudioRawFrame(audio, sampleRate, 1, n)
 	return &TTSAudioRawFrame{OutputAudioRawFrame: OutputAudioRawFrame{AudioRawFrame: *base}}
+}
+
+// TransportMessageFrame carries a generic transport message (e.g. for provider protocols).
+// Used for binary MessageFrame wire format and JSON envelope round-trip.
+type TransportMessageFrame struct {
+	DataFrame
+	Message map[string]any `json:"message"`
+}
+
+func (*TransportMessageFrame) FrameType() string { return "TransportMessageFrame" }
+
+// NewTransportMessageFrame creates a TransportMessageFrame with the given message.
+func NewTransportMessageFrame(msg map[string]any) *TransportMessageFrame {
+	return &TransportMessageFrame{
+		DataFrame: DataFrame{Base: NewBase()},
+		Message:   msg,
+	}
 }

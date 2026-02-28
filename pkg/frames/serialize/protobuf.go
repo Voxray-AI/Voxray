@@ -1,78 +1,57 @@
-// Package serialize provides optional binary envelope encoding (proto-shaped: type + payload).
-// For full protobuf, run: protoc --go_out=. --go_opt=paths=source_relative pkg/frames/proto/frames.proto
-// and switch to using the generated FrameEnvelope with proto.Marshal/Unmarshal.
+// Package serialize provides binary envelope encoding using wire.FrameEnvelope (wire_frames.proto).
+// ProtoEncoder/ProtoDecoder use standard protobuf wire format; ReadProtoEnvelope reads length-prefixed envelopes from a stream.
 package serialize
 
 import (
-	"encoding/binary"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 
 	"voila-go/pkg/frames"
+	"voila-go/pkg/frames/proto/wire"
 )
 
-// ProtoEncoder encodes a Frame to a binary envelope: 4-byte type length, type, 4-byte payload length, payload (JSON frame only).
-// This matches the shape of frames.proto FrameEnvelope for interoperability.
+// ProtoEncoder encodes a Frame to binary envelope format (wire.FrameEnvelope: type + payload).
+// Payload is the JSON-encoded frame body.
 func ProtoEncoder(f frames.Frame) ([]byte, error) {
 	payload, err := json.Marshal(f)
 	if err != nil {
 		return nil, err
 	}
-	typ := f.FrameType()
-	buf := make([]byte, 0, 8+len(typ)+len(payload))
-	lb := [4]byte{}
-	binary.BigEndian.PutUint32(lb[:], uint32(len(typ)))
-	buf = append(buf, lb[:]...)
-	buf = append(buf, typ...)
-	binary.BigEndian.PutUint32(lb[:], uint32(len(payload)))
-	buf = append(buf, lb[:]...)
-	buf = append(buf, payload...)
+	env := &wire.FrameEnvelope{Type: f.FrameType(), Payload: payload}
+	return env.Marshal()
+}
+
+// ProtoDecoder decodes a binary envelope (wire.FrameEnvelope) into a Frame.
+func ProtoDecoder(data []byte) (frames.Frame, error) {
+	var env wire.FrameEnvelope
+	if err := env.Unmarshal(data); err != nil {
+		return nil, err
+	}
+	return DecodeByType(env.Type, env.Payload)
+}
+
+// ReadProtoEnvelope reads one length-prefixed envelope from r (varint length + FrameEnvelope bytes) and decodes it to a Frame.
+func ReadProtoEnvelope(r io.Reader) (frames.Frame, error) {
+	data, err := readLengthPrefixed(r)
+	if err != nil {
+		return nil, err
+	}
+	return ProtoDecoder(data)
+}
+
+// readLengthPrefixed reads a varint length then that many bytes.
+func readLengthPrefixed(r io.Reader) ([]byte, error) {
+	length, err := readVarint(r)
+	if err != nil {
+		return nil, err
+	}
+	if length > 1e9 {
+		return nil, io.ErrShortBuffer
+	}
+	buf := make([]byte, length)
+	if _, err := io.ReadFull(r, buf); err != nil {
+		return nil, err
+	}
 	return buf, nil
 }
 
-// ProtoDecoder decodes a binary envelope (length-prefixed type + payload) into a Frame.
-// Payload is the JSON-encoded frame body; type discriminator is from the binary envelope.
-func ProtoDecoder(data []byte) (frames.Frame, error) {
-	if len(data) < 8 {
-		return nil, errors.New("proto envelope too short")
-	}
-	tl := binary.BigEndian.Uint32(data[0:4])
-	data = data[4:]
-	if uint32(len(data)) < tl {
-		return nil, errors.New("proto envelope truncated type")
-	}
-	typ := string(data[:tl])
-	data = data[tl:]
-	if len(data) < 4 {
-		return nil, errors.New("proto envelope too short for payload length")
-	}
-	pl := binary.BigEndian.Uint32(data[0:4])
-	data = data[4:]
-	if uint32(len(data)) < pl {
-		return nil, fmt.Errorf("proto envelope truncated payload (want %d have %d)", pl, len(data))
-	}
-	payload := data[:pl]
-	return DecodeByType(typ, payload)
-}
-
-// ReadProtoEnvelope reads one binary envelope from r and decodes it to a Frame.
-func ReadProtoEnvelope(r io.Reader) (frames.Frame, error) {
-	var tl, pl uint32
-	if err := binary.Read(r, binary.BigEndian, &tl); err != nil {
-		return nil, err
-	}
-	typ := make([]byte, tl)
-	if _, err := io.ReadFull(r, typ); err != nil {
-		return nil, err
-	}
-	if err := binary.Read(r, binary.BigEndian, &pl); err != nil {
-		return nil, err
-	}
-	payload := make([]byte, pl)
-	if _, err := io.ReadFull(r, payload); err != nil {
-		return nil, err
-	}
-	return DecodeByType(string(typ), payload)
-}

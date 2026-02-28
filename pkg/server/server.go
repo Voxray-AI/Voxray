@@ -6,12 +6,33 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/swaggo/http-swagger"
+	_ "voila-go/docs" // register generated Swagger spec
 	"voila-go/pkg/config"
 	"voila-go/pkg/logger"
 	"voila-go/pkg/transport"
 	"voila-go/pkg/transport/smallwebrtc"
 	ws "voila-go/pkg/transport/websocket"
 )
+
+// webrtcOfferResponse is the JSON response for POST /webrtc/offer.
+type webrtcOfferResponse struct {
+	Answer string `json:"answer"`
+}
+
+// WebrtcOfferDoc documents the WebRTC offer endpoint for Swagger.
+//
+// @Summary Submit WebRTC offer
+// @Description Accepts a WebRTC SDP offer and returns an SDP answer. Available when transport is smallwebrtc or both.
+// @Tags webrtc
+// @Accept json
+// @Produce json
+// @Param body body object true "JSON body with 'offer' (SDP offer string)"
+// @Success 200 {object} webrtcOfferResponse
+// @Failure 400 {string} string "Invalid offer or handling failed"
+// @Failure 405 {string} string "Method not allowed"
+// @Router /webrtc/offer [post]
+func WebrtcOfferDoc() {}
 
 // StartServers starts the HTTP server that hosts the WebSocket endpoint (/ws)
 // and, optionally, the SmallWebRTC signaling endpoint (/webrtc/offer).
@@ -42,10 +63,14 @@ func StartServers(ctx context.Context, cfg *config.Config, onTransport func(ctx 
 				onTransport(c, tr)
 			}
 		},
-	}
-
-	if enableWebRTC {
-		server.RegisterHandlers = func(mux *http.ServeMux) {
+		RegisterHandlers: func(mux *http.ServeMux) {
+			mux.Handle("/swagger/", httpSwagger.Handler(
+				httpSwagger.URL("/swagger/doc.json"),
+				httpSwagger.DeepLinking(true),
+			))
+			if !enableWebRTC {
+				return
+			}
 			mux.HandleFunc("/webrtc/offer", func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodPost {
 					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -89,7 +114,7 @@ func StartServers(ctx context.Context, cfg *config.Config, onTransport func(ctx 
 					logger.Error("encode webrtc answer: %v", err)
 				}
 			})
-		}
+		},
 	}
 
 	logger.Info("starting server on %s:%d (transport=%s)", cfg.Host, port, mode)
