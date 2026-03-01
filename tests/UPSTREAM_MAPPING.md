@@ -1,6 +1,6 @@
 ### Upstream test mapping
 
-This document tracks which upstream Python tests from [pipecat-ai/pipecat/tests](https://github.com/pipecat-ai/pipecat/tree/main/tests) have been conceptually ported into the Go test suite.
+This document tracks which upstream Python tests (see [upstream test tree](https://github.com/pipecat-ai/pipecat/tree/main/tests)) have been conceptually ported into the Go test suite.
 
 **Status legend:** **Ported** = Go test(s) exist and cover the same behavior; **Partial** = some scenarios ported, extend Go tests; **To port** = Go code exists, add/extend tests; **N/A** = no Go equivalent (Python-only SDK/feature).
 

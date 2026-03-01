@@ -115,7 +115,7 @@ func TestIdentityFilter_passesAll(t *testing.T) {
 func TestWakeCheckFilter_noWakeWord(t *testing.T) {
 	ctx := context.Background()
 	sink := newCollectProcessor("sink")
-	wc := filters.NewWakeCheckFilter("wake", []string{"Hey, Pipecat"}, 3*time.Second)
+	wc := filters.NewWakeCheckFilter("wake", []string{"Hey, Assistant"}, 3*time.Second)
 	wc.SetNext(sink)
 
 	tf := frames.NewTranscriptionFrame("Phrase 1", "test", "", true)
@@ -129,10 +129,10 @@ func TestWakeCheckFilter_noWakeWord(t *testing.T) {
 func TestWakeCheckFilter_wakeWord(t *testing.T) {
 	ctx := context.Background()
 	sink := newCollectProcessor("sink")
-	wc := filters.NewWakeCheckFilter("wake", []string{"Hey, Pipecat"}, 3*time.Second)
+	wc := filters.NewWakeCheckFilter("wake", []string{"Hey, Assistant"}, 3*time.Second)
 	wc.SetNext(sink)
 
-	_ = wc.ProcessFrame(ctx, frames.NewTranscriptionFrame("Hey, Pipecat", "test", "", true), processors.Downstream)
+	_ = wc.ProcessFrame(ctx, frames.NewTranscriptionFrame("Hey, Assistant", "test", "", true), processors.Downstream)
 	_ = wc.ProcessFrame(ctx, frames.NewTranscriptionFrame("Phrase 1", "test", "", true), processors.Downstream)
 	if len(sink.got) < 1 {
 		t.Fatalf("expected at least 1 frame after wake word, got %d", len(sink.got))
