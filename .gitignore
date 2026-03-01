@@ -37,4 +37,3 @@ go.work
 config.json
 .env
 .env.local
-config.json
