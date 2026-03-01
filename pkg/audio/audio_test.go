@@ -50,3 +50,34 @@ func TestResample16MonoAlloc(t *testing.T) {
 		t.Errorf("Resample16MonoAlloc len = %d, want 8", len(got))
 	}
 }
+
+func TestMixMono(t *testing.T) {
+	user := []byte{0x00, 0x00, 0x02, 0x00} // 0, 2 (LE)
+	bot := []byte{0x04, 0x00, 0x06, 0x00}  // 4, 6
+	got := MixMono(user, bot)
+	if len(got) != 4 {
+		t.Fatalf("MixMono len = %d, want 4", len(got))
+	}
+	// (0+4)/2=2, (2+6)/2=4 -> 0x02,0x00, 0x04,0x00
+	if got[0] != 2 || got[1] != 0 || got[2] != 4 || got[3] != 0 {
+		t.Errorf("MixMono = %v, want [2,0,4,0]", got)
+	}
+	empty := MixMono(nil, nil)
+	if empty != nil {
+		t.Errorf("MixMono(nil,nil) = %v, want nil", empty)
+	}
+}
+
+func TestInterleaveStereo(t *testing.T) {
+	left := []byte{0x01, 0x00, 0x03, 0x00}
+	right := []byte{0x02, 0x00, 0x04, 0x00}
+	got := InterleaveStereo(left, right)
+	// 2 samples -> 4 bytes per channel -> 8 bytes output (L,R,L,R)
+	if len(got) != 8 {
+		t.Fatalf("InterleaveStereo len = %d, want 8", len(got))
+	}
+	if got[0] != 1 || got[1] != 0 || got[2] != 2 || got[3] != 0 ||
+		got[4] != 3 || got[5] != 0 || got[6] != 4 || got[7] != 0 {
+		t.Errorf("InterleaveStereo = %v", got)
+	}
+}

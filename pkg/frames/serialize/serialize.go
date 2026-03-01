@@ -162,6 +162,27 @@ func DecodeByType(typ string, data []byte) (frames.Frame, error) {
 			return nil, err
 		}
 		return &f, nil
+	case "VADUserStartedSpeakingFrame":
+		var f frames.VADUserStartedSpeakingFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "VADUserStoppedSpeakingFrame":
+		var f frames.VADUserStoppedSpeakingFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "UserSpeakingFrame":
+		var f frames.UserSpeakingFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
 	case "AggregatedTextFrame":
 		var f frames.AggregatedTextFrame
 		f.TextFrame.DataFrame.Base = frames.NewBase()
@@ -186,6 +207,20 @@ func DecodeByType(typ string, data []byte) (frames.Frame, error) {
 	case "InputDTMFFrame":
 		var f frames.InputDTMFFrame
 		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "RTVIClientMessageFrame":
+		var f frames.RTVIClientMessageFrame
+		f.SystemFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "RTVIServerMessageFrame":
+		var f frames.RTVIServerMessageFrame
+		f.SystemFrame.Base = frames.NewBase()
 		if err := json.Unmarshal(data, &f); err != nil {
 			return nil, err
 		}

@@ -5,9 +5,10 @@ import (
 	"errors"
 	"io"
 
-	openai "github.com/sashabaranov/go-openai"
 	"voila-go/pkg/config"
 	"voila-go/pkg/frames"
+
+	openai "github.com/sashabaranov/go-openai"
 )
 
 // DefaultLLMModel is the default Groq chat model when none is specified.

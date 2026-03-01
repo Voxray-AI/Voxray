@@ -11,7 +11,7 @@ import (
 	"voila-go/pkg/processors"
 )
 
-func isLifecycleFrame(f frames.Frame) bool {
+func parallelIsLifecycleFrame(f frames.Frame) bool {
 	if f == nil {
 		return false
 	}
@@ -92,7 +92,7 @@ func (pp *ParallelPipeline) onDownstreamFromBranch(ctx context.Context, f frames
 	pp.mu.Lock()
 	defer pp.mu.Unlock()
 
-	if isLifecycleFrame(f) {
+	if parallelIsLifecycleFrame(f) {
 		if f.ID() == pp.syncFrameID && pp.synchronizing {
 			pp.counter--
 			if pp.counter == 0 {
@@ -150,7 +150,7 @@ func (pp *ParallelPipeline) ProcessFrame(ctx context.Context, f frames.Frame, di
 	}
 
 	pp.mu.Lock()
-	if isLifecycleFrame(f) {
+	if parallelIsLifecycleFrame(f) {
 		pp.syncFrameID = f.ID()
 		pp.counter = len(pp.branches)
 		pp.synchronizing = true

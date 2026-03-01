@@ -3,8 +3,6 @@ package pipeline_test
 import (
 	"context"
 	"encoding/binary"
-	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,27 +17,6 @@ import (
 	"voila-go/pkg/processors/voice"
 	"voila-go/pkg/services"
 )
-
-// #region agent log
-const debugLogPath = "debug-ac28aa.log"
-
-func debugLog(location, message string, data map[string]interface{}, hypothesisId string) {
-	payload := map[string]interface{}{
-		"sessionId":     "ac28aa",
-		"location":      location,
-		"message":       message,
-		"data":          data,
-		"timestamp":     time.Now().UnixMilli(),
-		"hypothesisId": hypothesisId,
-	}
-	j, _ := json.Marshal(payload)
-	f, err := os.OpenFile(debugLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return
-	}
-	f.Write(append(j, '\n'))
-	f.Close()
-}
 
 func saveTTSAudioAsWAV(path string, pcm []byte, sampleRate, numChannels int) error {
 	if numChannels <= 0 {
@@ -100,17 +77,8 @@ func (p *textLoggingProcessor) ProcessFrame(ctx context.Context, f frames.Frame,
 
 // sttInputLogger logs the raw audio heading into STT.
 var sttInputLogger = newTextLoggingProcessor("stt-input-logger", func(f frames.Frame) {
-	if af, ok := f.(*frames.AudioRawFrame); ok {
-		debugLog(
-			"groq_voice_e2e_test.go:sttInput",
-			"STT input audio",
-			map[string]interface{}{
-				"audioLen":   len(af.Audio),
-				"sampleRate": af.SampleRate,
-				"channels":   af.NumChannels,
-			},
-			"H-STT-IN",
-		)
+	if _, ok := f.(*frames.AudioRawFrame); ok {
+		// no-op after agent log removal
 	}
 })
 
@@ -118,22 +86,7 @@ var sttInputLogger = newTextLoggingProcessor("stt-input-logger", func(f frames.F
 var sttOutputLLMInputLogger = newTextLoggingProcessor("stt-output-llm-input-logger", func(f frames.Frame) {
 	if tf, ok := f.(*frames.TranscriptionFrame); ok {
 		text := tf.Text
-		preview := text
-		if len(preview) > 160 {
-			preview = preview[:160] + "..."
-		}
 		logger.Info("LLM input (user): %q\n", text)
-		debugLog(
-			"groq_voice_e2e_test.go:llmInput",
-			"LLM input from STT",
-			map[string]interface{}{
-				"text":      text,
-				"preview":   preview,
-				"finalized": tf.Finalized,
-				"language":  tf.Language,
-			},
-			"H-LLM-IN",
-		)
 	}
 })
 
@@ -141,39 +94,16 @@ var sttOutputLLMInputLogger = newTextLoggingProcessor("stt-output-llm-input-logg
 var llmOutputTTSInputLogger = newTextLoggingProcessor("llm-output-tts-input-logger", func(f frames.Frame) {
 	if tf, ok := f.(*frames.LLMTextFrame); ok {
 		text := tf.Text
-		preview := text
-		if len(preview) > 160 {
-			preview = preview[:160] + "..."
-		}
 		logger.Info("LLM output (assistant): %q\n", text)
-		debugLog(
-			"groq_voice_e2e_test.go:llmOutput",
-			"LLM output to TTS",
-			map[string]interface{}{
-				"text":    text,
-				"preview": preview,
-			},
-			"H-LLM-OUT",
-		)
 	}
 })
 
 // ttsOutputLogger logs synthesized audio coming out of TTS.
 var ttsOutputLogger = newTextLoggingProcessor("tts-output-logger", func(f frames.Frame) {
-	if af, ok := f.(*frames.TTSAudioRawFrame); ok {
-		debugLog(
-			"groq_voice_e2e_test.go:ttsOutput",
-			"TTS output audio",
-			map[string]interface{}{
-				"audioLen":   len(af.Audio),
-				"sampleRate": af.SampleRate,
-			},
-			"H-TTS-OUT",
-		)
+	if _, ok := f.(*frames.TTSAudioRawFrame); ok {
+		// no-op after agent log removal
 	}
 })
-
-// #endregion
 
 // TestGroqVoicePipeline_E2E exercises an end-to-end voice pipeline:
 // AudioRawFrame (hello.wav) -> Groq STT -> Groq LLM -> Groq TTS -> TTSAudioRawFrame.
@@ -214,9 +144,6 @@ func TestGroqVoicePipeline_E2E(t *testing.T) {
 	if audioPath == "" {
 		t.Skipf("hello.wav fixture missing; add a small spoken-phrase WAV file at tests/testdata/hello.wav")
 	}
-	// #region agent log
-	debugLog("groq_voice_e2e_test.go:audioPath", "audio fixture resolved", map[string]interface{}{"audioPath": audioPath}, "H1")
-	// #endregion
 
 	// Locate config.json starting from common relative locations and then
 	// walking up parent directories.
@@ -270,9 +197,6 @@ func TestGroqVoicePipeline_E2E(t *testing.T) {
 	if cfg.TTSVoice == "" || cfg.TTSVoice == "alloy" {
 		cfg.TTSVoice = "hannah"
 	}
-	// #region agent log
-	debugLog("groq_voice_e2e_test.go:config", "TTS config for pipeline", map[string]interface{}{"TTSVoice": cfg.TTSVoice, "TTSModel": cfg.TTSModel}, "H2")
-	// #endregion
 
 	// Ensure we have a Groq API key either from config or environment.
 	apiKey := cfg.GetAPIKey("groq", "GROQ_API_KEY")
@@ -315,17 +239,11 @@ func TestGroqVoicePipeline_E2E(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading audio fixture %s: %v", audioPath, err)
 	}
-	// #region agent log
-	debugLog("groq_voice_e2e_test.go:audioData", "audio file read", map[string]interface{}{"lenBytes": len(audioData), "path": audioPath}, "H1")
-	// #endregion
 
 	audioFrame := frames.NewAudioRawFrame(audioData, 16000, 1, 0)
 	if err := pl.Push(ctx, audioFrame); err != nil {
 		t.Fatalf("pushing AudioRawFrame into pipeline: %v", err)
 	}
-	// #region agent log
-	debugLog("groq_voice_e2e_test.go:push", "AudioRawFrame pushed", map[string]interface{}{"audioLen": len(audioData), "sampleRate": 16000, "channels": 1}, "H3")
-	// #endregion
 
 	// Wait for a TTSAudioRawFrame or fail if we only see errors / timeout.
 	for {
@@ -333,15 +251,8 @@ func TestGroqVoicePipeline_E2E(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for TTSAudioRawFrame from Groq voice pipeline")
 		case f := <-outCh:
-			// #region agent log
-			frameType := fmt.Sprintf("%T", f)
-			debugLog("groq_voice_e2e_test.go:outCh", "frame received", map[string]interface{}{"frameType": frameType}, "H4")
-			// #endregion
 			switch v := f.(type) {
 			case *frames.TTSAudioRawFrame:
-				// #region agent log
-				debugLog("groq_voice_e2e_test.go:TTSAudioRawFrame", "success", map[string]interface{}{"audioLen": len(v.Audio), "sampleRate": v.SampleRate}, "H4")
-				// #endregion
 				if len(v.Audio) == 0 {
 					t.Fatal("received TTSAudioRawFrame with empty audio payload")
 				}
@@ -354,9 +265,6 @@ func TestGroqVoicePipeline_E2E(t *testing.T) {
 				}
 				return
 			case *frames.ErrorFrame:
-				// #region agent log
-				debugLog("groq_voice_e2e_test.go:ErrorFrame", "error from processor", map[string]interface{}{"processor": v.Processor, "error": v.Error}, "H4")
-				// #endregion
 				// If Groq TTS requires terms acceptance or similar account-level
 				// setup, skip instead of failing the suite.
 				if v.Processor == "tts" && strings.Contains(v.Error, "requires terms acceptance") {

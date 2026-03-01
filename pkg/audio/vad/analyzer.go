@@ -40,7 +40,7 @@ const (
 	defaultConfidence = 0.7
 	defaultStartSecs  = 0.2
 	defaultStopSecs   = 0.2
-	defaultMinVolume  = 0.6
+	defaultMinVolume  = 0.2
 	defaultThreshold  = 0.02
 )
 
@@ -112,9 +112,9 @@ type baseAnalyzer struct {
 	stopFrames       int
 	startingCount    int
 	stoppingCount    int
-	prevVolume       float64
-	lastConfidence   float64
-	lastVolume       float64
+	prevVolume     float64
+	lastConfidence float64
+	lastVolume     float64
 }
 
 func newBaseAnalyzer(b confidenceBackend) *baseAnalyzer {
@@ -291,5 +291,12 @@ func (d *AnalyzerDetector) IsSpeech(f audio.Frame) (bool, error) {
 		return false, err
 	}
 	return state == StateSpeaking, nil
+}
+
+// SetSampleRate configures the analyzer for the given pipeline input rate.
+func (d *AnalyzerDetector) SetSampleRate(sampleRate int) {
+	if d != nil && d.Analyzer != nil {
+		d.Analyzer.SetSampleRate(sampleRate)
+	}
 }
 

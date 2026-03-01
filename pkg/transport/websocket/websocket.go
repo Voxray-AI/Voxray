@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -69,10 +70,14 @@ type ConnTransport struct {
 	lastActivity atomic.Int64
 }
 
+// DefaultReadLimit is the maximum WebSocket message size in bytes (1MB). Prevents memory exhaustion from oversized frames.
+const DefaultReadLimit = 1 << 20
+
 // NewConnTransport builds a transport for an already-upgraded WebSocket connection.
 // If serializer is nil, JSON text messages are used. inBuf and outBuf set channel sizes; zero or negative values default to 64.
 // The caller must not use conn for reads or writes after passing it here.
 func NewConnTransport(conn *websocket.Conn, inBuf, outBuf int, serializer serialize.Serializer) *ConnTransport {
+	conn.SetReadLimit(DefaultReadLimit)
 	if inBuf <= 0 {
 		inBuf = 64
 	}
@@ -242,6 +247,34 @@ func (t *ConnTransport) writeLoop() {
 // Zero disables inactivity timeouts.
 const DefaultSessionTimeout = 5 * time.Minute
 
+// recoveryMiddleware wraps next and recovers panics, logging the error and stack then returning HTTP 500.
+func recoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				buf := make([]byte, 4096)
+				n := runtime.Stack(buf, false)
+				stack := string(buf[:n])
+				logger.Error("panic recovered: %v\n%s", err, stack)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":"internal server error"}`))
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+// Default HTTP server timeouts for production hardening.
+const (
+	defaultReadHeaderTimeout = 10 * time.Second
+	defaultReadTimeout       = 30 * time.Second
+	defaultWriteTimeout      = 30 * time.Second
+	defaultIdleTimeout       = 60 * time.Second
+	defaultShutdownTimeout   = 30 * time.Second
+	defaultMaxHeaderBytes    = 1 << 20 // 1 MiB
+)
+
 // Server is an HTTP server that upgrades requests to /ws to WebSocket and creates a ConnTransport per connection.
 // SessionTimeout is the idle timeout before closing a connection; zero or negative disables it.
 // OnConn is called in a new goroutine for each connection. RegisterHandlers, if set, is called once with the mux before serving.
@@ -256,6 +289,21 @@ type Server struct {
 	// RegisterHandlers, if non-nil, is called with the HTTP mux before the server
 	// starts to allow registration of additional HTTP handlers (e.g. WebRTC signaling).
 	RegisterHandlers func(mux *http.ServeMux)
+	// ReadHeaderTimeout, ReadTimeout, WriteTimeout, IdleTimeout, MaxHeaderBytes, ShutdownTimeout set HTTP server timeouts.
+	// Zero values use package defaults (10s, 30s, 30s, 60s, 1MiB, 30s).
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	MaxHeaderBytes    int
+	ShutdownTimeout   time.Duration
+	// TLS: when both are non-empty, ListenAndServe uses ListenAndServeTLS(certFile, keyFile).
+	TLSCertFile string
+	TLSKeyFile  string
+	// CheckAuth if non-nil is called before upgrading to WebSocket. If it returns false, the handler returns (caller should have written 401).
+	CheckAuth func(http.ResponseWriter, *http.Request) bool
+	// GetSerializer if non-nil is called per request to choose the frame serializer (e.g. RTVI when query has rtvi=1).
+	GetSerializer func(r *http.Request) serialize.Serializer
 }
 
 // ListenAndServe starts the HTTP server and blocks until ctx is canceled.
@@ -263,12 +311,21 @@ type Server struct {
 func (s *Server) ListenAndServe(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		if s.CheckAuth != nil && !s.CheckAuth(w, r) {
+			return
+		}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			logger.Error("upgrade: %v", err)
 			return
 		}
-		tr := NewConnTransport(conn, 64, 64, nil)
+		var ser serialize.Serializer = serialize.JSONSerializer{}
+		if s.GetSerializer != nil {
+			if custom := s.GetSerializer(r); custom != nil {
+				ser = custom
+			}
+		}
+		tr := NewConnTransport(conn, 64, 64, ser)
 		// Start monitoring this connection for inactivity if a session timeout
 		// has been configured.
 		if s.SessionTimeout > 0 {
@@ -281,6 +338,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	if s.RegisterHandlers != nil {
 		s.RegisterHandlers(mux)
 	}
+	handler := recoveryMiddleware(mux)
 
 	port := s.Port
 	if port == 0 {
@@ -296,15 +354,50 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		}
 		addr = fmt.Sprintf("%s:%d", host, port)
 	}
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: defaultReadHeaderTimeout,
+		ReadTimeout:       defaultReadTimeout,
+		WriteTimeout:      defaultWriteTimeout,
+		IdleTimeout:       defaultIdleTimeout,
+		MaxHeaderBytes:    defaultMaxHeaderBytes,
+	}
+	if s.ReadHeaderTimeout > 0 {
+		srv.ReadHeaderTimeout = s.ReadHeaderTimeout
+	}
+	if s.ReadTimeout > 0 {
+		srv.ReadTimeout = s.ReadTimeout
+	}
+	if s.WriteTimeout > 0 {
+		srv.WriteTimeout = s.WriteTimeout
+	}
+	if s.IdleTimeout > 0 {
+		srv.IdleTimeout = s.IdleTimeout
+	}
+	if s.MaxHeaderBytes > 0 {
+		srv.MaxHeaderBytes = s.MaxHeaderBytes
+	}
+	shutdownTimeout := defaultShutdownTimeout
+	if s.ShutdownTimeout > 0 {
+		shutdownTimeout = s.ShutdownTimeout
+	}
 	go func() {
 		<-ctx.Done()
-		if err := srv.Shutdown(context.Background()); err != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
 			logger.Error("websocket server shutdown: %v", err)
 		}
 	}()
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("websocket server listen: %w", err)
+	if s.TLSCertFile != "" && s.TLSKeyFile != "" {
+		if err := srv.ListenAndServeTLS(s.TLSCertFile, s.TLSKeyFile); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("websocket server listen tls: %w", err)
+		}
+	} else {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("websocket server listen: %w", err)
+		}
 	}
 	return nil
 }
@@ -314,12 +407,21 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 func (s *Server) ServeWithListener(ctx context.Context, listener net.Listener) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		if s.CheckAuth != nil && !s.CheckAuth(w, r) {
+			return
+		}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			logger.Error("upgrade: %v", err)
 			return
 		}
-		tr := NewConnTransport(conn, 64, 64, nil)
+		var ser serialize.Serializer = serialize.JSONSerializer{}
+		if s.GetSerializer != nil {
+			if custom := s.GetSerializer(r); custom != nil {
+				ser = custom
+			}
+		}
+		tr := NewConnTransport(conn, 64, 64, ser)
 		if s.SessionTimeout > 0 {
 			go s.monitorSession(ctx, tr, s.SessionTimeout)
 		}
@@ -330,11 +432,40 @@ func (s *Server) ServeWithListener(ctx context.Context, listener net.Listener) e
 	if s.RegisterHandlers != nil {
 		s.RegisterHandlers(mux)
 	}
+	handler := recoveryMiddleware(mux)
 
-	srv := &http.Server{Handler: mux}
+	srv := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: defaultReadHeaderTimeout,
+		ReadTimeout:       defaultReadTimeout,
+		WriteTimeout:      defaultWriteTimeout,
+		IdleTimeout:       defaultIdleTimeout,
+		MaxHeaderBytes:    defaultMaxHeaderBytes,
+	}
+	if s.ReadHeaderTimeout > 0 {
+		srv.ReadHeaderTimeout = s.ReadHeaderTimeout
+	}
+	if s.ReadTimeout > 0 {
+		srv.ReadTimeout = s.ReadTimeout
+	}
+	if s.WriteTimeout > 0 {
+		srv.WriteTimeout = s.WriteTimeout
+	}
+	if s.IdleTimeout > 0 {
+		srv.IdleTimeout = s.IdleTimeout
+	}
+	if s.MaxHeaderBytes > 0 {
+		srv.MaxHeaderBytes = s.MaxHeaderBytes
+	}
+	shutdownTimeout := defaultShutdownTimeout
+	if s.ShutdownTimeout > 0 {
+		shutdownTimeout = s.ShutdownTimeout
+	}
 	go func() {
 		<-ctx.Done()
-		_ = srv.Shutdown(context.Background())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
 	}()
 	if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("websocket server serve: %w", err)

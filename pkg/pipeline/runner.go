@@ -2,11 +2,19 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"sync"
+	"time"
 
 	"voila-go/pkg/frames"
 	"voila-go/pkg/logger"
 )
+
+// inputQueueCap is the buffer size between transport read and pipeline push.
+// Decouples reading mic input from pipeline processing so that when the pipeline
+// is blocked (e.g. Sink writing TTS to transport), we still drain transport input.
+const inputQueueCap = 256
 
 // Transport is the minimal interface for runner: input frames from transport, output frames to transport.
 type Transport interface {
@@ -73,18 +81,24 @@ func (r *Runner) Run(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	// If we have an input channel, forward frames to pipeline in a goroutine.
+	// If we have an input channel, forward frames via a queue so that reading from
+	// transport is never blocked by pipeline processing (e.g. Sink blocked on TTS output).
+	// Reader goroutine drains transport into queueCh; worker goroutine drains queueCh into pipeline.
 	if inCh != nil {
-		logger.Info("pipeline runner: input channel active, forwarding frames to pipeline")
+		logger.Info("pipeline runner: input channel active, forwarding frames to pipeline (queue cap=%d)", inputQueueCap)
+		queueCh := make(chan frames.Frame, inputQueueCap)
+		// Reader: transport -> queue (never blocks on pipeline)
 		go func() {
 			var inCount uint64
 			for {
 				select {
 				case <-ctx.Done():
+					close(queueCh)
 					return
 				case f, ok := <-inCh:
 					if !ok {
 						logger.Info("pipeline runner: input channel closed (received %d frames total)", inCount)
+						close(queueCh)
 						return
 					}
 					inCount++
@@ -93,14 +107,41 @@ func (r *Runner) Run(ctx context.Context) error {
 					} else if inCount%25 == 0 {
 						logger.Info("pipeline runner: frames from transport so far: %d (latest type=%s)", inCount, f.FrameType())
 					}
-					_ = r.Pipeline.Push(ctx, f)
-					// Stop on fatal error or cancel
-					if ef, ok := f.(*frames.ErrorFrame); ok && ef.Fatal {
+					select {
+					case <-ctx.Done():
+						close(queueCh)
 						return
+					case queueCh <- f:
+						// #region agent log
+						if inCount%25 == 0 || inCount <= 2 {
+							if line, _ := json.Marshal(map[string]interface{}{
+								"sessionId": "9f73a2", "hypothesisId": "A", "location": "pipeline/runner.go:enqueue",
+								"message": "transport frame enqueued", "data": map[string]interface{}{"inCount": inCount, "frameType": f.FrameType()},
+								"timestamp": time.Now().UnixMilli(),
+							}); len(line) > 0 {
+								if fp, err := os.OpenFile("debug-9f73a2.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); err == nil {
+									_, _ = fp.Write(append(line, '\n'))
+									_ = fp.Close()
+								}
+							}
+						}
+						// #endregion
 					}
-					if _, ok := f.(*frames.CancelFrame); ok {
-						return
-					}
+				}
+			}
+		}()
+		// Worker: queue -> pipeline (may block; does not block reader)
+		go func() {
+			for f := range queueCh {
+				if ctx.Err() != nil {
+					return
+				}
+				_ = r.Pipeline.Push(ctx, f)
+				if ef, ok := f.(*frames.ErrorFrame); ok && ef.Fatal {
+					return
+				}
+				if _, ok := f.(*frames.CancelFrame); ok {
+					return
 				}
 			}
 		}()

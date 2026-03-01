@@ -222,6 +222,11 @@ Otherwise, the pipeline is built from **config.Plugins** (e.g. echo, logger, agg
 - **gated_llm_context**: Holds `LLMContextFrame` until a notifier signals release.
 - **llmcontextsummarizer**: Monitors context size; pushes `LLMContextSummaryRequestFrame` when thresholds are exceeded; applies `LLMContextSummaryResultFrame` to compress history.
 
+**Frameworks** (`pkg/processors/frameworks/`) integrate external runtimes and the RTVI protocol (ported from [Pipecat processors/frameworks](https://github.com/pipecat-ai/pipecat/tree/main/src/pipecat/processors/frameworks)):
+
+- **external_chain**: Calls an HTTP endpoint (e.g. Langchain or Strands sidecar) with the last user message from `LLMContextFrame` and streams the response as `LLMTextFrame`. Configure via `plugin_options["external_chain"]` with `url`, `stream`, `timeout_sec`, `transcript_key`.
+- **rtvi**: RTVI (Real-Time Voice Interface) protocol processor. Handles client-ready, send-text (injects `TranscriptionFrame`), and pushes bot-ready/error as RTVI server messages. Use WebSocket with `?rtvi=1` and include `rtvi` in plugins; see [FRAMEWORKS.md](./FRAMEWORKS.md).
+
 ---
 
 ### 5.1 Runner modes and entry points
@@ -244,7 +249,7 @@ voila-go/
 │   ├── server/          # StartServers; /ws, /webrtc/offer, /start, /sessions, telephony, Daily routes
 │   ├── transport/       # Transport interface; websocket (server + client), smallwebrtc, memory, whatsapp; base
 │   ├── pipeline/        # Pipeline, Runner, Source, Sink, Registry
-│   ├── processors/      # Processor interface; voice (Turn, STT, LLM, TTS), echo, aggregator, logger; aggregators (dtmf, gated, llmfullresponse, llmtext, userresponse, gatedcontext, llmcontextsummarizer)
+│   ├── processors/      # Processor interface; voice (Turn, STT, LLM, TTS), echo, aggregator, logger; aggregators; filters; frameworks (external_chain, rtvi)
 │   ├── services/        # Factory; LLM/STT/TTS providers; RealtimeService (use realtime.NewFromConfig)
 │   ├── realtime/        # OpenAI Realtime API (RealtimeSession, RealtimeService)
 │   ├── runner/          # SessionStore; daily (room/token); telephony message parsing, serializers

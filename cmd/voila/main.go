@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -32,6 +33,9 @@ import (
 	"voila-go/pkg/processors/aggregators/llmtext"
 	"voila-go/pkg/processors/aggregators/userresponse"
 	"voila-go/pkg/processors/echo"
+	_ "voila-go/pkg/processors/filters"
+	_ "voila-go/pkg/processors/frameworks"
+	_ "voila-go/pkg/processors/frameworks/rtvi"
 	proclog "voila-go/pkg/processors/logger"
 	"voila-go/pkg/processors/voice"
 	"voila-go/pkg/server"
@@ -40,7 +44,11 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "config.json", "Path to config file")
+	defaultConfig := "config.json"
+	if e := os.Getenv("VOILA_CONFIG"); e != "" {
+		defaultConfig = e
+	}
+	configPath := flag.String("config", defaultConfig, "Path to config file")
 	initCmd := flag.Bool("init", false, "Scaffold config.json and dirs (plugins, logs) then exit")
 	runnerTransport := flag.String("transport", "", "Runner transport type: webrtc, daily, twilio, telnyx, plivo, exotel (overrides config)")
 	runnerPort := flag.Int("port", 0, "Server port (overrides config; default 8080)")
@@ -90,6 +98,7 @@ func run(configPath string, flags runFlags) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	logger.Configure(cfg.LogLevel, cfg.JSONLogs)
 	// Apply runner flags over config
 	if flags.transport != "" {
 		cfg.RunnerTransport = flags.transport
@@ -105,18 +114,18 @@ func run(configPath string, flags runFlags) error {
 	}
 
 	// Register built-in processors for plugin registry (dynamic loading from config)
-	pipeline.RegisterProcessor("echo", func(name string) processors.Processor { return echo.New(name) })
-	pipeline.RegisterProcessor("logger", func(name string) processors.Processor { return proclog.New(name) })
-	pipeline.RegisterProcessor("aggregator", func(name string) processors.Processor { return aggregator.New(name, "", 0) })
-	pipeline.RegisterProcessor("dtmf_aggregator", func(name string) processors.Processor { return dtmf.New(name, 0, "", "") })
-	pipeline.RegisterProcessor("gated", func(name string) processors.Processor {
+	pipeline.RegisterProcessor("echo", func(name string, _ json.RawMessage) processors.Processor { return echo.New(name) })
+	pipeline.RegisterProcessor("logger", func(name string, _ json.RawMessage) processors.Processor { return proclog.New(name) })
+	pipeline.RegisterProcessor("aggregator", func(name string, _ json.RawMessage) processors.Processor { return aggregator.New(name, "", 0) })
+	pipeline.RegisterProcessor("dtmf_aggregator", func(name string, _ json.RawMessage) processors.Processor { return dtmf.New(name, 0, "", "") })
+	pipeline.RegisterProcessor("gated", func(name string, _ json.RawMessage) processors.Processor {
 		return gated.New(name, nil, nil, true, processors.Downstream)
 	})
-	pipeline.RegisterProcessor("llmfullresponse", func(name string) processors.Processor { return llmfullresponse.New(name, nil) })
-	pipeline.RegisterProcessor("llmtext", func(name string) processors.Processor { return llmtext.New(name, nil) })
-	pipeline.RegisterProcessor("userresponse", func(name string) processors.Processor { return userresponse.New(name) })
-	pipeline.RegisterProcessor("gated_llm_context", func(name string) processors.Processor { return gatedcontext.New(name, nil, false) })
-	pipeline.RegisterProcessor("llmcontextsummarizer", func(name string) processors.Processor {
+	pipeline.RegisterProcessor("llmfullresponse", func(name string, _ json.RawMessage) processors.Processor { return llmfullresponse.New(name, nil) })
+	pipeline.RegisterProcessor("llmtext", func(name string, _ json.RawMessage) processors.Processor { return llmtext.New(name, nil) })
+	pipeline.RegisterProcessor("userresponse", func(name string, _ json.RawMessage) processors.Processor { return userresponse.New(name) })
+	pipeline.RegisterProcessor("gated_llm_context", func(name string, _ json.RawMessage) processors.Processor { return gatedcontext.New(name, nil, false) })
+	pipeline.RegisterProcessor("llmcontextsummarizer", func(name string, _ json.RawMessage) processors.Processor {
 		return llmcontextsummarizer.New(name, nil, llmcontextsummarizer.DefaultConfig())
 	})
 
@@ -172,12 +181,27 @@ func run(configPath string, flags runFlags) error {
 					}
 				}
 				if vadDetector == nil {
-					ed := vad.NewEnergyDetector()
-					if cfg.VadThreshold > 0 {
-						ed.Threshold = cfg.VadThreshold
+					vp := cfg.VADParams()
+					// Energy VAD: volume (smoothed RMS) from typical mics often stays well below 0.2,
+					// so cap MinVolume at 0.05 so speech is detected when confidence is high.
+					conf, minVol := vp.Confidence, vp.MinVolume
+					if conf > 0.5 {
+						conf = 0.5
 					}
+					if minVol > 0.05 {
+						minVol = 0.05
+					}
+					vadParams := vad.Params{
+						Confidence: conf,
+						StartSecs:  vp.StartSecs,
+						StopSecs:   vp.StopSecs,
+						MinVolume:  minVol,
+						Threshold:  cfg.VadThreshold,
+					}
+					ed := vad.NewEnergyDetectorWithParams(vadParams)
 					vadDetector = ed
 				}
+				vadDetector.SetSampleRate(16000)
 				turnParams := turn.Params{
 					StopSecs:        cfg.TurnStopSecs,
 					PreSpeechMs:     cfg.TurnPreSpeechMs,
