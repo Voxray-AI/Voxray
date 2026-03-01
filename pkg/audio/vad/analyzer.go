@@ -112,9 +112,9 @@ type baseAnalyzer struct {
 	stopFrames       int
 	startingCount    int
 	stoppingCount    int
-	prevVolume       float64
-	lastConfidence   float64
-	lastVolume       float64
+	prevVolume     float64
+	lastConfidence float64
+	lastVolume     float64
 }
 
 func newBaseAnalyzer(b confidenceBackend) *baseAnalyzer {

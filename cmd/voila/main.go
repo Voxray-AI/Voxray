@@ -182,11 +182,20 @@ func run(configPath string, flags runFlags) error {
 				}
 				if vadDetector == nil {
 					vp := cfg.VADParams()
+					// Energy VAD: volume (smoothed RMS) from typical mics often stays well below 0.2,
+					// so cap MinVolume at 0.05 so speech is detected when confidence is high.
+					conf, minVol := vp.Confidence, vp.MinVolume
+					if conf > 0.5 {
+						conf = 0.5
+					}
+					if minVol > 0.05 {
+						minVol = 0.05
+					}
 					vadParams := vad.Params{
-						Confidence: vp.Confidence,
+						Confidence: conf,
 						StartSecs:  vp.StartSecs,
 						StopSecs:   vp.StopSecs,
-						MinVolume:  vp.MinVolume,
+						MinVolume:  minVol,
 						Threshold:  cfg.VadThreshold,
 					}
 					ed := vad.NewEnergyDetectorWithParams(vadParams)

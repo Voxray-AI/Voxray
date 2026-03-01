@@ -43,7 +43,7 @@
   "interruption_strategy": "keyword",
   "min_words": 3,
   "turn_detection": "silence",
-  "turn_stop_secs": 3,
+  "turn_stop_secs": 1.5,
   "turn_pre_speech_ms": 500,
   "turn_max_duration_secs": 8,
   "vad_start_secs": 0,
