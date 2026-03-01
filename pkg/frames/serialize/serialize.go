@@ -162,6 +162,27 @@ func DecodeByType(typ string, data []byte) (frames.Frame, error) {
 			return nil, err
 		}
 		return &f, nil
+	case "VADUserStartedSpeakingFrame":
+		var f frames.VADUserStartedSpeakingFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "VADUserStoppedSpeakingFrame":
+		var f frames.VADUserStoppedSpeakingFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "UserSpeakingFrame":
+		var f frames.UserSpeakingFrame
+		f.ControlFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
 	case "AggregatedTextFrame":
 		var f frames.AggregatedTextFrame
 		f.TextFrame.DataFrame.Base = frames.NewBase()
