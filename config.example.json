@@ -16,7 +16,9 @@
   "plugin_options": {
     "frame_filter": { "allowed_types": ["TextFrame", "TranscriptionFrame"] },
     "wake_check_filter": { "wake_phrases": ["hey bot"], "keepalive_secs": 3 },
-    "stt_mute_filter": { "strategies": ["first_speech", "always"] }
+    "stt_mute_filter": { "strategies": ["first_speech", "always"] },
+    "external_chain": { "url": "http://localhost:8765/chain", "stream": true, "timeout_sec": 60, "transcript_key": "input" },
+    "rtvi": { "protocol_version": "1.2.0" }
   },
   "allow_interruptions": true,
   "turn_detection": "none",

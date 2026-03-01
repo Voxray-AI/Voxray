@@ -20,6 +20,8 @@ import (
 	"voila-go/pkg/runner/daily"
 	"voila-go/pkg/transport/smallwebrtc"
 	ws "voila-go/pkg/transport/websocket"
+	"voila-go/pkg/frames/serialize"
+	rtvi "voila-go/pkg/processors/frameworks/rtvi"
 )
 
 // webrtcOfferResponse is the JSON body for successful POST /webrtc/offer responses.
@@ -619,6 +621,12 @@ func StartServers(ctx context.Context, cfg *config.Config, onTransport func(ctx 
 		RegisterHandlers: func(mux *http.ServeMux) {
 			registerHandlers(mux, cfg, ctx, onTransport, sessionStore)
 		},
+		GetSerializer: func(r *http.Request) serialize.Serializer {
+			if r != nil && r.URL != nil && r.URL.Query().Get("rtvi") != "" {
+				return &rtvi.Serializer{}
+			}
+			return nil
+		},
 	}
 	if cfg.ServerAPIKey != "" {
 		server.CheckAuth = func(w http.ResponseWriter, r *http.Request) bool {
@@ -672,6 +680,12 @@ func StartServersWithListener(ctx context.Context, listener net.Listener, cfg *c
 		},
 		RegisterHandlers: func(mux *http.ServeMux) {
 			registerHandlers(mux, cfg, ctx, onTransport, sessionStore)
+		},
+		GetSerializer: func(r *http.Request) serialize.Serializer {
+			if r != nil && r.URL != nil && r.URL.Query().Get("rtvi") != "" {
+				return &rtvi.Serializer{}
+			}
+			return nil
 		},
 	}
 	if cfg.ServerAPIKey != "" {

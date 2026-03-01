@@ -211,6 +211,20 @@ func DecodeByType(typ string, data []byte) (frames.Frame, error) {
 			return nil, err
 		}
 		return &f, nil
+	case "RTVIClientMessageFrame":
+		var f frames.RTVIClientMessageFrame
+		f.SystemFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
+	case "RTVIServerMessageFrame":
+		var f frames.RTVIServerMessageFrame
+		f.SystemFrame.Base = frames.NewBase()
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, err
+		}
+		return &f, nil
 	default:
 		return nil, fmt.Errorf("unknown frame type: %s", typ)
 	}

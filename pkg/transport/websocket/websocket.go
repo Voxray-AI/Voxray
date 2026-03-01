@@ -302,6 +302,8 @@ type Server struct {
 	TLSKeyFile  string
 	// CheckAuth if non-nil is called before upgrading to WebSocket. If it returns false, the handler returns (caller should have written 401).
 	CheckAuth func(http.ResponseWriter, *http.Request) bool
+	// GetSerializer if non-nil is called per request to choose the frame serializer (e.g. RTVI when query has rtvi=1).
+	GetSerializer func(r *http.Request) serialize.Serializer
 }
 
 // ListenAndServe starts the HTTP server and blocks until ctx is canceled.
@@ -317,7 +319,13 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			logger.Error("upgrade: %v", err)
 			return
 		}
-		tr := NewConnTransport(conn, 64, 64, nil)
+		var ser serialize.Serializer = serialize.JSONSerializer{}
+		if s.GetSerializer != nil {
+			if custom := s.GetSerializer(r); custom != nil {
+				ser = custom
+			}
+		}
+		tr := NewConnTransport(conn, 64, 64, ser)
 		// Start monitoring this connection for inactivity if a session timeout
 		// has been configured.
 		if s.SessionTimeout > 0 {
@@ -407,7 +415,13 @@ func (s *Server) ServeWithListener(ctx context.Context, listener net.Listener) e
 			logger.Error("upgrade: %v", err)
 			return
 		}
-		tr := NewConnTransport(conn, 64, 64, nil)
+		var ser serialize.Serializer = serialize.JSONSerializer{}
+		if s.GetSerializer != nil {
+			if custom := s.GetSerializer(r); custom != nil {
+				ser = custom
+			}
+		}
+		tr := NewConnTransport(conn, 64, 64, ser)
 		if s.SessionTimeout > 0 {
 			go s.monitorSession(ctx, tr, s.SessionTimeout)
 		}

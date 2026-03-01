@@ -34,6 +34,8 @@ import (
 	"voila-go/pkg/processors/aggregators/userresponse"
 	"voila-go/pkg/processors/echo"
 	_ "voila-go/pkg/processors/filters"
+	_ "voila-go/pkg/processors/frameworks"
+	_ "voila-go/pkg/processors/frameworks/rtvi"
 	proclog "voila-go/pkg/processors/logger"
 	"voila-go/pkg/processors/voice"
 	"voila-go/pkg/server"
