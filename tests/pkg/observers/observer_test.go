@@ -93,6 +93,38 @@ func TestUserBotLatencyObserver_OnLatencyMeasured(t *testing.T) {
 	}
 }
 
+// TestTurnTrackingObserver_MultipleTurns mirrors upstream: first turn starts on StartFrame; second turn starts after end (CancelFrame) then UserStartedSpeakingFrame.
+func TestTurnTrackingObserver_MultipleTurns(t *testing.T) {
+	var counts []int
+	ob := observers.NewTurnTrackingObserver(observers.OnTurnStarted(func(turnCount int) {
+		counts = append(counts, turnCount)
+	}))
+	ob.OnFrameProcessed("p", frames.NewStartFrame(), processors.Downstream)
+	if len(counts) != 1 || counts[0] != 1 {
+		t.Fatalf("first StartFrame should trigger OnTurnStarted(1), got %v", counts)
+	}
+	ob.OnFrameProcessed("p", frames.NewCancelFrame("test"), processors.Downstream)
+	ob.OnFrameProcessed("p", frames.NewUserStartedSpeakingFrame(), processors.Downstream)
+	if len(counts) != 2 {
+		t.Errorf("expected OnTurnStarted called 2 times (turn 1 then turn 2), got %d: %v", len(counts), counts)
+	}
+	if len(counts) >= 2 && counts[1] != 2 {
+		t.Errorf("second turn count should be 2, got %d", counts[1])
+	}
+}
+
+// TestUserBotLatencyObserver_NoUserStop_NoCallback mirrors upstream: bot start without prior user stop should not trigger latency callback.
+func TestUserBotLatencyObserver_NoUserStop_NoCallback(t *testing.T) {
+	var called bool
+	ob := observers.NewUserBotLatencyObserver(observers.OnLatencyMeasured(func(_ float64) {
+		called = true
+	}))
+	ob.OnFrameProcessed("p", frames.NewBotStartedSpeakingFrame(), processors.Downstream)
+	if called {
+		t.Error("OnLatencyMeasured should not be called when bot starts without prior user stop")
+	}
+}
+
 type mockObserver struct {
 	onProcessed func()
 }

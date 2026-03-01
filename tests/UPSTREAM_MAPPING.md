@@ -9,7 +9,7 @@ This document tracks which upstream Python tests from [pipecat-ai/pipecat/tests]
 #### VAD / speech activity
 
 - **test_vad_controller.py** — **Ported**. Go: `pkg/audio/vad`, `pkg/processors/voice/turn.go`. Tests: `pkg/audio/vad/vad_test.go`, `pkg/processors/voice/turn_test.go`.
-- **test_vad_processor.py** — **Partial**. Go: `pkg/processors/audio` VAD processor. Tests: `tests/pkg/processors/audio/vad_processor_test.go` (start/stop/forwards). Extended with STARTING/STOPPING and quiet-only cases.
+- **test_vad_processor.py** — **Ported**. Go: `pkg/processors/audio` VAD processor. Tests: `tests/pkg/processors/audio/vad_processor_test.go` (start/stop/forwards, STARTING/STOPPING, quiet-only, StartingThenSpeaking).
 
 #### User turn / strategies
 
@@ -25,8 +25,8 @@ This document tracks which upstream Python tests from [pipecat-ai/pipecat/tests]
 - **test_pattern_pair_aggregator.py** — **Ported**. Go: `pkg/utils/patternaggregator`. Tests: `tests/pkg/utils/patternaggregator/patternaggregator_test.go`.
 - **test_dtmf_aggregator.py** — **Ported**. Go: `pkg/processors/aggregators/dtmf`. Tests: `tests/pkg/processors/aggregators/dtmf/dtmf_test.go`.
 - **test_skip_tags_aggregator.py** — **N/A** (or **Partial** if Go has skip-tags logic in aggregators; no dedicated processor found).
-- **test_context_aggregators.py**, **test_context_aggregators_universal.py**, **test_context_summarization.py** — **Partial**. Go: `pkg/processors/aggregators/llmcontextsummarizer`, `pkg/processors/aggregators/gatedcontext`. Add tests if needed.
-- **test_llm_context_summarizer.py** — **Partial**. Go: `pkg/processors/aggregators/llmcontextsummarizer`. Documented.
+- **test_context_aggregators.py**, **test_context_aggregators_universal.py**, **test_context_summarization.py** — **Ported**. Go: `pkg/processors/aggregators/llmcontextsummarizer`, `pkg/processors/aggregators/gatedcontext`. Tests: `tests/pkg/processors/aggregators/llmcontextsummarizer/summarizer_test.go`, `tests/pkg/processors/aggregators/gatedcontext/gatedcontext_test.go`.
+- **test_llm_context_summarizer.py** — **Ported**. Go: `pkg/processors/aggregators/llmcontextsummarizer`. Tests: `tests/pkg/processors/aggregators/llmcontextsummarizer/summarizer_test.go`.
 
 #### Filters
 
@@ -36,7 +36,7 @@ This document tracks which upstream Python tests from [pipecat-ai/pipecat/tests]
 
 #### Pipeline / frame processing
 
-- **test_pipeline.py** — **Partial**. Go: `pkg/pipeline`. Tests: `tests/pkg/pipeline/pipeline_test.go`, `pipeline_flow_test.go`. Extended with PipelineTask queue, Run, HasFinished, Cancel.
+- **test_pipeline.py** — **Ported**. Go: `pkg/pipeline`. Tests: `tests/pkg/pipeline/pipeline_test.go`, `pipeline_flow_test.go` (PipelineTask queue, Run, HasFinished, Cancel, CancelFrame propagation).
 - **test_frame_processor.py** — **Partial**. Base processor behavior covered by pipeline and filter tests.
 - **test_producer_consumer.py** — **Partial**. Pipeline flow tests cover producer/consumer style.
 
@@ -47,8 +47,8 @@ This document tracks which upstream Python tests from [pipecat-ai/pipecat/tests]
 
 #### Observers
 
-- **test_turn_trace_observer.py**, **test_turn_tracking_observer.py** — **Partial**. Go: `pkg/observers`. Tests: `tests/pkg/observers/observer_test.go`, `metrics_test.go`. Extended for turn tracking / callbacks.
-- **test_user_bot_latency_observer.py** — **Partial**. Go: `pkg/observers/user_bot_latency.go`. Add or extend observer tests.
+- **test_turn_trace_observer.py**, **test_turn_tracking_observer.py** — **Ported**. Go: `pkg/observers`. Tests: `tests/pkg/observers/observer_test.go`, `metrics_test.go` (turn tracking, multiple turns).
+- **test_user_bot_latency_observer.py** — **Ported**. Go: `pkg/observers/user_bot_latency.go`. Tests: `tests/pkg/observers/observer_test.go` (OnLatencyMeasured, no callback when bot starts without user stop).
 
 #### Transports
 
@@ -66,11 +66,11 @@ This document tracks which upstream Python tests from [pipecat-ai/pipecat/tests]
 - **test_google_llm_openai.py**, **test_google_utils.py** — **N/A**. Google LLM helpers are Python-specific; Go has different client structure.
 - **test_get_llm_invocation_params.py**, **test_llm_response.py**, **test_openai_llm_timeout.py** — **N/A** (or **Partial** if Go has equivalent invocation/response/timeout logic; add tests in service packages).
 - **test_sambanova_llm.py** — **N/A**. Sambanova is not in Go pkg/services.
-- **test_service_switcher.py** — **Partial**. Go: `pkg/pipeline/service_switcher.go`. Add tests if needed.
+- **test_service_switcher.py** — **Ported**. Go: `pkg/pipeline/service_switcher.go`. Tests: `tests/pkg/pipeline/service_switcher_test.go` (initial active, switch to B, invalid switch, LLMSwitcher).
 
 #### Adapters / tools
 
-- **test_direct_functions.py**, **test_function_calling_adapters.py** — **Partial**. Go: `pkg/adapters/schemas`. Tests: `tests/pkg/adapters/schemas/toolschema_test.go`. Extend for direct/function-calling behavior if applicable.
+- **test_direct_functions.py**, **test_function_calling_adapters.py** — **Ported**. Go: `pkg/adapters/schemas`. Tests: `tests/pkg/adapters/schemas/toolschema_test.go` (schema round-trip, parameters, CustomTools by AdapterType).
 
 #### Config / utils
 
@@ -85,7 +85,7 @@ This document tracks which upstream Python tests from [pipecat-ai/pipecat/tests]
 - **test_piper_tts.py** — **N/A**. Piper TTS is Python-specific.
 - **test_krisp_sdk_manager.py**, **test_krisp_viva_filter.py** — **N/A**. Krisp SDK is Python-specific.
 - **test_langchain.py** — **N/A**. LangChain is Python-specific.
-- **test_ivr_navigation.py** — **Partial**. Go: `pkg/extensions/ivr`. Tests: `tests/pkg/extensions/ivr/ivr_test.go`. Extend for navigation if needed.
+- **test_ivr_navigation.py** — **Ported**. Go: `pkg/extensions/ivr`. Tests: `tests/pkg/extensions/ivr/ivr_test.go` (DTMF, status completed, navigation multiple DTMF).
 - **test_interruption_strategies.py** — **Partial**. Go: `pkg/audio/turn`, interruption handling. Documented.
 
 #### Subdirs

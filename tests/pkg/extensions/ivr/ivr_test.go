@@ -82,3 +82,55 @@ func (c *collectSink) ProcessFrame(ctx context.Context, f frames.Frame, dir proc
 }
 
 var _ processors.Processor = (*collectSink)(nil)
+
+// TestIVRProcessor_StatusCompleted mirrors upstream test_ivr_navigation: " completed " tag triggers IVRStatusCompleted callback.
+func TestIVRProcessor_StatusCompleted(t *testing.T) {
+	ctx := context.Background()
+	ivrProc := ivr.NewIVRProcessor("IVR", "Classify.", "Navigate.", 2.0)
+	var collected []frames.Frame
+	sink := newCollectSink(&collected)
+	pl := pipeline.New()
+	pl.Add(ivrProc)
+	pl.Add(sink)
+	_ = pl.Setup(ctx)
+	defer pl.Cleanup(ctx)
+
+	var statusSeen ivr.IVRStatus
+	ivrProc.OnIVRStatusChanged(func(s ivr.IVRStatus) { statusSeen = s })
+	_ = pl.Push(ctx, frames.NewStartFrame())
+	// Tag " completed " in backtick delimiters triggers handleMatch -> handleIVRStatus(IVRStatusCompleted)
+	_ = pl.Push(ctx, &frames.LLMTextFrame{TextFrame: frames.TextFrame{DataFrame: frames.DataFrame{Base: frames.NewBase()}, Text: " ` completed ` "}})
+	_ = pl.Push(ctx, frames.NewLLMFullResponseEndFrame())
+
+	if statusSeen != ivr.IVRStatusCompleted {
+		t.Errorf("expected OnIVRStatusChanged(IVRStatusCompleted), got %v", statusSeen)
+	}
+}
+
+// TestIVRProcessor_NavigationMultipleDTMF mirrors upstream: multiple DTMF in sequence (menu steps) produce multiple OutputDTMFUrgentFrame.
+func TestIVRProcessor_NavigationMultipleDTMF(t *testing.T) {
+	ctx := context.Background()
+	ivrProc := ivr.NewIVRProcessor("IVR", "Classify.", "Navigate.", 2.0)
+	var collected []frames.Frame
+	sink := newCollectSink(&collected)
+	pl := pipeline.New()
+	pl.Add(ivrProc)
+	pl.Add(sink)
+	_ = pl.Setup(ctx)
+	defer pl.Cleanup(ctx)
+
+	_ = pl.Push(ctx, frames.NewStartFrame())
+	_ = pl.Push(ctx, &frames.LLMTextFrame{TextFrame: frames.TextFrame{DataFrame: frames.DataFrame{Base: frames.NewBase()}, Text: " ` 1 ` "}})
+	_ = pl.Push(ctx, &frames.LLMTextFrame{TextFrame: frames.TextFrame{DataFrame: frames.DataFrame{Base: frames.NewBase()}, Text: " ` 2 ` "}})
+	_ = pl.Push(ctx, frames.NewLLMFullResponseEndFrame())
+
+	var dtmfFrames int
+	for _, f := range collected {
+		if _, ok := f.(*frames.OutputDTMFUrgentFrame); ok {
+			dtmfFrames++
+		}
+	}
+	if dtmfFrames < 2 {
+		t.Errorf("expected at least 2 OutputDTMFUrgentFrame (navigation steps), got %d", dtmfFrames)
+	}
+}

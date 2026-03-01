@@ -107,3 +107,34 @@ func TestPipeline_StartFrameMetadata(t *testing.T) {
 	}
 }
 
+// TestPipeline_CancelFramePropagation mirrors upstream: CancelFrame propagates downstream to all processors in order.
+func TestPipeline_CancelFramePropagation(t *testing.T) {
+	p := pipeline.New()
+	m1 := newMockProcessor("m1")
+	m2 := newMockProcessor("m2")
+	p.Link(m1, m2)
+	ctx := context.Background()
+	if err := p.Setup(ctx); err != nil {
+		t.Fatalf("Setup: %v", err)
+	}
+	defer p.Cleanup(ctx)
+	if err := p.Start(ctx, nil); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	_ = p.Push(ctx, frames.NewTextFrame("x"))
+	_ = p.Push(ctx, frames.NewCancelFrame("test-reason"))
+	// Both processors should receive StartFrame, TextFrame, then CancelFrame
+	if len(m1.received) != 3 {
+		t.Errorf("m1 expected 3 frames (Start, Text, Cancel), got %d", len(m1.received))
+	}
+	if len(m2.received) != 3 {
+		t.Errorf("m2 expected 3 frames (Start, Text, Cancel), got %d", len(m2.received))
+	}
+	if len(m1.received) >= 3 && m1.received[2].FrameType() != "CancelFrame" {
+		t.Errorf("m1 third frame expected CancelFrame, got %s", m1.received[2].FrameType())
+	}
+	if len(m2.received) >= 3 && m2.received[2].FrameType() != "CancelFrame" {
+		t.Errorf("m2 third frame expected CancelFrame, got %s", m2.received[2].FrameType())
+	}
+}
+

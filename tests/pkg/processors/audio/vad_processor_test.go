@@ -153,6 +153,37 @@ func TestVADProcessor_noVADFramesOnStopping(t *testing.T) {
 	}
 }
 
+// TestVADProcessor_StartingThenSpeaking_EmitsStart mirrors upstream: STARTING then SPEAKING should emit VADUserStartedSpeakingFrame.
+func TestVADProcessor_StartingThenSpeaking_EmitsStart(t *testing.T) {
+	ctx := context.Background()
+	analyzer := &fakeVADAnalyzer{
+		states: []vad.State{vad.StateQuiet, vad.StateStarting, vad.StateStarting, vad.StateSpeaking, vad.StateSpeaking},
+		params: vad.Params{StartSecs: 0.2, StopSecs: 0.3},
+	}
+	p := audio.NewVADProcessor("vad", analyzer, 0)
+	col := &vadCollectProcessor{}
+	p.SetNext(col)
+
+	start := frames.NewStartFrame()
+	start.AudioInSampleRate = 16000
+	_ = p.ProcessFrame(ctx, start, processors.Downstream)
+	chunk := make([]byte, 320)
+	for i := 0; i < 5; i++ {
+		_ = p.ProcessFrame(ctx, frames.NewAudioRawFrame(chunk, 16000, 1, 0), processors.Downstream)
+	}
+
+	var gotStart bool
+	for _, f := range col.received {
+		if _, ok := f.(*frames.VADUserStartedSpeakingFrame); ok {
+			gotStart = true
+			break
+		}
+	}
+	if !gotStart {
+		t.Error("expected VADUserStartedSpeakingFrame after STARTING -> SPEAKING transition")
+	}
+}
+
 // TestVADProcessor_noVADFramesWhenQuiet mirrors upstream: when staying quiet, no VAD frames are pushed.
 func TestVADProcessor_noVADFramesWhenQuiet(t *testing.T) {
 	ctx := context.Background()
