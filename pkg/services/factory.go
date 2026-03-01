@@ -27,21 +27,21 @@ import (
 )
 
 const (
-	ProviderOpenAI        = "openai"
-	ProviderGroq          = "groq"
+	ProviderOpenAI       = "openai"
+	ProviderGroq         = "groq"
 	ProviderSarvam       = "sarvam"
-	ProviderGrok          = "grok"
-	ProviderCerebras      = "cerebras"
+	ProviderGrok         = "grok"
+	ProviderCerebras     = "cerebras"
 	ProviderElevenLabs   = "elevenlabs"
 	ProviderAWS          = "aws"
-	ProviderMistral       = "mistral"
-	ProviderDeepSeek      = "deepseek"
-	ProviderAnthropic     = "anthropic"
-	ProviderGoogle        = "google"
-	ProviderGoogleVertex  = "google_vertex"
-	ProviderOllama        = "ollama"
-	ProviderQwen          = "qwen"
-	ProviderWhisper       = "whisper"
+	ProviderMistral      = "mistral"
+	ProviderDeepSeek     = "deepseek"
+	ProviderAnthropic    = "anthropic"
+	ProviderGoogle       = "google"
+	ProviderGoogleVertex = "google_vertex"
+	ProviderOllama       = "ollama"
+	ProviderQwen         = "qwen"
+	ProviderWhisper      = "whisper"
 )
 
 // SupportedLLMProviders lists provider keys that can be passed to NewLLMFromConfig.

@@ -17,7 +17,7 @@ const defaultConfig = `{
   "transport": "websocket",
   "webrtc_ice_servers": [],
   "allow_interruptions": true,
-  "turn_detection": "none",
+  "turn_detection": "silence",
   "turn_stop_secs": 3,
   "turn_pre_speech_ms": 500,
   "turn_max_duration_secs": 8,

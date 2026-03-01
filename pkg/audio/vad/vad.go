@@ -8,8 +8,10 @@ import (
 
 // Detector decides whether a given audio frame contains speech.
 // Implementations should assume 16-bit PCM mono by default.
+// SetSampleRate configures the detector for the given pipeline input rate (e.g. 16000).
 type Detector interface {
 	IsSpeech(f audio.Frame) (bool, error)
+	SetSampleRate(sampleRate int)
 }
 
 // EnergyAnalyzerBackend is a simple confidence backend based on RMS energy.
@@ -107,5 +109,12 @@ func (e *EnergyDetector) IsSpeech(f audio.Frame) (bool, error) {
 		return false, nil
 	}
 	return e.detector.IsSpeech(f)
+}
+
+// SetSampleRate sets the sample rate on the internal analyzer (e.g. 16000 for pipeline input).
+func (e *EnergyDetector) SetSampleRate(sampleRate int) {
+	if e != nil && e.detector != nil && e.detector.Analyzer != nil {
+		e.detector.Analyzer.SetSampleRate(sampleRate)
+	}
 }
 

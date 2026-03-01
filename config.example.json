@@ -1,5 +1,6 @@
 {
   "_comment": "Copy to config.json and set API keys (or use env vars). Unknown keys like _comment are ignored.",
+  "_comment_turn_vad": "Use turn_detection silence for full utterance to LLM. If VAD misses speech (e.g. second utterance or quiet mic), lower vad_min_volume (e.g. 0.2) or vad_threshold.",
   "host": "localhost",
   "port": 8080,
   "model": "llama-3.1-8b-instant",
@@ -41,7 +42,7 @@
   "allow_interruptions": true,
   "interruption_strategy": "keyword",
   "min_words": 3,
-  "turn_detection": "none",
+  "turn_detection": "silence",
   "turn_stop_secs": 3,
   "turn_pre_speech_ms": 500,
   "turn_max_duration_secs": 8,
@@ -56,7 +57,7 @@
   "vad_stop_secs": 0.5,
   "vad_min_volume": 0.6,
   "interruption_strategy": "keyword",
-  "min_words": 3,
+  "min_words": 2,
   "api_keys": {
     "openai": "",
     "deepgram": "",

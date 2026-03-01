@@ -19,6 +19,8 @@ func (f *fakeVAD) IsSpeech(_ audio.Frame) (bool, error) {
 	return f.isSpeech, nil
 }
 
+func (f *fakeVAD) SetSampleRate(_ int) {}
+
 type fakeAnalyzer struct {
 	state          turn.EndOfTurnState
 	speechTriggered bool

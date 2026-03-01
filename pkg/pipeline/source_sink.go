@@ -74,12 +74,19 @@ func (s *Sink) ProcessFrame(ctx context.Context, f frames.Frame, dir processors.
 			logger.Info("pipeline (sink): forwarding to transport frame type=%s id=%d", f.FrameType(), f.ID())
 		}
 	}
-	if s.Out != nil {
-		select {
-		case s.Out <- f:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+	if s.Out != nil && f != nil {
+		// Send in a goroutine so the pipeline never blocks on a slow transport.
+		// This allows the runner's worker to keep processing queued mic input while TTS
+		// frames are still being sent to the client; order is preserved by the channel.
+		out := s.Out
+		frame := f
+		go func() {
+			defer func() { _ = recover() }() // avoid panic if channel closed during shutdown
+			select {
+			case out <- frame:
+			case <-ctx.Done():
+			}
+		}()
 	}
 	return nil
 }

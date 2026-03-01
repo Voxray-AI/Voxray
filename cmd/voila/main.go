@@ -181,12 +181,18 @@ func run(configPath string, flags runFlags) error {
 					}
 				}
 				if vadDetector == nil {
-					ed := vad.NewEnergyDetector()
-					if cfg.VadThreshold > 0 {
-						ed.Threshold = cfg.VadThreshold
+					vp := cfg.VADParams()
+					vadParams := vad.Params{
+						Confidence: vp.Confidence,
+						StartSecs:  vp.StartSecs,
+						StopSecs:   vp.StopSecs,
+						MinVolume:  vp.MinVolume,
+						Threshold:  cfg.VadThreshold,
 					}
+					ed := vad.NewEnergyDetectorWithParams(vadParams)
 					vadDetector = ed
 				}
+				vadDetector.SetSampleRate(16000)
 				turnParams := turn.Params{
 					StopSecs:        cfg.TurnStopSecs,
 					PreSpeechMs:     cfg.TurnPreSpeechMs,

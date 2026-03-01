@@ -168,4 +168,3 @@ func (s *Service) Chat(ctx context.Context, messages []map[string]any, onToken f
 
 	return nil
 }
-

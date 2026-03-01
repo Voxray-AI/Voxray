@@ -10,20 +10,20 @@ import (
 )
 
 type Config struct {
-	Host        string            `json:"host"`
-	Port        int               `json:"port"`
-	Model       string            `json:"model"`
-	Provider    string            `json:"provider,omitempty"` // default for all tasks; "openai" or "groq"
-	SttProvider string            `json:"stt_provider,omitempty"`
-	LlmProvider string            `json:"llm_provider,omitempty"`
-	TtsProvider string            `json:"tts_provider,omitempty"`
-	STTModel    string            `json:"stt_model,omitempty"`
-	STTLanguage string            `json:"stt_language,omitempty"` // e.g. "hi-IN", "en-IN"; empty = auto-detect (Sarvam)
-	TTSModel    string            `json:"tts_model,omitempty"`
-	TTSVoice    string            `json:"tts_voice,omitempty"`
+	Host          string                     `json:"host"`
+	Port          int                        `json:"port"`
+	Model         string                     `json:"model"`
+	Provider      string                     `json:"provider,omitempty"` // default for all tasks; "openai" or "groq"
+	SttProvider   string                     `json:"stt_provider,omitempty"`
+	LlmProvider   string                     `json:"llm_provider,omitempty"`
+	TtsProvider   string                     `json:"tts_provider,omitempty"`
+	STTModel      string                     `json:"stt_model,omitempty"`
+	STTLanguage   string                     `json:"stt_language,omitempty"` // e.g. "hi-IN", "en-IN"; empty = auto-detect (Sarvam)
+	TTSModel      string                     `json:"tts_model,omitempty"`
+	TTSVoice      string                     `json:"tts_voice,omitempty"`
 	Plugins       []string                   `json:"plugins"`
 	PluginOptions map[string]json.RawMessage `json:"plugin_options,omitempty"` // per-plugin JSON options; key = plugin name
-	APIKeys       map[string]string         `json:"api_keys,omitempty"`
+	APIKeys       map[string]string          `json:"api_keys,omitempty"`
 
 	// Transport selects which network transports are enabled for the server.
 	// Supported values:

@@ -2,8 +2,9 @@
 package groq
 
 import (
-	openai "github.com/sashabaranov/go-openai"
 	"voila-go/pkg/config"
+
+	openai "github.com/sashabaranov/go-openai"
 )
 
 const groqBaseURL = "https://api.groq.com/openai/v1"

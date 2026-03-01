@@ -23,7 +23,9 @@ const DefaultSarvamSTTModel = "saarika:v2.5"
 // using Sarvam AI's speech-to-text REST API.
 //
 // It uses:
-//   POST https://api.sarvam.ai/speech-to-text (multipart/form-data)
+//
+//	POST https://api.sarvam.ai/speech-to-text (multipart/form-data)
+//
 // with fields:
 //   - file: binary audio (WAV or raw PCM; format must match input_audio_codec)
 //   - model: e.g. "saarika:v2.5" or "saaras:v3"
@@ -139,8 +141,8 @@ func (s *SarvamSTTService) Transcribe(ctx context.Context, audio []byte, sampleR
 
 	var out struct {
 		Transcript   string   `json:"transcript"`
-		LanguageCode *string `json:"language_code"`
-		RequestID    string  `json:"request_id"`
+		LanguageCode *string  `json:"language_code"`
+		RequestID    string   `json:"request_id"`
 		LanguageProb *float64 `json:"language_probability"`
 	}
 	if err := json.Unmarshal(respBody, &out); err != nil {
@@ -168,4 +170,3 @@ func (s *SarvamSTTService) Transcribe(ctx context.Context, audio []byte, sampleR
 func (s *SarvamSTTService) TranscribeStream(ctx context.Context, audioCh <-chan []byte, sampleRate, numChannels int, outCh chan<- frames.Frame) {
 	s.runSTTStreaming(ctx, audioCh, sampleRate, numChannels, outCh)
 }
-
