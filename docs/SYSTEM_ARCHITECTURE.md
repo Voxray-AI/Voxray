@@ -67,7 +67,7 @@ flowchart TB
         end
 
         subgraph L2b["Session Store"]
-            SessionStore["runner.SessionStore\n(sessionId → Session)"]
+            SessionStore["SessionStore interface\n(memory or Redis)\nsessionId → Session"]
         end
 
         subgraph L3["Layer 3: Transport"]
@@ -240,8 +240,8 @@ flowchart LR
 ```
 
 - **Single process:** One `voila-go` process; one goroutine per active connection (Runner).
-- **No built-in clustering:** Horizontal scaling = multiple instances behind a load balancer; no shared state between instances. SessionStore is in-memory per process.
-- **Config:** `config.json` (and env) drives providers, pipeline shape, `transport`, and `runner_transport`.
+- **Scaling:** **Vertical** — run one instance; use default in-memory SessionStore. **Horizontal** — run multiple instances behind a load balancer; set `session_store=redis` and `redis_url` so all instances share session state via Redis (Redis is then an external dependency).
+- **Config:** `config.json` (and env) drives providers, pipeline shape, `transport`, `runner_transport`, and optional `session_store` / `redis_url` / `session_ttl_secs` for shared sessions.
 
 ---
 
@@ -254,7 +254,7 @@ flowchart LR
 | **Runner per connection** | Isolates sessions; one connection failure does not block others. |
 | **Frames + serialization** | Unified Frame type (audio, text, transcription, …); JSON or binary protobuf for pipecat compatibility; provider-specific serializers for telephony. |
 | **Config-driven pipeline** | Voice pipeline (provider + model) or plugin chain (echo, logger, aggregator, …) from config. |
-| **Session store** | In-memory store for Pipecat-style /start and /sessions; sessionId → Session (body, ICE options). |
+| **Session store** | SessionStore interface: in-memory (default, single instance) or Redis (shared across instances for horizontal scaling). Used by Pipecat-style /start and /sessions; sessionId → Session (body, ICE options). Config: `session_store`, `redis_url`, `session_ttl_secs`. |
 | **Realtime service** | Optional RealtimeService (e.g. OpenAI Realtime API) for single-WebSocket voice; lives alongside LLM/STT/TTS in services. |
 | **Observers** | Metrics, turn tracking, and user–bot latency wrapped around processors for observability. |
 

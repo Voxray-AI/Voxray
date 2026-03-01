@@ -13,34 +13,44 @@ type Session struct {
 	EnableDefaultIceServers bool
 }
 
-// SessionStore is an in-memory, concurrency-safe store for sessions by ID.
-type SessionStore struct {
+// SessionStore is the interface for storing and retrieving sessions by ID.
+// Implementations may be in-memory (single instance) or backed by Redis (horizontal scaling).
+type SessionStore interface {
+	Put(id string, sess *Session) error
+	Get(id string) (*Session, error)
+	Delete(id string) error
+}
+
+// MemorySessionStore is an in-memory, concurrency-safe store for sessions by ID.
+type MemorySessionStore struct {
 	mu   sync.RWMutex
 	sess map[string]*Session
 }
 
-// NewSessionStore returns a new session store.
-func NewSessionStore() *SessionStore {
-	return &SessionStore{sess: make(map[string]*Session)}
+// NewMemorySessionStore returns a new in-memory session store.
+func NewMemorySessionStore() *MemorySessionStore {
+	return &MemorySessionStore{sess: make(map[string]*Session)}
 }
 
 // Put stores a session by id. Overwrites if id exists.
-func (s *SessionStore) Put(id string, sess *Session) {
+func (s *MemorySessionStore) Put(id string, sess *Session) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sess[id] = sess
+	return nil
 }
 
 // Get returns the session for id, or nil if not found.
-func (s *SessionStore) Get(id string) *Session {
+func (s *MemorySessionStore) Get(id string) (*Session, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.sess[id]
+	return s.sess[id], nil
 }
 
 // Delete removes the session for id. Idempotent.
-func (s *SessionStore) Delete(id string) {
+func (s *MemorySessionStore) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.sess, id)
+	return nil
 }

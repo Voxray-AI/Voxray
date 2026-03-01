@@ -71,6 +71,15 @@ type Config struct {
 	ProxyHost string `json:"proxy_host,omitempty"`
 	// Dialin enables Daily PSTN dial-in webhook (POST /daily-dialin-webhook). Only with runner_transport=daily.
 	Dialin bool `json:"dialin,omitempty"`
+
+	// Session store for Pipecat-style sessions (POST /start, /sessions/{id}/...).
+	// "memory" (default): in-memory per process; use for single instance or vertical scaling.
+	// "redis": shared store via Redis; use for horizontal scaling behind a load balancer.
+	SessionStore string `json:"session_store,omitempty"`
+	// RedisURL is the Redis connection URL (e.g. redis://localhost:6379/0). Required when session_store is "redis".
+	RedisURL string `json:"redis_url,omitempty"`
+	// SessionTTLSecs is the TTL for sessions in seconds (default 3600). Applies to Redis store; optional for memory store.
+	SessionTTLSecs int `json:"session_ttl_secs,omitempty"`
 }
 
 // GetAPIKey returns the API key for the given service, checking the config first,

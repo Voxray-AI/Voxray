@@ -43,7 +43,7 @@ type webrtcOfferResponse struct {
 func WebrtcOfferDoc() {}
 
 // registerHandlers registers the web file server (when web/ exists), Swagger, Pipecat-style /start and /sessions when WebRTC is enabled, and the WebRTC /webrtc/offer handler on mux.
-func registerHandlers(mux *http.ServeMux, cfg *config.Config, ctx context.Context, onTransport func(context.Context, transport.Transport), sessionStore *runner.SessionStore) {
+func registerHandlers(mux *http.ServeMux, cfg *config.Config, ctx context.Context, onTransport func(context.Context, transport.Transport), sessionStore runner.SessionStore) {
 	// Swagger first
 	mux.Handle("/swagger/", httpSwagger.Handler(
 		httpSwagger.URL("/swagger/doc.json"),
@@ -57,7 +57,7 @@ func registerHandlers(mux *http.ServeMux, cfg *config.Config, ctx context.Contex
 	runnerMode := enableWebRTC || cfg.RunnerTransport == "daily"
 	if runnerMode {
 		if sessionStore == nil {
-			sessionStore = runner.NewSessionStore()
+			sessionStore = runner.NewMemorySessionStore()
 		}
 		registerRunnerWebRTCRoutes(mux, cfg, ctx, onTransport, sessionStore)
 	}
@@ -298,7 +298,7 @@ func registerDailyRoutes(mux *http.ServeMux, cfg *config.Config, ctx context.Con
 }
 
 // registerRunnerWebRTCRoutes adds POST /start and POST/PATCH /sessions/{id}/api/offer (Pipecat Cloud-style).
-func registerRunnerWebRTCRoutes(mux *http.ServeMux, cfg *config.Config, ctx context.Context, onTransport func(context.Context, transport.Transport), store *runner.SessionStore) {
+func registerRunnerWebRTCRoutes(mux *http.ServeMux, cfg *config.Config, ctx context.Context, onTransport func(context.Context, transport.Transport), store runner.SessionStore) {
 	mux.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -340,10 +340,14 @@ func registerRunnerWebRTCRoutes(mux *http.ServeMux, cfg *config.Config, ctx cont
 			return
 		}
 		sessionID := uuid.New().String()
-		store.Put(sessionID, &runner.Session{
+		if err := store.Put(sessionID, &runner.Session{
 			Body:                    req.Body,
 			EnableDefaultIceServers: req.EnableDefaultIceServers,
-		})
+		}); err != nil {
+			logger.Error("session store put: %v", err)
+			http.Error(w, "failed to store session", http.StatusInternalServerError)
+			return
+		}
 		resp := map[string]interface{}{"sessionId": sessionID}
 		if req.EnableDefaultIceServers {
 			resp["iceConfig"] = map[string]interface{}{
@@ -374,7 +378,12 @@ func registerRunnerWebRTCRoutes(mux *http.ServeMux, cfg *config.Config, ctx cont
 		if sessionID == "" {
 			sessionID = rest
 		}
-		sess := store.Get(sessionID)
+		sess, err := store.Get(sessionID)
+		if err != nil {
+			logger.Error("session store get: %v", err)
+			http.Error(w, "failed to get session", http.StatusInternalServerError)
+			return
+		}
 		if sess == nil {
 			http.Error(w, "invalid or not-yet-ready session_id", http.StatusNotFound)
 			return
@@ -461,9 +470,13 @@ func StartServers(ctx context.Context, cfg *config.Config, onTransport func(ctx 
 	}
 	enableWebRTC := mode == "smallwebrtc" || mode == "both"
 	runnerMode := enableWebRTC || cfg.RunnerTransport == "daily"
-	var sessionStore *runner.SessionStore
+	var sessionStore runner.SessionStore
 	if runnerMode {
-		sessionStore = runner.NewSessionStore()
+		var err error
+		sessionStore, err = runner.NewSessionStoreFromConfig(cfg)
+		if err != nil {
+			return err
+		}
 	}
 
 	server := &ws.Server{
@@ -498,9 +511,13 @@ func StartServersWithListener(ctx context.Context, listener net.Listener, cfg *c
 	}
 	enableWebRTC := mode == "smallwebrtc" || mode == "both"
 	runnerMode := enableWebRTC || cfg.RunnerTransport == "daily"
-	var sessionStore *runner.SessionStore
+	var sessionStore runner.SessionStore
 	if runnerMode {
-		sessionStore = runner.NewSessionStore()
+		var err error
+		sessionStore, err = runner.NewSessionStoreFromConfig(cfg)
+		if err != nil {
+			return err
+		}
 	}
 
 	server := &ws.Server{
