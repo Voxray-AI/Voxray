@@ -79,3 +79,31 @@ func TestPipeline_Flow(t *testing.T) {
 	p.Cleanup(ctx)
 }
 
+// TestPipeline_StartFrameMetadata mirrors upstream test_pipeline_start_metadata: StartFrame with metadata passes through.
+func TestPipeline_StartFrameMetadata(t *testing.T) {
+	p := pipeline.New()
+	m1 := newMockProcessor("m1")
+	p.Link(m1)
+	ctx := context.Background()
+	if err := p.Setup(ctx); err != nil {
+		t.Fatalf("Setup: %v", err)
+	}
+	defer p.Cleanup(ctx)
+
+	start := frames.NewStartFrame()
+	start.Metadata()["foo"] = "bar"
+	if err := p.Start(ctx, start); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if len(m1.received) < 1 {
+		t.Fatalf("expected at least StartFrame, got %d", len(m1.received))
+	}
+	gotStart, ok := m1.received[0].(*frames.StartFrame)
+	if !ok {
+		t.Fatalf("first frame expected *StartFrame, got %T", m1.received[0])
+	}
+	if gotStart.Metadata()["foo"] != "bar" {
+		t.Errorf("expected metadata foo=bar, got %v", gotStart.Metadata())
+	}
+}
+
