@@ -1,4 +1,4 @@
-﻿// Package voice provides processors that wire STT, LLM, and TTS into a pipeline.
+// Package voice provides processors that wire STT, LLM, and TTS into a pipeline.
 package voice
 
 import (

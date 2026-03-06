@@ -121,6 +121,7 @@ func (p *LLMProcessor) runLLMWithMessages(ctx context.Context, messages []map[st
 		_ = p.PushDownstream(ctx, tf)
 	})
 	if err != nil {
+		logger.Error("LLM: chat error: %v", err)
 		metrics.LLMErrorsTotal.WithLabelValues("provider_error", "", "llm", "").Inc()
 		now := time.Since(start).Seconds()
 		metrics.LLMTimeToFirstTokenSeconds.WithLabelValues("", "llm", "error", "").Observe(now)
@@ -128,6 +129,9 @@ func (p *LLMProcessor) runLLMWithMessages(ctx context.Context, messages []map[st
 		return err
 	}
 	metrics.LLMGenerationLatencySeconds.WithLabelValues("", "llm", "success", "").Observe(time.Since(start).Seconds())
+	if fullContent == "" {
+		logger.Info("LLM: response complete but empty (no text to send to TTS)")
+	}
 	if fullContent != "" {
 		preview := fullContent
 		if len(preview) > 80 {
