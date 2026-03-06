@@ -1,4 +1,6 @@
-### Test layout and conventions
+# Tests
+
+## Layout and conventions
 
 - **Unit tests**
   - Live under `tests/pkg/**` as external tests (`package <pkg>_test`, import `voxray-go/pkg/...`). Run with `go test ./tests/pkg/...`.
@@ -104,7 +106,7 @@ Notes:
 - When the `web/` directory exists, the server serves the browser client at `/` and the WebRTC signaling endpoint at `/webrtc/offer`.
 - Transports: WebSocket (`/ws`) and SmallWebRTC (RTP/Opus audio tracks via `/webrtc/offer`).
 
-### Stress tests and CI
+## Stress tests and CI
 
 Stress tests live in `tests/stress_testing/` (`http_stress_test.go`, `stress_harness_test.go`, `stress_mock_test.go`, `run_stress.sh`). They are skipped when running with the `-short` flag so CI can use `go test -short ./...` for fast runs.
 

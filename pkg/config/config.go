@@ -115,6 +115,9 @@ type Config struct {
 
 	// Recording controls conversation-wide audio recording and async upload.
 	Recording RecordingConfig `json:"recording,omitempty"`
+
+	// Transcripts controls per-message transcript logging to an external database.
+	Transcripts TranscriptConfig `json:"transcripts,omitempty"`
 }
 
 // RecordingConfig controls per-call/session audio recording.
@@ -129,6 +132,18 @@ type RecordingConfig struct {
 	Format string `json:"format,omitempty"`
 	// WorkerCount is the number of async uploader workers (thread pool size).
 	WorkerCount int `json:"worker_count,omitempty"`
+}
+
+// TranscriptConfig controls per-message transcript storage in a SQL database.
+type TranscriptConfig struct {
+	// Enable turns transcript logging on for all sessions.
+	Enable bool `json:"enable,omitempty"`
+	// Driver is the SQL driver name, e.g. "postgres" or "mysql".
+	Driver string `json:"driver,omitempty"`
+	// DSN is the driver-specific data source name / connection string.
+	DSN string `json:"dsn,omitempty"`
+	// TableName is the table to write transcript rows into (default "call_transcripts").
+	TableName string `json:"table_name,omitempty"`
 }
 
 // MCPConfig configures an MCP server connection (stdio: command + args). Used to register MCP tools with the LLM.
@@ -308,6 +323,18 @@ func ApplyEnvOverrides(cfg *Config) {
 		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 			cfg.Recording.WorkerCount = n
 		}
+	}
+	if v := os.Getenv("VOXRAY_TRANSCRIPTS_ENABLE"); v != "" {
+		cfg.Transcripts.Enable = strings.EqualFold(v, "true") || v == "1"
+	}
+	if v := os.Getenv("VOXRAY_TRANSCRIPTS_DRIVER"); v != "" {
+		cfg.Transcripts.Driver = v
+	}
+	if v := os.Getenv("VOXRAY_TRANSCRIPTS_DSN"); v != "" {
+		cfg.Transcripts.DSN = v
+	}
+	if v := os.Getenv("VOXRAY_TRANSCRIPTS_TABLE"); v != "" {
+		cfg.Transcripts.TableName = v
 	}
 }
 

@@ -165,6 +165,47 @@ Each call/session is written to a local WAV file and, when the session ends, a b
 
 AWS credentials and region are resolved via the standard AWS SDK v2 configuration (environment variables, shared config/credentials files, IAM role, etc.).
 
+### Transcript logging to Postgres/MySQL
+
+Voxray can persist **per-message text transcripts** (user and assistant) for each session to a **Postgres** or **MySQL** database.
+
+- **Config block (`config.json`)**:
+  ```json
+  "transcripts": {
+    "enable": true,
+    "driver": "postgres",
+    "dsn": "postgres://user:pass@localhost:5432/voxray?sslmode=disable",
+    "table_name": "call_transcripts"
+  }
+  ```
+  or:
+  ```json
+  "transcripts": {
+    "enable": true,
+    "driver": "mysql",
+    "dsn": "user:pass@tcp(localhost:3306)/voxray?parseTime=true",
+    "table_name": "call_transcripts"
+  }
+  ```
+- **Expected schema** (Postgres example):
+  ```sql
+  CREATE TABLE call_transcripts (
+    id          BIGSERIAL PRIMARY KEY,
+    session_id  TEXT NOT NULL,
+    role        TEXT NOT NULL, -- "user" or "assistant"
+    text        TEXT NOT NULL,
+    seq         BIGINT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  ```
+
+Environment overrides:
+
+- `VOXRAY_TRANSCRIPTS_ENABLE=true`
+- `VOXRAY_TRANSCRIPTS_DRIVER=postgres` (or `mysql`)
+- `VOXRAY_TRANSCRIPTS_DSN=...`
+- `VOXRAY_TRANSCRIPTS_TABLE=call_transcripts`
+
 ### Prometheus metrics
 
 - **Endpoint**: the server exposes a Prometheus-compatible scrape endpoint at `/metrics` on the same host/port as `/ws` and `/webrtc/offer`.
