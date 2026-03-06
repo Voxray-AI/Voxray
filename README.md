@@ -1,30 +1,61 @@
-# Voxray
+# Voxray-AI
 
-**Real-time voice pipeline server (STT → LLM → TTS) with WebSocket and WebRTC.**
+Config-driven framework for building real-time AI voice agents.
 
-Voxray is the Go server (`voxray-go`) that runs configurable voice pipelines and exposes **WebSocket** (`/ws`) and **SmallWebRTC** (`/webrtc/offer`) transports. For architecture and pipeline details, see [Architecture](docs/ARCHITECTURE.md).
+STT → LLM → TTS pipelines with WebSocket and WebRTC streaming.
+
+Built for low-latency conversational systems and industrial-scale adoption.
+
+Voxray-AI is the Go server (`voxray-go`) that runs configurable voice pipelines and exposes **WebSocket** (`/ws`) and **SmallWebRTC** (`/webrtc/offer`) transports for **voice-ai** and **real-time-ai** agents built in **Go/golang**. For architecture and pipeline details, see [Architecture](docs/ARCHITECTURE.md).
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
 
 ## Table of contents
 
+- [Overview](#overview)
 - [Features](#features)
+- [Architecture](#architecture)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
+- [Examples](#examples)
+- [Use cases](#use-cases)
+- [Roadmap](#roadmap)
 - [Documentation](#documentation)
 - [License](#license)
 - [Contributing](#contributing)
 
+## Overview
+
+Voxray-AI is a **config-driven Go server** for building **real-time voice agents** over **WebSocket** and **WebRTC**. It wires together **speech-to-text (STT)**, **LLM**, and **text-to-speech (TTS)** providers into low-latency streaming pipelines, so you can build production-ready **voice-ai**, **voice-agents**, and **conversational-ai** systems without hand-rolling audio plumbing. Pipelines, providers, and transports are defined via JSON config, making it easy to swap services and deploy to your own infrastructure.
+
 ## Features
 
-- **Voice pipeline:** STT → LLM → TTS with configurable providers and models
-- **Transports:** WebSocket and WebRTC (SmallWebRTC) support
-- **Multiple providers** for STT, LLM, and TTS (e.g. OpenAI, Groq, Sarvam, AWS, Google, Anthropic)
-- **Plugin system** for custom processors and aggregators
-- **Config-driven** setup via JSON; API keys via config or environment
-- **Optional CGO build** for Opus encoding and WebRTC TTS audio
+- **Pipelines:** Low-latency STT → LLM → TTS voice pipeline with configurable providers and models
+- **Transports:** WebSocket and WebRTC (SmallWebRTC) support for real-time streaming audio
+- **Providers:** Multiple STT, LLM, and TTS backends (e.g. OpenAI, Groq, Sarvam, AWS, Google, Anthropic)
+- **Framework & plugins:** Plugin system for custom processors and aggregators; built as an extensible **ai-framework**
+- **Config-driven:** JSON configuration for pipelines and transports; API keys via config or environment variables
+- **Voice over WebRTC:** Optional CGO build for Opus encoding and WebRTC TTS audio, tuned for low-latency conversational systems
+
+## Architecture
+
+At a high level, Voxray-AI receives audio from Web or native clients over **WebSocket** or **WebRTC**, runs it through a configurable **STT → LLM → TTS** pipeline, and streams audio responses back over the same transport. Each stage (STT, LLM, TTS) is pluggable, so you can mix and match providers while keeping a consistent, low-latency real-time pipeline.
+
+```mermaid
+flowchart LR
+  client["Client (Web/Native)"] --> ws[WebSocket]
+  client --> webrtc[WebRTC]
+  ws & webrtc --> stt[STT]
+  stt --> llm[LLM]
+  llm --> tts[TTS]
+  tts --> ws
+  tts --> webrtc
+```
+
+For a deeper dive into the internals and pipeline design, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md).
+
 
 ## Requirements
 
@@ -215,6 +246,37 @@ Environment overrides:
 - **Scalability**: metrics are process-local (per instance); Prometheus aggregates across instances using its own `instance`/`pod` labels, and high-cardinality labels like `session_id` are safely handled via hashing/sampling.
 
 You can set the config path with the `-config` flag or the `VOXRAY_CONFIG` environment variable.
+
+## Examples
+
+- **Minimal voice pipeline**: see [examples/voice/README.md](examples/voice/README.md) for sample `config.json` files that wire STT, LLM, and TTS providers into end-to-end voice pipelines.
+- **WebRTC voice client**: see [tests/frontend/README.md](tests/frontend/README.md) for a browser-based WebRTC client that connects to Voxray-AI and streams audio in real time.
+
+Example `config.json` snippet for a simple voice agent:
+
+```json
+{
+  "transport": "both",
+  "stt": { "provider": "openai", "model": "gpt-4o-mini-transcribe" },
+  "llm": { "provider": "openai", "model": "gpt-4.1-mini" },
+  "tts": { "provider": "openai", "voice": "alloy" }
+}
+```
+
+## Use cases
+
+- **AI call centers / IVR**: conversational-ai agents that handle inbound and outbound calls with low latency.
+- **In-app voice copilots**: embed real-time voice-agents inside SaaS or productivity apps using WebSocket or WebRTC.
+- **Operations and support bots**: agentic voicebots for support, ops, and internal tooling that run in your own infra.
+- **Realtime monitoring and control**: voice interfaces for dashboards, observability tools, and control systems.
+- **On-prem / VPC assistants**: self-hosted voice-ai stacks where data must stay within your cloud or datacenter.
+
+## Roadmap
+
+- More built-in STT/LLM/TTS providers and opinionated presets for common stacks.
+- Deeper observability, tracing, and debugging tools for real-time pipelines.
+- Additional starter templates and example agents for popular voice-agent scenarios.
+- Expanded documentation on scaling, deployment patterns, and production hardening.
 
 ## Documentation
 
