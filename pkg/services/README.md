@@ -2,6 +2,43 @@
 
 This package provides LLM, STT, TTS, and realtime service abstractions aligned with common LLM/STT/TTS service patterns. Use the factory and `config.Config` to construct implementations by provider name.
 
+## API interaction (streaming)
+
+```mermaid
+sequenceDiagram
+    participant P as Pipeline
+    participant C as Provider Client
+    participant A as External API
+
+    P->>C: Call(ctx, input)
+    C->>A: HTTP POST (streaming)
+    loop chunks
+        P-->>C: Write(chunk)
+        C-->>A: stream bytes
+    end
+    A-->>C: response stream
+    C-->>P: Result
+```
+
+## Provider registry
+
+```mermaid
+graph TD
+    Factory["Factory\nNew*FromConfig"] --> LLM["LLM Interface"]
+    Factory --> STT["STT Interface"]
+    Factory --> TTS["TTS Interface"]
+    LLM --> OpenAI_LLM["openai"]
+    LLM --> Groq_LLM["groq"]
+    LLM --> Anthropic["anthropic"]
+    LLM --> Mistral["mistral"]
+    STT --> OpenAI_STT["openai"]
+    STT --> Groq_STT["groq"]
+    STT --> Sarvam_STT["sarvam"]
+    TTS --> OpenAI_TTS["openai"]
+    TTS --> Sarvam_TTS["sarvam"]
+    TTS --> Groq_TTS["groq"]
+```
+
 ## Interfaces
 
 - **LLMService** — chat completion with optional streaming (`Chat(ctx, messages, onToken)`).
@@ -157,3 +194,10 @@ llm, stt, tts := services.NewServicesFromConfig(cfg)
 
 - `tests/pkg/services/` — factory construction tests for all supported providers; Sarvam integration test (requires `SARVAM_API_KEY`).
 - `tests/pkg/realtime/` — realtime.NewFromConfig for openai and unsupported provider.
+
+## See also
+
+- [../config/README.md](../config/README.md) — Config and API key resolution
+- [../processors/README.md](../processors/README.md) — Voice pipeline uses STT/LLM/TTS services
+- [../frames/README.md](../frames/README.md) — TranscriptionFrame, LLMTextFrame, TTSAudioRawFrame
+- [../../docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) — High-level architecture
