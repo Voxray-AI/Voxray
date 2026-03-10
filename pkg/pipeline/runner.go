@@ -32,6 +32,7 @@ type Runner struct {
 	StartFrame *frames.StartFrame // optional; if nil, NewStartFrame() is used in Run
 	done       chan struct{}
 	mu         sync.Mutex
+	wg         sync.WaitGroup
 }
 
 // NewRunner returns a Runner that will run the given pipeline with the transport.
@@ -85,7 +86,9 @@ func (r *Runner) Run(ctx context.Context) error {
 		logger.Info("pipeline runner: input channel active, forwarding frames to pipeline (queue cap=%d)", inputQueueCap)
 		queueCh := make(chan frames.Frame, inputQueueCap)
 		// Reader: transport -> queue (never blocks on pipeline)
+		r.wg.Add(1)
 		go func() {
+			defer r.wg.Done()
 			var inCount uint64
 			for {
 				select {
@@ -118,16 +121,28 @@ func (r *Runner) Run(ctx context.Context) error {
 			}
 		}()
 		// Worker: queue -> pipeline (may block; does not block reader)
+		r.wg.Add(1)
 		go func() {
-			for f := range queueCh {
-				if ctx.Err() != nil {
+			defer r.wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
 					return
-				}
-				_ = r.Pipeline.Push(ctx, f)
-				if ef, ok := f.(*frames.ErrorFrame); ok && ef.Fatal {
-					return
-				}
-				if _, ok := f.(*frames.CancelFrame); ok {
+				case f, ok := <-queueCh:
+					if !ok {
+						return
+					}
+					if f == nil {
+						continue
+					}
+					_ = r.Pipeline.Push(ctx, f)
+					if ef, ok := f.(*frames.ErrorFrame); ok && ef.Fatal {
+						return
+					}
+					if _, ok := f.(*frames.CancelFrame); ok {
+						return
+					}
+				case <-r.done:
 					return
 				}
 			}
@@ -136,6 +151,8 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	// Block until context done
 	<-ctx.Done()
+	// Wait for internal goroutines (reader/worker) to drain before signaling Done.
+	r.wg.Wait()
 	logger.Info("pipeline runner: context done, stopping")
 	r.mu.Lock()
 	close(r.done)
