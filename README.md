@@ -17,7 +17,7 @@ Voxray-AI is the Go server (`voxray-go`) that runs configurable voice pipelines 
 - [Architecture](#architecture)
 - [Requirements](#requirements)
 - [Installation](#installation)
-- [Quick start](#quick-start)
+- [Getting Started](#getting-started)
 - [Configuration](#configuration)
 - [Examples](#examples)
 - [Use cases](#use-cases)
@@ -44,14 +44,37 @@ Voxray-AI is a **config-driven Go server** for building **real-time voice agents
 At a high level, Voxray-AI receives audio from Web or native clients over **WebSocket** or **WebRTC**, runs it through a configurable **STT → LLM → TTS** pipeline, and streams audio responses back over the same transport. Each stage (STT, LLM, TTS) is pluggable, so you can mix and match providers while keeping a consistent, low-latency real-time pipeline.
 
 ```mermaid
-flowchart LR
-  client["Client (Web/Native)"] --> ws[WebSocket]
-  client --> webrtc[WebRTC]
-  ws & webrtc --> stt[STT]
-  stt --> llm[LLM]
-  llm --> tts[TTS]
-  tts --> ws
-  tts --> webrtc
+flowchart TB
+  subgraph Client["Client"]
+    Browser["Browser / Native app"]
+  end
+  subgraph Server["Server"]
+    HTTP["HTTP\n/ws, /webrtc/offer\n/metrics"]
+  end
+  subgraph Transport["Transport"]
+    WS["WebSocket"]
+    WebRTC["SmallWebRTC"]
+  end
+  subgraph Pipeline["Pipeline"]
+    Runner["Runner"]
+    Chain["Processors\nVAD → STT → LLM → TTS → Sink"]
+  end
+  subgraph Providers["External providers"]
+    STT_API["STT API"]
+    LLM_API["LLM API"]
+    TTS_API["TTS API"]
+  end
+  Browser --> WS
+  Browser --> WebRTC
+  WS --> HTTP
+  WebRTC --> HTTP
+  HTTP --> Runner
+  Runner --> Chain
+  Chain --> STT_API
+  Chain --> LLM_API
+  Chain --> TTS_API
+  Chain --> WS
+  Chain --> WebRTC
 ```
 
 For a deeper dive into the internals and pipeline design, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md).
@@ -138,20 +161,16 @@ CGO_ENABLED=1 go run ./cmd/voxray -config config.json
 
 After a voice build, WebRTC offers succeed and TTS audio is sent over the peer connection.
 
-## Quick start
+## Getting Started
 
-1. Copy the example config and set your API keys (or use env vars):
-   ```bash
-   cp config.example.json config.json
-   ```
-2. Run the server:
-   ```bash
-   ./voxray -config config.json
-   ```
-   On Windows: `.\voxray.exe -config config.json`
-3. **Endpoints:** WebSocket at `/ws`, WebRTC at `/webrtc/offer`.
+End-to-end steps to run the server and connect a client:
 
-For sample configs and provider/model examples see [examples/voice/README.md](examples/voice/README.md). For a WebRTC voice client see [tests/frontend/README.md](tests/frontend/README.md).
+1. **Prerequisites** — Go 1.25+; for WebRTC TTS/Opus, CGO and gcc (see [Requirements](#requirements)).
+2. **Build** — From repo root: `go build -o voxray ./cmd/voxray` (or `make build`). For voice/WebRTC: `.\scripts\build-voice.ps1` (Windows) or `make build-voice` (Linux/macOS).
+3. **Config** — `cp config.example.json config.json` and set `api_keys` or environment variables (e.g. `OPENAI_API_KEY`). See [examples/voice/README.md](examples/voice/README.md) for provider/model examples.
+4. **Run** — `./voxray -config config.json` (Windows: `.\voxray.exe -config config.json`).
+5. **Connect** — WebSocket: `http://localhost:8080/ws`. WebRTC: `http://localhost:8080/webrtc/offer`.
+6. **Try the WebRTC client** — From repo root: `cd tests/frontend && python -m http.server 3000`, then open **http://localhost:3000/webrtc-voice.html** in your browser. Set Server URL to `http://localhost:8080` and click Start. See [tests/frontend/README.md](tests/frontend/README.md) for details.
 
 ## Configuration
 
@@ -280,7 +299,24 @@ Example `config.json` snippet for a simple voice agent:
 
 ## Documentation
 
+### Repository layout (package READMEs)
+
+- [pkg/pipeline/README.md](pkg/pipeline/README.md) — pipeline, runner, source/sink, task, registry
+- [pkg/transport/README.md](pkg/transport/README.md) — WebSocket, WebRTC, in-memory transports
+- [pkg/services/README.md](pkg/services/README.md) — LLM, STT, TTS interfaces and provider factory
+- [pkg/recording/README.md](pkg/recording/README.md) — conversation recording and S3 upload
+- [pkg/metrics/README.md](pkg/metrics/README.md) — Prometheus metrics
+- [pkg/config/README.md](pkg/config/README.md) — configuration and env overrides
+- [pkg/processors/README.md](pkg/processors/README.md) — voice, echo, filters, aggregators
+- [pkg/runner/README.md](pkg/runner/README.md) — session store and runner args
+- [pkg/utils/README.md](pkg/utils/README.md) — backoff, notifier, sentence, aggregators
+- [pkg/frames/README.md](pkg/frames/README.md) — frame types and serialization
+- [pkg/audio/README.md](pkg/audio/README.md) — VAD, turn detection, codecs, resample
+- [scripts/README.md](scripts/README.md) — build, run, and maintenance scripts
 - [docs/README.md](docs/README.md) — documentation index and reading order
+
+### Docs and examples
+
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — high-level architecture and pipeline
 - [docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md) — system view and entry points
 - [examples/voice/README.md](examples/voice/README.md) — minimal voice pipeline and config samples
