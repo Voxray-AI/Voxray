@@ -1,4 +1,4 @@
-﻿// Package realtime provides realtime session implementations (OpenAI Realtime API and shim).
+// Package realtime provides realtime session implementations (OpenAI Realtime API and shim).
 // RealtimeSession (SendText, SendAudio, Events, Close) and RealtimeService (NewSession) align with
 // OpenAI Realtime and WebSocket session abstractions: a long-lived bidirectional session over
 // WebSocket with event-driven input/output. OpenAIRealtimeAPI uses the official OpenAI Realtime
@@ -55,8 +55,17 @@ type OpenAIRealtimeAPI struct {
 	model  string
 }
 
+// unimplementedRealtimeService is a stub that returns an error from NewSession.
+type unimplementedRealtimeService struct {
+	provider string
+}
+
+func (u *unimplementedRealtimeService) NewSession(ctx context.Context, cfg services.RealtimeConfig) (services.RealtimeSession, error) {
+	return nil, fmt.Errorf("realtime session for provider %q is not yet implemented", u.provider)
+}
+
 // NewFromConfig returns a RealtimeService for the given provider, or an error if unsupported.
-// Provider should be one of services.SupportedRealtimeProviders (e.g. "openai").
+// Provider should be one of services.SupportedRealtimeProviders (e.g. "openai", "hume", "inworld").
 // This lives in the realtime package to avoid an import cycle (services -> realtime -> services).
 func NewFromConfig(cfg *config.Config, provider string) (services.RealtimeService, error) {
 	apiKey := cfg.GetAPIKey("openai", "OPENAI_API_KEY")
@@ -67,6 +76,8 @@ func NewFromConfig(cfg *config.Config, provider string) (services.RealtimeServic
 	switch provider {
 	case "openai":
 		return NewOpenAIRealtimeAPI(apiKey, model), nil
+	case "hume", "inworld":
+		return &unimplementedRealtimeService{provider: provider}, nil
 	default:
 		return nil, fmt.Errorf("realtime not supported for provider %q", provider)
 	}

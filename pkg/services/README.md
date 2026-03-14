@@ -64,8 +64,20 @@ These are the providers currently implemented in this Go port.
 | ollama     | ✓   | —   | —   | —        |
 | qwen       | ✓   | —   | —   | —        |
 | whisper    | —   | ✓   | —   | —        |
+| asyncai    | ✓   | —   | —   | —        |
+| camb       | —   | ✓   | —   | —        |
+| fish       | ✓   | —   | —   | —        |
+| gradium    | —   | ✓   | —   | —        |
+| hume       | —   | —   | ✓   | ✓ (stub) |
+| inworld    | ✓   | —   | ✓   | ✓ (stub) |
+| minimax    | ✓   | —   | ✓   | —        |
+| moondream  | ✓   | —   | —   | —        |
+| neuphonic   | —   | —   | ✓   | —        |
+| openpipe   | ✓   | —   | —   | —        |
+| soniox     | —   | ✓   | —   | —        |
+| xtts       | —   | —   | ✓   | —        |
 
-Constants: `ProviderOpenAI`, `ProviderGroq`, `ProviderSarvam`, `ProviderGrok`, `ProviderCerebras`, `ProviderElevenLabs`, `ProviderAWS`, `ProviderMistral`, `ProviderDeepSeek`, `ProviderOllama`, `ProviderQwen`, `ProviderWhisper`. Realtime: `SupportedRealtimeProviders` (currently `"openai"`).
+Constants: `ProviderOpenAI`, `ProviderGroq`, `ProviderSarvam`, `ProviderGrok`, `ProviderCerebras`, `ProviderElevenLabs`, `ProviderAWS`, `ProviderMistral`, `ProviderDeepSeek`, `ProviderOllama`, `ProviderQwen`, `ProviderWhisper`, `ProviderAsyncAI`, `ProviderCamb`, `ProviderFish`, `ProviderGradium`, `ProviderHume`, `ProviderInworld`, `ProviderMinimax`, `ProviderMoondream`, `ProviderNeuphonic`, `ProviderOpenPipe`, `ProviderSoniox`, `ProviderXTTS`. Realtime: `SupportedRealtimeProviders` (`"openai"`, `"hume"`, `"inworld"`).
 
 ## Upstream providers and Go coverage
 
@@ -83,11 +95,11 @@ Legend:
 |----------------------|--------------|--------------|--------------|-------------------|--------|--------|--------|-------------|
 | anthropic            | ✓            | —            | —            | —                 | —      | —      | —      | —           |
 | assemblyai           | —            | ✓            | —            | —                 | —      | —      | —      | —           |
-| asyncai              | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| asyncai              | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
 | aws                  | ✓            | ✓            | ✓            | —                 | ✓      | ✓      | ✓      | —           |
 | aws_nova_sonic       | ✓            | —            | ✓            | —                 | —      | —      | —      | —           |
 | azure                | ✓            | ✓            | ✓            | —                 | —      | —      | —      | —           |
-| camb                 | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| camb                 | —            | ✓            | —            | —                 | —      | ✓      | —      | —           |
 | cartesia             | —            | —            | ✓            | —                 | —      | —      | —      | —           |
 | cerebras             | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
 | deepgram             | —            | ✓            | —            | —                 | —      | —      | —      | —           |
@@ -104,22 +116,22 @@ Legend:
 | groq                 | ✓            | ✓            | ✓            | —                 | ✓      | ✓      | ✓      | —           |
 | hathora              | —            | —            | —            | ✓                 | —      | —      | —      | —           |
 | heygen               | —            | —            | ✓            | ✓                 | —      | —      | —      | —           |
-| hume                 | —            | —            | ✓            | ✓                 | —      | —      | —      | —           |
-| inworld              | ✓            | —            | ✓            | ✓                 | —      | —      | —      | —           |
+| hume                 | —            | —            | ✓            | ✓                 | —      | —      | ✓      | ✓ (stub)    |
+| inworld              | ✓            | —            | ✓            | ✓                 | ✓      | —      | ✓      | ✓ (stub)    |
 | kokoro               | —            | —            | ✓            | —                 | —      | —      | —      | —           |
 | lmnt                 | —            | —            | ✓            | —                 | —      | —      | —      | —           |
 | mem0                 | —            | —            | —            | —                 | —      | —      | —      | —           |
-| minimax              | ✓            | —            | ✓            | —                 | —      | —      | —      | —           |
+| minimax              | ✓            | —            | ✓            | —                 | ✓      | —      | ✓      | —           |
 | mistral              | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
-| moondream            | ✓            | —            | —            | —                 | —      | —      | —      | —           |
-| neuphonic            | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+| moondream            | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
+| neuphonic            | —            | —            | ✓            | —                 | —      | —      | ✓      | —           |
 | nim                  | ✓            | —            | —            | —                 | —      | —      | —      | —           |
 | nvidia               | ✓            | ✓            | ✓            | —                 | —      | —      | —      | —           |
 | ollama               | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
 | openai               | ✓            | ✓            | ✓            | ✓                 | ✓      | ✓      | ✓      | ✓           |
 | openai_realtime      | ✓            | ✓            | ✓            | ✓                 | —      | —      | —      | —           |
 | openai_realtime_beta | ✓            | ✓            | ✓            | ✓                 | —      | —      | —      | —           |
-| openpipe             | ✓            | —            | —            | —                 | —      | —      | —      | —           |
+| openpipe             | ✓            | —            | —            | —                 | ✓      | —      | —      | —           |
 | openrouter           | ✓            | —            | —            | —                 | —      | —      | —      | —           |
 | perplexity           | ✓            | —            | —            | —                 | —      | —      | —      | —           |
 | piper                | —            | —            | ✓            | —                 | —      | —      | —      | —           |
@@ -130,13 +142,13 @@ Legend:
 | sambanova            | ✓            | —            | —            | —                 | —      | —      | —      | —           |
 | sarvam               | —            | ✓            | ✓            | —                 | —      | ✓      | ✓      | —           |
 | simli                | —            | —            | ✓            | ✓                 | —      | —      | —      | —           |
-| soniox               | —            | ✓            | —            | —                 | —      | —      | —      | —           |
+| soniox               | —            | ✓            | —            | —                 | —      | ✓      | —      | —           |
 | speechmatics         | —            | ✓            | —            | —                 | —      | —      | —      | —           |
 | tavus                | —            | —            | ✓            | ✓                 | —      | —      | —      | —           |
 | together             | ✓            | —            | —            | —                 | —      | —      | —      | —           |
 | ultravox             | —            | —            | ✓            | —                 | —      | —      | —      | —           |
 | whisper              | —            | ✓            | —            | —                 | —      | ✓      | —      | —           |
-| xtts                 | —            | —            | ✓            | —                 | —      | —      | —      | —           |
+| xtts                 | —            | —            | ✓            | —                 | —      | —      | ✓      | —           |
 
 
 ## Configuration
@@ -165,6 +177,18 @@ Use **config.Config** (JSON or env):
 | ollama    | OLLAMA_API_KEY (optional), OLLAMA_BASE_URL (optional, default http://localhost:11434/v1) |
 | qwen      | DASHSCOPE_API_KEY or QWEN_API_KEY, DASHSCOPE_BASE_URL (optional) |
 | whisper   | WHISPER_API_KEY or OPENAI_API_KEY, WHISPER_BASE_URL (optional) |
+| asyncai   | ASYNC_AI_API_KEY, ASYNC_AI_BASE_URL (optional) |
+| camb      | CAMB_API_KEY, CAMB_BASE_URL (optional) |
+| fish      | FISH_API_KEY, FISH_BASE_URL (optional) |
+| gradium   | GRADIUM_API_KEY, GRADIUM_BASE_URL (optional) |
+| hume      | HUME_API_KEY |
+| inworld   | INWORLD_API_KEY |
+| minimax   | MINIMAX_API_KEY, MINIMAX_BASE_URL (optional) |
+| moondream | MOONDREAM_API_KEY, MOONDREAM_BASE_URL (optional) |
+| neuphonic  | NEUPHONIC_API_KEY, NEUPHONIC_BASE_URL (optional) |
+| openpipe  | OPENPIPE_API_KEY |
+| soniox    | SONIOX_API_KEY, SONIOX_WS_URL (optional), SONIOX_MODEL (optional) |
+| xtts      | XTTS_BASE_URL (optional, default http://localhost:8000 for local server) |
 
 ## Usage
 

@@ -1,4 +1,4 @@
-﻿package services_test
+package services_test
 
 import (
 	"context"
@@ -57,6 +57,35 @@ func TestNewTTSFromConfig_ConstructsAllSupportedProviders(t *testing.T) {
 		svc := services.NewTTSFromConfig(cfg, provider, "", "")
 		if svc == nil {
 			t.Errorf("NewTTSFromConfig(%q) returned nil", provider)
+		}
+	}
+}
+
+// TestNewFromConfig_PipecatIntegratedProviders verifies the 12 integrated Pipecat providers construct.
+func TestNewFromConfig_PipecatIntegratedProviders(t *testing.T) {
+	cfg := &config.Config{Model: "test-model"}
+	llmProviders := []string{
+		services.ProviderAsyncAI, services.ProviderFish, services.ProviderInworld,
+		services.ProviderMinimax, services.ProviderMoondream, services.ProviderOpenPipe,
+	}
+	for _, p := range llmProviders {
+		if svc := services.NewLLMFromConfig(cfg, p, "test-model"); svc == nil {
+			t.Errorf("NewLLMFromConfig(%q) returned nil", p)
+		}
+	}
+	sttProviders := []string{services.ProviderCamb, services.ProviderGradium, services.ProviderSoniox}
+	for _, p := range sttProviders {
+		if svc := services.NewSTTFromConfig(cfg, p); svc == nil {
+			t.Errorf("NewSTTFromConfig(%q) returned nil", p)
+		}
+	}
+	ttsProviders := []string{
+		services.ProviderHume, services.ProviderInworld, services.ProviderMinimax,
+		services.ProviderNeuphonic, services.ProviderXTTS,
+	}
+	for _, p := range ttsProviders {
+		if svc := services.NewTTSFromConfig(cfg, p, "", ""); svc == nil {
+			t.Errorf("NewTTSFromConfig(%q) returned nil", p)
 		}
 	}
 }

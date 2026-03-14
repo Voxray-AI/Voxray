@@ -1,4 +1,4 @@
-﻿// Package services defines interfaces and implementations for LLM, STT, and TTS.
+// Package services defines interfaces and implementations for LLM, STT, and TTS.
 // Use the factory functions (NewLLMFromConfig, NewSTTFromConfig, NewTTSFromConfig) to construct
 // services by provider name; see Supported*Providers for capability matrix. For RealtimeService
 // use realtime.NewFromConfig(cfg, provider) to avoid an import cycle.
@@ -9,21 +9,33 @@ import (
 
 	"voxray-go/pkg/config"
 	"voxray-go/pkg/services/anthropic"
+	"voxray-go/pkg/services/asyncai"
 	"voxray-go/pkg/services/aws"
+	"voxray-go/pkg/services/camb"
 	"voxray-go/pkg/services/cerebras"
 	"voxray-go/pkg/services/deepseek"
 	"voxray-go/pkg/services/elevenlabs"
+	"voxray-go/pkg/services/fish"
 	"voxray-go/pkg/services/google"
+	"voxray-go/pkg/services/gradium"
 	"voxray-go/pkg/services/grok"
 	"voxray-go/pkg/services/groq"
+	"voxray-go/pkg/services/hume"
+	"voxray-go/pkg/services/inworld"
 	"voxray-go/pkg/services/mistral"
+	"voxray-go/pkg/services/minimax"
+	"voxray-go/pkg/services/moondream"
+	"voxray-go/pkg/services/neuphonic"
 	"voxray-go/pkg/services/ollama"
 	"voxray-go/pkg/services/openai"
+	"voxray-go/pkg/services/openpipe"
 	"voxray-go/pkg/services/qwen"
 	"voxray-go/pkg/services/sarvam"
+	"voxray-go/pkg/services/soniox"
 	"voxray-go/pkg/services/stt"
 	"voxray-go/pkg/services/tts"
 	"voxray-go/pkg/services/whisper"
+	"voxray-go/pkg/services/xtts"
 )
 
 const (
@@ -42,6 +54,19 @@ const (
 	ProviderOllama       = "ollama"
 	ProviderQwen         = "qwen"
 	ProviderWhisper      = "whisper"
+	// Pipecat-integrated providers
+	ProviderAsyncAI   = "asyncai"
+	ProviderCamb      = "camb"
+	ProviderFish      = "fish"
+	ProviderGradium   = "gradium"
+	ProviderHume       = "hume"
+	ProviderInworld   = "inworld"
+	ProviderMinimax   = "minimax"
+	ProviderMoondream = "moondream"
+	ProviderNeuphonic = "neuphonic"
+	ProviderOpenPipe  = "openpipe"
+	ProviderSoniox    = "soniox"
+	ProviderXTTS      = "xtts"
 )
 
 // SupportedLLMProviders lists provider keys that can be passed to NewLLMFromConfig.
@@ -58,16 +83,28 @@ var SupportedLLMProviders = []string{
 	ProviderGoogleVertex,
 	ProviderOllama,
 	ProviderQwen,
+	ProviderAsyncAI,
+	ProviderFish,
+	ProviderInworld,
+	ProviderMinimax,
+	ProviderMoondream,
+	ProviderOpenPipe,
 }
 
 // SupportedSTTProviders lists provider keys that can be passed to NewSTTFromConfig.
-var SupportedSTTProviders = []string{ProviderOpenAI, ProviderGroq, ProviderSarvam, ProviderElevenLabs, ProviderAWS, ProviderGoogle, ProviderWhisper}
+var SupportedSTTProviders = []string{
+	ProviderOpenAI, ProviderGroq, ProviderSarvam, ProviderElevenLabs, ProviderAWS, ProviderGoogle, ProviderWhisper,
+	ProviderCamb, ProviderGradium, ProviderSoniox,
+}
 
 // SupportedTTSProviders lists provider keys that can be passed to NewTTSFromConfig.
-var SupportedTTSProviders = []string{ProviderOpenAI, ProviderGroq, ProviderSarvam, ProviderElevenLabs, ProviderAWS, ProviderGoogle}
+var SupportedTTSProviders = []string{
+	ProviderOpenAI, ProviderGroq, ProviderSarvam, ProviderElevenLabs, ProviderAWS, ProviderGoogle,
+	ProviderHume, ProviderInworld, ProviderMinimax, ProviderNeuphonic, ProviderXTTS,
+}
 
 // SupportedRealtimeProviders lists provider keys for realtime (use realtime.NewFromConfig to construct).
-var SupportedRealtimeProviders = []string{ProviderOpenAI}
+var SupportedRealtimeProviders = []string{ProviderOpenAI, ProviderHume, ProviderInworld}
 
 // apiKeyForProvider returns the API key for the given provider (e.g. openai -> OPENAI_API_KEY, groq -> GROQ_API_KEY).
 func apiKeyForProvider(cfg *config.Config, provider string) string {
@@ -110,6 +147,30 @@ func apiKeyForProvider(cfg *config.Config, provider string) string {
 			key = cfg.GetAPIKey("openai", "OPENAI_API_KEY")
 		}
 		return key
+	case ProviderAsyncAI:
+		return cfg.GetAPIKey("asyncai", "ASYNC_AI_API_KEY")
+	case ProviderCamb:
+		return cfg.GetAPIKey("camb", "CAMB_API_KEY")
+	case ProviderFish:
+		return cfg.GetAPIKey("fish", "FISH_API_KEY")
+	case ProviderGradium:
+		return cfg.GetAPIKey("gradium", "GRADIUM_API_KEY")
+	case ProviderHume:
+		return cfg.GetAPIKey("hume", "HUME_API_KEY")
+	case ProviderInworld:
+		return cfg.GetAPIKey("inworld", "INWORLD_API_KEY")
+	case ProviderMinimax:
+		return cfg.GetAPIKey("minimax", "MINIMAX_API_KEY")
+	case ProviderMoondream:
+		return cfg.GetAPIKey("moondream", "MOONDREAM_API_KEY")
+	case ProviderNeuphonic:
+		return cfg.GetAPIKey("neuphonic", "NEUPHONIC_API_KEY")
+	case ProviderOpenPipe:
+		return cfg.GetAPIKey("openpipe", "OPENPIPE_API_KEY")
+	case ProviderSoniox:
+		return cfg.GetAPIKey("soniox", "SONIOX_API_KEY")
+	case ProviderXTTS:
+		return cfg.GetAPIKey("xtts", "XTTS_API_KEY")
 	default:
 		return cfg.GetAPIKey(provider, "OPENAI_API_KEY")
 	}
@@ -181,6 +242,18 @@ func NewLLMFromConfig(cfg *config.Config, provider, model string) LLMService {
 		return ollama.NewLLMService(apiKey, model)
 	case ProviderQwen:
 		return qwen.NewLLMService(apiKey, model)
+	case ProviderOpenPipe:
+		return openpipe.NewLLMService(apiKey, model)
+	case ProviderAsyncAI:
+		return asyncai.NewLLMService(apiKey, model)
+	case ProviderFish:
+		return fish.NewLLMService(apiKey, model)
+	case ProviderMoondream:
+		return moondream.NewLLMService(apiKey, model)
+	case ProviderMinimax:
+		return minimax.NewLLMService(apiKey, model)
+	case ProviderInworld:
+		return inworld.NewLLMService(apiKey, model)
 	case ProviderOpenAI:
 		fallthrough
 	default:
@@ -216,6 +289,12 @@ func NewSTTFromConfig(cfg *config.Config, provider string) STTService {
 		return svc
 	case ProviderWhisper:
 		return whisper.NewService(apiKey, config.GetEnv("WHISPER_BASE_URL", ""))
+	case ProviderCamb:
+		return camb.NewSTT(apiKey, config.GetEnv("CAMB_BASE_URL", ""), cfg.STTModel)
+	case ProviderGradium:
+		return gradium.NewSTT(apiKey, config.GetEnv("GRADIUM_BASE_URL", ""), cfg.STTModel)
+	case ProviderSoniox:
+		return soniox.NewSTT(apiKey, config.GetEnv("SONIOX_WS_URL", ""), cfg.STTModel)
 	case ProviderOpenAI:
 		fallthrough
 	default:
@@ -253,6 +332,28 @@ func NewTTSFromConfig(cfg *config.Config, provider, model, voice string) TTSServ
 			return nil
 		}
 		return svc
+	case ProviderXTTS:
+		baseURL := config.GetEnv("XTTS_BASE_URL", "")
+		lang := cfg.STTLanguage
+		if lang == "" {
+			lang = "en"
+		}
+		return xtts.NewTTS(apiKey, baseURL, voice, lang)
+	case ProviderHume:
+		return hume.NewTTS(apiKey, voice)
+	case ProviderNeuphonic:
+		lang := cfg.STTLanguage
+		if lang == "" {
+			lang = "en"
+		}
+		return neuphonic.NewTTS(apiKey, config.GetEnv("NEUPHONIC_BASE_URL", ""), voice, lang, 1.0)
+	case ProviderMinimax:
+		if model == "" {
+			model = "speech-01"
+		}
+		return minimax.NewTTS(apiKey, config.GetEnv("MINIMAX_BASE_URL", ""), model, voice)
+	case ProviderInworld:
+		return inworld.NewTTS(apiKey, voice)
 	case ProviderOpenAI:
 		fallthrough
 	default:

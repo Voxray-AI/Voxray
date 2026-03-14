@@ -1,4 +1,4 @@
-﻿package realtime_test
+package realtime_test
 
 import (
 	"testing"
@@ -17,6 +17,20 @@ func TestNewFromConfig_OpenAI(t *testing.T) {
 	}
 	if svc == nil {
 		t.Fatal("NewFromConfig(openai) returned nil service")
+	}
+}
+
+// TestNewFromConfig_HumeAndInworld verifies realtime returns a service for hume and inworld (stub).
+func TestNewFromConfig_HumeAndInworld(t *testing.T) {
+	cfg := &config.Config{}
+	for _, provider := range []string{"hume", "inworld"} {
+		svc, err := realtime.NewFromConfig(cfg, provider)
+		if err != nil {
+			t.Fatalf("NewFromConfig(%q): %v", provider, err)
+		}
+		if svc == nil {
+			t.Fatalf("NewFromConfig(%q) returned nil service", provider)
+		}
 	}
 }
 
