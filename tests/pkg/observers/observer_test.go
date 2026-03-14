@@ -1,4 +1,4 @@
-﻿package observers_test
+package observers_test
 
 import (
 	"context"
@@ -54,6 +54,8 @@ func TestObservingProcessor_NotifiesObserver(t *testing.T) {
 
 	wrap.ProcessFrame(ctx, frames.NewStartFrame(), processors.Downstream)
 	wrap.ProcessFrame(ctx, frames.NewTextFrame("hi"), processors.Downstream)
+	// ObservingProcessor notifies observer in a goroutine; allow it to run before asserting.
+	time.Sleep(50 * time.Millisecond)
 	mu.Lock()
 	n := count
 	mu.Unlock()

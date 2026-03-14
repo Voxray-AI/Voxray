@@ -1,4 +1,4 @@
-﻿// Package observers provides optional frame processing observers for metrics and logging.
+// Package observers provides optional frame processing observers for metrics and logging.
 package observers
 
 import (
@@ -70,9 +70,11 @@ type ObservingProcessor struct {
 }
 
 // ProcessFrame forwards to the inner processor and notifies the observer.
+// ORDERING: data frames still flow sequentially through Inner; observer notification is async and does not affect order.
 func (o *ObservingProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir processors.Direction) error {
 	if o.Observer != nil {
-		o.Observer.OnFrameProcessed(o.Inner.Name(), f, dir)
+		name, frame, d := o.Inner.Name(), f, dir
+		go func() { o.Observer.OnFrameProcessed(name, frame, d) }()
 	}
 	return o.Inner.ProcessFrame(ctx, f, dir)
 }

@@ -1,9 +1,11 @@
-﻿// Package serialize provides JSON (and optional protobuf) encoding/decoding for frames.
+// Package serialize provides JSON (and optional protobuf) encoding/decoding for frames.
 package serialize
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"voxray-go/pkg/frames"
 )
@@ -14,14 +16,25 @@ type Envelope struct {
 	Data json.RawMessage `json:"data"`
 }
 
+// MEMORY: sync.Pool reuse for Encoder to avoid allocating a new buffer per frame.
+var encoderBufferPool = sync.Pool{
+	New: func() interface{} { return &bytes.Buffer{} },
+}
+
 // Encoder encodes a Frame to JSON with a type discriminator.
 func Encoder(f frames.Frame) ([]byte, error) {
 	payload, err := json.Marshal(f)
 	if err != nil {
 		return nil, err
 	}
-	env := Envelope{Type: f.FrameType(), Data: payload}
-	return json.Marshal(env)
+	env := Envelope{Type: f.FrameType(), Data: json.RawMessage(payload)}
+	buf := encoderBufferPool.Get().(*bytes.Buffer)
+	defer func() { buf.Reset(); encoderBufferPool.Put(buf) }()
+	buf.Reset()
+	if err := json.NewEncoder(buf).Encode(env); err != nil {
+		return nil, err
+	}
+	return append([]byte(nil), buf.Bytes()...), nil
 }
 
 // Decoder decodes JSON (envelope format) into a Frame using the type field.

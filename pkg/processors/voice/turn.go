@@ -14,6 +14,25 @@ import (
 	"voxray-go/pkg/processors"
 )
 
+// MEMORY: sync.Pool reuse for turn-completion audio copy buffers to reduce allocs in hot path.
+var turnBufferPool = sync.Pool{
+	New: func() interface{} { b := make([]byte, 0, 32768); return &b },
+}
+
+// getTurnBuffer returns a slice with at least need bytes, and a release func to return it to the pool.
+func getTurnBuffer(need int) (buf []byte, release func()) {
+	ptr := turnBufferPool.Get().(*[]byte)
+	if cap(*ptr) < need {
+		turnBufferPool.Put(ptr)
+		return make([]byte, need), func() {}
+	}
+	*ptr = (*ptr)[:need]
+	return *ptr, func() {
+		*ptr = (*ptr)[:0]
+		turnBufferPool.Put(ptr)
+	}
+}
+
 // TurnProcessor buffers AudioRawFrame chunks, runs VAD and turn detection, and forwards
 // concatenated audio downstream only when the turn is complete (end of speech).
 type TurnProcessor struct {
@@ -44,11 +63,15 @@ type TurnProcessor struct {
 // When useAsync is true, end-of-turn detection is driven via Analyzer.AnalyzeEndOfTurnAsync;
 // otherwise the synchronous AppendAudio return value is used.
 func NewTurnProcessor(name string, v vad.Detector, a turn.Analyzer, sampleRate, channels int, useAsync bool) *TurnProcessor {
-	return NewTurnProcessorWithUserTurn(name, v, a, sampleRate, channels, useAsync, 5.0, 0.0)
+	return NewTurnProcessorWithUserTurn(name, v, a, sampleRate, channels, useAsync, 5.0, 0.0, 0)
 }
 
+// DefaultTurnMaxDurationSecs is the default max turn duration when maxDurationSecs <= 0.
+const DefaultTurnMaxDurationSecs = 8
+
 // NewTurnProcessorWithUserTurn is like NewTurnProcessor but allows callers to
-// configure user turn stop and idle timeouts.
+// configure user turn stop and idle timeouts. maxDurationSecs when <= 0 uses DefaultTurnMaxDurationSecs;
+// the turn buffer is pre-allocated to this duration to avoid repeated growth and GC.
 func NewTurnProcessorWithUserTurn(
 	name string,
 	v vad.Detector,
@@ -58,6 +81,7 @@ func NewTurnProcessorWithUserTurn(
 	useAsync bool,
 	userTurnStopTimeout float64,
 	userIdleTimeout float64,
+	maxDurationSecs float64,
 ) *TurnProcessor {
 	if name == "" {
 		name = "Turn"
@@ -68,7 +92,15 @@ func NewTurnProcessorWithUserTurn(
 	if channels <= 0 {
 		channels = 1
 	}
+	if maxDurationSecs <= 0 {
+		maxDurationSecs = DefaultTurnMaxDurationSecs
+	}
 	a.SetSampleRate(sampleRate)
+	// MEMORY: pre-alloc to max turn duration to avoid repeated growth and GC.
+	bufferCap := int(maxDurationSecs * float64(sampleRate*2*channels))
+	if bufferCap <= 0 {
+		bufferCap = 256000
+	}
 	p := &TurnProcessor{
 		BaseProcessor: processors.NewBaseProcessor(name),
 		VAD:           v,
@@ -76,6 +108,7 @@ func NewTurnProcessorWithUserTurn(
 		SampleRate:    sampleRate,
 		Channels:      channels,
 		useAsync:      useAsync,
+		buffer:        make([]byte, 0, bufferCap),
 	}
 
 	// Wire a simple user turn controller using VAD-only strategies and
@@ -128,7 +161,7 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 	// Pass through non-audio frames; on cancel clear turn state
 	switch f.(type) {
 	case *frames.CancelFrame:
-		p.buffer = nil
+		p.buffer = p.buffer[:0]
 		p.Analyzer.Clear()
 		// Drop any pending async analysis; any in-flight goroutine will observe ctx cancellation
 		// at the pipeline level and exit independently.
@@ -181,10 +214,13 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 	if !p.useAsync {
 		if state == turn.Complete {
 			// Push accumulated audio as one AudioRawFrame for this turn
-			audioCopy := make([]byte, len(p.buffer))
-			copy(audioCopy, p.buffer)
+			buf, release := getTurnBuffer(len(p.buffer))
+			copy(buf, p.buffer)
+			audioCopy := make([]byte, len(buf))
+			copy(audioCopy, buf)
+			release()
 			out := frames.NewAudioRawFrame(audioCopy, p.SampleRate, p.Channels, 0)
-			p.buffer = nil
+			p.buffer = p.buffer[:0]
 			p.Analyzer.Clear()
 			logger.Info("pipeline (turn): turn complete, pushing %d bytes to STT", len(audioCopy))
 			return p.PushDownstream(ctx, out)
@@ -194,10 +230,13 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 
 	// Async mode: allow synchronous Complete as a fast path.
 	if state == turn.Complete {
-		audioCopy := make([]byte, len(p.buffer))
-		copy(audioCopy, p.buffer)
+		buf, release := getTurnBuffer(len(p.buffer))
+		copy(buf, p.buffer)
+		audioCopy := make([]byte, len(buf))
+		copy(audioCopy, buf)
+		release()
 		out := frames.NewAudioRawFrame(audioCopy, p.SampleRate, p.Channels, 0)
-		p.buffer = nil
+		p.buffer = p.buffer[:0]
 		p.Analyzer.Clear()
 		p.pendingResult = nil
 		logger.Info("pipeline (turn): turn complete, pushing %d bytes to STT", len(audioCopy))
@@ -209,10 +248,13 @@ func (p *TurnProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 		select {
 		case res, ok := <-p.pendingResult:
 			if ok && res.Err == nil && res.State == turn.Complete {
-				audioCopy := make([]byte, len(p.buffer))
-				copy(audioCopy, p.buffer)
+				buf, release := getTurnBuffer(len(p.buffer))
+				copy(buf, p.buffer)
+				audioCopy := make([]byte, len(buf))
+				copy(audioCopy, buf)
+				release()
 				out := frames.NewAudioRawFrame(audioCopy, p.SampleRate, p.Channels, 0)
-				p.buffer = nil
+				p.buffer = p.buffer[:0]
 				p.Analyzer.Clear()
 				p.pendingResult = nil
 				logger.Info("pipeline (turn): turn complete (async), pushing %d bytes to STT", len(audioCopy))

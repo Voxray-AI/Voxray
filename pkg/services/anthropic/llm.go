@@ -1,4 +1,4 @@
-﻿package anthropic
+package anthropic
 
 import (
 	"bytes"
@@ -28,12 +28,16 @@ func NewLLMService(apiKey, model string) *Service {
 	if model == "" {
 		model = DefaultLLMModel
 	}
+	// PERF: shared transport reuses TCP connections.
+	transport := &http.Transport{
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  false,
+	}
 	return &Service{
 		apiKey: apiKey,
 		model:  model,
-		client: &http.Client{
-			Timeout: 60 * time.Second,
-		},
+		client: &http.Client{Transport: transport, Timeout: 60 * time.Second},
 	}
 }
 
@@ -122,6 +126,7 @@ func (s *Service) Chat(ctx context.Context, messages []map[string]any, onToken f
 		return fmt.Errorf("anthropic: encode request: %w", err)
 	}
 
+	// CONCURRENCY: context cancels in-flight provider request on session end.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("anthropic: create request: %w", err)

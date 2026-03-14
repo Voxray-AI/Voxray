@@ -1,4 +1,4 @@
-﻿package elevenlabs
+package elevenlabs
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"time"
 
 	"voxray-go/pkg/config"
 	"voxray-go/pkg/frames"
@@ -69,8 +70,14 @@ func NewSTT(apiKey, modelID string) *STTService {
 	if modelID == "" {
 		modelID = defaultSTTModel
 	}
+	// PERF: shared transport reuses TCP connections.
+	transport := &http.Transport{
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  false,
+	}
 	return &STTService{
-		client:  http.DefaultClient,
+		client:  &http.Client{Transport: transport, Timeout: 60 * time.Second},
 		apiKey:  apiKey,
 		modelID: modelID,
 	}
@@ -100,6 +107,7 @@ func (s *STTService) Transcribe(ctx context.Context, audio []byte, sampleRate, n
 		return nil, fmt.Errorf("elevenlabs stt: close multipart: %w", err)
 	}
 
+	// CONCURRENCY: context cancels in-flight provider request on session end.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, elevenlabsAPIBase+"/speech-to-text", body)
 	if err != nil {
 		return nil, err

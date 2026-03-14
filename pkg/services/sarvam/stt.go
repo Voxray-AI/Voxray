@@ -1,4 +1,4 @@
-﻿package sarvam
+package sarvam
 
 import (
 	"bytes"
@@ -54,14 +54,18 @@ func NewSTTWithLanguage(apiKey, model, languageCode string) *SarvamSTTService {
 	if model == "" {
 		model = DefaultSarvamSTTModel
 	}
+	// PERF: shared transport reuses TCP connections.
+	transport := &http.Transport{
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  false,
+	}
 	return &SarvamSTTService{
 		apiKey:       apiKey,
 		baseURL:      DefaultBaseURL,
 		model:        model,
 		languageCode: languageCode,
-		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
-		},
+		httpClient:   &http.Client{Transport: transport, Timeout: 60 * time.Second},
 	}
 }
 
@@ -112,6 +116,7 @@ func (s *SarvamSTTService) Transcribe(ctx context.Context, audio []byte, sampleR
 		return nil, err
 	}
 
+	// CONCURRENCY: context cancels in-flight provider request on session end.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/speech-to-text", &buf)
 	if err != nil {
 		return nil, err
