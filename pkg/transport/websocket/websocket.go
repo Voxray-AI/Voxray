@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"voxray-go/pkg/api"
 	"voxray-go/pkg/frames"
 	"voxray-go/pkg/frames/serialize"
 	"voxray-go/pkg/logger"
@@ -322,7 +323,7 @@ func (t *ConnTransport) writeOne(f frames.Frame, useBinaryDefault bool) error {
 // Zero disables inactivity timeouts.
 const DefaultSessionTimeout = 5 * time.Minute
 
-// recoveryMiddleware wraps next and recovers panics, logging the error and stack then returning HTTP 500.
+// recoveryMiddleware wraps next and recovers panics, logging the error and stack then returning HTTP 500 with standard error envelope.
 func recoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -331,9 +332,11 @@ func recoveryMiddleware(next http.Handler) http.Handler {
 				n := runtime.Stack(buf, false)
 				stack := string(buf[:n])
 				logger.Error("panic recovered: %v\n%s", err, stack)
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = w.Write([]byte(`{"error":"internal server error"}`))
+				api.RespondError(w, r, &api.APIError{
+					StatusCode: http.StatusInternalServerError,
+					Code:       api.CodeInternalError,
+					Message:    "Internal server error",
+				})
 			}
 		}()
 		next.ServeHTTP(w, r)

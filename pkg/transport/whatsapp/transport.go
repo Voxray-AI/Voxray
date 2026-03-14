@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 
+	"voxray-go/pkg/api"
 	"voxray-go/pkg/frames"
 	"voxray-go/pkg/logger"
 )
@@ -144,22 +145,22 @@ func (t *Transport) HandleWebhook(verifyToken, appSecret string) http.HandlerFun
 				w.Write([]byte(challenge))
 				return
 			}
-			http.Error(w, "forbidden", http.StatusForbidden)
+			api.RespondError(w, r, &api.APIError{StatusCode: http.StatusForbidden, Code: api.CodeForbidden, Message: "Forbidden"})
 			return
 		}
 		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			api.RespondError(w, r, &api.APIError{StatusCode: http.StatusMethodNotAllowed, Code: api.CodeBadRequest, Message: "Method not allowed"})
 			return
 		}
 		body, err := io.ReadAll(io.LimitReader(r.Body, MaxWebhookBodyBytes))
 		if err != nil {
-			http.Error(w, "failed to read body", http.StatusBadRequest)
+			api.RespondError(w, r, &api.APIError{StatusCode: http.StatusBadRequest, Code: api.CodeBadRequest, Message: "Failed to read body"})
 			return
 		}
 		if appSecret != "" {
 			sigHeader := r.Header.Get("X-Hub-Signature-256")
 			if !strings.HasPrefix(sigHeader, "sha256=") {
-				http.Error(w, "missing or invalid signature", http.StatusUnauthorized)
+				api.RespondError(w, r, &api.APIError{StatusCode: http.StatusUnauthorized, Code: api.CodeUnauthorized, Message: "Missing or invalid signature"})
 				return
 			}
 			expectedSig := strings.TrimSpace(sigHeader[7:])
@@ -167,13 +168,13 @@ func (t *Transport) HandleWebhook(verifyToken, appSecret string) http.HandlerFun
 			mac.Write(body)
 			computedSig := hex.EncodeToString(mac.Sum(nil))
 			if len(expectedSig) != len(computedSig) || !hmac.Equal([]byte(computedSig), []byte(expectedSig)) {
-				http.Error(w, "invalid signature", http.StatusUnauthorized)
+				api.RespondError(w, r, &api.APIError{StatusCode: http.StatusUnauthorized, Code: api.CodeUnauthorized, Message: "Invalid signature"})
 				return
 			}
 		}
 		var payload WebhookPayload
 		if err := json.NewDecoder(bytes.NewReader(body)).Decode(&payload); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			api.RespondError(w, r, &api.APIError{StatusCode: http.StatusBadRequest, Code: api.CodeBadRequest, Message: "Invalid JSON payload"})
 			return
 		}
 		if payload.Object != "whatsapp_business_account" {
