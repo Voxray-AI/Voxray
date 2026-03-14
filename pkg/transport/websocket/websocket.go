@@ -68,6 +68,9 @@ type ConnTransport struct {
 	WriteCoalesceMs     int
 	WriteCoalesceMaxFrames int
 
+	// WriteMessageFunc, when non-nil, is used instead of conn.WriteMessage in writeOne (e.g. for tests to count or capture writes). When nil, conn.WriteMessage is used.
+	WriteMessageFunc func(messageType int, data []byte) error
+
 	// lastActivity holds the last time we saw activity on this connection
 	// (either a successfully read frame from the client or a successfully
 	// written frame to the client), stored as Unix nano time.
@@ -284,7 +287,11 @@ func (t *ConnTransport) writeOne(f frames.Frame, useBinaryDefault bool) error {
 	if data == nil {
 		return nil
 	}
-	if err := t.conn.WriteMessage(msgType, data); err != nil {
+	write := t.WriteMessageFunc
+	if write == nil {
+		write = t.conn.WriteMessage
+	}
+	if err := write(msgType, data); err != nil {
 		logger.Error("websocket write: %v", err)
 		return err
 	}

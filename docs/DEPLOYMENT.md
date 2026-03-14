@@ -65,7 +65,7 @@ readinessProbe:
 - **Pipeline input queue**: `pipeline_input_queue_cap` (or `VOXRAY_PIPELINE_INPUT_QUEUE_CAP`) sets the buffer between transport read and pipeline push. When full, the reader blocks so the transport does not consume unbounded memory; default 256. Increase under very bursty input if needed.
 - **WebSocket write coalescing**: When `ws_write_coalesce_ms` > 0, the WebSocket writer drains multiple frames in a short window before writing, reducing syscalls at the cost of a small latency budget. Disabled by default (0).
 - **Recording**: `recording.queue_cap` and `recording.worker_count` control the upload job queue and worker pool; `recording.max_retries` enables exponential backoff on S3 failures. Uploads stream from temp files to S3 (no full WAV in memory). See [ARCHITECTURE.md](ARCHITECTURE.md) for concurrency notes.
-- **Metrics**: Optional `metrics.audio_sample_rate` (0..1) can reduce per-chunk counter updates under load. Prometheus metric names are stable for dashboards and alerts.
+- **Metrics**: Prometheus metric names are stable for dashboards and alerts. Per-chunk metric sampling may be added in a future release.
 
 ---
 

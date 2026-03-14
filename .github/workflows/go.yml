@@ -25,10 +25,11 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test -v ./...
+      run: go test ./...
 
   # CONCURRENCY: race detector job catches data races introduced in concurrent refactors.
   race:
+    needs: build
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4

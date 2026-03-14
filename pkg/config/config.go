@@ -141,7 +141,7 @@ type Config struct {
 
 // MetricsConfig holds optional metrics tuning.
 type MetricsConfig struct {
-	// AudioSampleRate is the ratio (0..1) at which to record per-audio-chunk metrics; 1.0 = every chunk. Use <1 to reduce counter contention under load.
+	// Future: AudioSampleRate is reserved for per-chunk metric sampling (0..1). Not yet wired; do not document until a consumer exists.
 	AudioSampleRate float64 `json:"audio_sample_rate,omitempty"`
 }
 

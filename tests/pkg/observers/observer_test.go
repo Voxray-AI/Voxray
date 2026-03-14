@@ -64,6 +64,34 @@ func TestObservingProcessor_NotifiesObserver(t *testing.T) {
 	}
 }
 
+// TestObservingProcessor_AllFramesObservedNoneDropped verifies that each frame results in exactly one observer invocation and the pipeline does not block.
+func TestObservingProcessor_AllFramesObservedNoneDropped(t *testing.T) {
+	const K = 10
+	var count int
+	var mu sync.Mutex
+	ob := &mockObserver{onProcessed: func() {
+		mu.Lock()
+		count++
+		mu.Unlock()
+	}}
+	inner := filters.NewIdentityFilter("id")
+	wrap := observers.WrapWithObserver(inner, ob)
+	ctx := context.Background()
+	wrap.Setup(ctx)
+	defer wrap.Cleanup(ctx)
+
+	for i := 0; i < K; i++ {
+		wrap.ProcessFrame(ctx, frames.NewTextFrame("x"), processors.Downstream)
+	}
+	time.Sleep(100 * time.Millisecond)
+	mu.Lock()
+	n := count
+	mu.Unlock()
+	if n != K {
+		t.Errorf("expected observer OnFrameProcessed to be called %d times (all frames observed, none dropped), got %d", K, n)
+	}
+}
+
 // TestTurnTrackingObserver_OnTurnStarted mirrors upstream: StartFrame triggers turn started callback.
 func TestTurnTrackingObserver_OnTurnStarted(t *testing.T) {
 	var started int
