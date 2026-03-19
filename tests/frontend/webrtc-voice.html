@@ -270,7 +270,8 @@
         var data;
         try {
           data = await resp.json();
-          log('[STEP 7] Parsed JSON. answer present=', !!data.answer, 'answer type=', typeof data.answer);
+          var payload = data && data.data ? data.data : data; // server uses {data:{answer}} envelope
+          log('[STEP 7] Parsed JSON. answer present=', !!payload.answer, 'answer type=', typeof payload.answer);
         } catch (e) {
           setStatus('idle');
           log('[FAIL] Step 7: Invalid JSON from server:', e.message);
@@ -278,7 +279,8 @@
           return;
         }
 
-        if (!data.answer) {
+        var payload = data && data.data ? data.data : data; // server uses {data:{answer}} envelope
+        if (!payload.answer) {
           setStatus('idle');
           log('[FAIL] Step 7: No answer in response. Keys:', data ? Object.keys(data).join(', ') : 'none');
           cleanup();
@@ -287,7 +289,7 @@
 
         log('[STEP 7] Setting remote description (answer)…');
         try {
-          var answer = typeof data.answer === 'string' ? JSON.parse(data.answer) : data.answer;
+          var answer = typeof payload.answer === 'string' ? JSON.parse(payload.answer) : payload.answer;
           log('[STEP 7] Answer type=', answer?.type, 'sdp length=', answer?.sdp?.length ?? 0);
           await pc.setRemoteDescription(new RTCSessionDescription(answer));
           log('[STEP 7] Remote description set successfully.');

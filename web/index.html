@@ -812,12 +812,13 @@
           throw new Error("Offer failed: " + resp.status + " " + text);
         }
         const data = await resp.json();
-        if (!data.answer) {
+        const payload = data && data.data ? data.data : data; // server uses {data:{answer}} envelope
+        if (!payload.answer) {
           log("No answer in response.");
           cleanup();
           throw new Error("No answer in response");
         }
-        const answer = typeof data.answer === "string" ? JSON.parse(data.answer) : data.answer;
+        const answer = typeof payload.answer === "string" ? JSON.parse(payload.answer) : payload.answer;
         log("Answer received, setting remote description…");
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
 
