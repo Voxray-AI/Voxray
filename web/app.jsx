@@ -551,11 +551,11 @@ function LeftStage({ theme, accent, state, isConnected, isBusy, stateLabel, conn
           fontWeight: 500,
           textWrap: "balance",
         }}>
-          Talk to your agent.<br />
-          <span style={{ color: "var(--dim)" }}>It listens, thinks,</span>
+          Real-time voice agent<br />
+          <span style={{ color: "var(--accent)" }}>Speech-to-speech</span>
           <br />
-          <span style={{ color: "var(--dim)" }}>and answers — </span>
-          <em style={{ fontStyle: "normal", color: accent, fontWeight: 500 }}>under 400&thinsp;ms.</em>
+          <span style={{ color: "var(--dim)" }}>conversation platform.</span>
+          <em style={{ fontStyle: "normal", color: accent, fontWeight: 500 }}>&thinsp;</em>
         </h1>
       </div>
 
