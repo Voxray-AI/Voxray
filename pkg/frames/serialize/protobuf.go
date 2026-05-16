@@ -54,4 +54,3 @@ func readLengthPrefixed(r io.Reader) ([]byte, error) {
 	}
 	return buf, nil
 }
-

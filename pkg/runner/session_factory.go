@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/redis/go-redis/v9"
 )
 
 const defaultSessionTTLSecs = 3600

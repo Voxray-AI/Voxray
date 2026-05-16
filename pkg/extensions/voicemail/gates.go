@@ -82,7 +82,7 @@ type ClassifierGate struct {
 	conversationNotifier *notifier.Notifier
 	conversationDetected bool
 	convMu               sync.Mutex
-	convCancel            context.CancelFunc
+	convCancel           context.CancelFunc
 }
 
 // NewClassifierGate creates a classifier gate. gateNotifier signals when classification is done;

@@ -24,7 +24,7 @@ const (
 )
 
 // Default delimiters for XML-style tags in LLM output (backtick-space).
-const defaultOpenDelim  = " ` "
+const defaultOpenDelim = " ` "
 const defaultCloseDelim = " ` "
 
 // IVRProcessor processes LLM responses for IVR navigation: aggregates XML-tagged
@@ -35,7 +35,7 @@ type IVRProcessor struct {
 	IVRPrompt        string
 	IVRVADStopSecs   float64 // VAD stop_secs when in IVR mode (e.g. 2.0)
 
-	agg          *patternaggregator.Aggregator
+	agg           *patternaggregator.Aggregator
 	savedMessages []map[string]any
 	mu            sync.Mutex
 

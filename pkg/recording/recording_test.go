@@ -49,4 +49,3 @@ func TestFileRecorder_WritesWAV(t *testing.T) {
 		t.Fatalf("expected .wav extension, got %q", filepath.Ext(info.Path))
 	}
 }
-

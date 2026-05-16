@@ -106,12 +106,12 @@ type baseAnalyzer struct {
 	vadFramesNumByte int
 
 	// state
-	buf              []byte
-	state            State
-	startFrames      int
-	stopFrames       int
-	startingCount    int
-	stoppingCount    int
+	buf            []byte
+	state          State
+	startFrames    int
+	stopFrames     int
+	startingCount  int
+	stoppingCount  int
 	prevVolume     float64
 	lastConfidence float64
 	lastVolume     float64
@@ -299,4 +299,3 @@ func (d *AnalyzerDetector) SetSampleRate(sampleRate int) {
 		d.Analyzer.SetSampleRate(sampleRate)
 	}
 }
-

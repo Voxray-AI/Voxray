@@ -17,10 +17,10 @@ type GateFunc func(f frames.Frame) bool
 // it pushes the gate-opening frame (if any) then all buffered frames.
 type Processor struct {
 	*processors.BaseProcessor
-	GateOpen   GateFunc
-	GateClose  GateFunc
-	StartOpen  bool
-	Direction  processors.Direction
+	GateOpen  GateFunc
+	GateClose GateFunc
+	StartOpen bool
+	Direction processors.Direction
 
 	mu          sync.Mutex
 	gateOpen    bool

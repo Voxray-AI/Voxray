@@ -21,9 +21,9 @@ type ServiceSwitcherStrategy interface {
 
 // ServiceSwitcherStrategyManual keeps the first service active until a ManuallySwitchServiceFrame requests a switch.
 type ServiceSwitcherStrategyManual struct {
-	mu            sync.Mutex
-	serviceNames  []string
-	activeIndex   int
+	mu           sync.Mutex
+	serviceNames []string
+	activeIndex  int
 }
 
 // NewServiceSwitcherStrategyManual returns a strategy that starts with the first service and switches on ManuallySwitchServiceFrame.

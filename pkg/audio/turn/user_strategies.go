@@ -21,4 +21,3 @@ type UserTurnStopStrategy interface {
 	// should be stopped (e.g. after sufficient silence).
 	ShouldStopTurn() bool
 }
-

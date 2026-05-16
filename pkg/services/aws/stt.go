@@ -18,7 +18,7 @@ const transcribeSampleRate = 16000
 
 // STTService implements services.STTService using Amazon Transcribe streaming.
 type STTService struct {
-	client     *transcribestreaming.Client
+	client       *transcribestreaming.Client
 	languageCode types.LanguageCode
 }
 
@@ -58,11 +58,11 @@ func (s *STTService) Transcribe(ctx context.Context, audio []byte, sampleRate, n
 	}
 	sr32 := int32(sampleRate)
 	input := &transcribestreaming.StartStreamTranscriptionInput{
-		LanguageCode:                  s.languageCode,
-		MediaEncoding:                 types.MediaEncodingPcm,
-		MediaSampleRateHertz:          &sr32,
+		LanguageCode:                      s.languageCode,
+		MediaEncoding:                     types.MediaEncodingPcm,
+		MediaSampleRateHertz:              &sr32,
 		EnablePartialResultsStabilization: true,
-		PartialResultsStability:       types.PartialResultsStabilityHigh,
+		PartialResultsStability:           types.PartialResultsStabilityHigh,
 	}
 	output, err := s.client.StartStreamTranscription(ctx, input)
 	if err != nil {
@@ -72,7 +72,7 @@ func (s *STTService) Transcribe(ctx context.Context, audio []byte, sampleRate, n
 	defer stream.Close()
 
 	var (
-		mu       sync.Mutex
+		mu        sync.Mutex
 		finalText string
 		errResult error
 	)

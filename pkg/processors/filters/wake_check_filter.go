@@ -14,8 +14,8 @@ import (
 
 // WakeCheckFilterOptions is the JSON shape for plugin_options["wake_check_filter"].
 type WakeCheckFilterOptions struct {
-	WakePhrases    []string  `json:"wake_phrases"`
-	KeepaliveSecs  float64   `json:"keepalive_secs"`
+	WakePhrases   []string `json:"wake_phrases"`
+	KeepaliveSecs float64  `json:"keepalive_secs"`
 }
 
 const defaultKeepaliveSecs = 3
@@ -28,8 +28,8 @@ const (
 )
 
 type participantState struct {
-	state      wakeState
-	wakeTimer  time.Time
+	state       wakeState
+	wakeTimer   time.Time
 	accumulator string
 }
 
@@ -69,10 +69,10 @@ func NewWakeCheckFilter(name string, wakePhrases []string, keepaliveTimeout time
 		patterns = append(patterns, re)
 	}
 	return &WakeCheckFilter{
-		BaseProcessor:     processors.NewBaseProcessor(name),
-		patterns:           patterns,
-		keepaliveTimeout:   keepaliveTimeout,
-		participants:       make(map[string]*participantState),
+		BaseProcessor:    processors.NewBaseProcessor(name),
+		patterns:         patterns,
+		keepaliveTimeout: keepaliveTimeout,
+		participants:     make(map[string]*participantState),
 	}
 }
 

@@ -12,8 +12,8 @@ import (
 
 // serviceSwitcherMock is a processor that records received frames for testing which branch is active.
 type serviceSwitcherMock struct {
-	name    string
-	mu      sync.Mutex
+	name     string
+	mu       sync.Mutex
 	received []frames.Frame
 }
 
@@ -23,11 +23,11 @@ func (m *serviceSwitcherMock) ProcessFrame(_ context.Context, f frames.Frame, _ 
 	m.mu.Unlock()
 	return nil
 }
-func (m *serviceSwitcherMock) SetNext(processors.Processor)   {}
-func (m *serviceSwitcherMock) SetPrev(processors.Processor)   {}
+func (m *serviceSwitcherMock) SetNext(processors.Processor)  {}
+func (m *serviceSwitcherMock) SetPrev(processors.Processor)  {}
 func (m *serviceSwitcherMock) Setup(context.Context) error   { return nil }
 func (m *serviceSwitcherMock) Cleanup(context.Context) error { return nil }
-func (m *serviceSwitcherMock) Name() string                   { return m.name }
+func (m *serviceSwitcherMock) Name() string                  { return m.name }
 
 func (m *serviceSwitcherMock) count() int {
 	m.mu.Lock()

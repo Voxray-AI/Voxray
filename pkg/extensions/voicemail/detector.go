@@ -41,7 +41,7 @@ type VoicemailDetector struct {
 	// DetectorBranch is the parallel pipeline to insert after STT (classification branch + conversation gate branch).
 	DetectorBranch *pipeline.ParallelPipeline
 	// GateProcessor is the TTS gate to insert after TTS in the main pipeline.
-	GateProcessor *TTSGate
+	GateProcessor  *TTSGate
 	classification *ClassificationProcessor
 }
 
@@ -76,9 +76,9 @@ func NewVoicemailDetectorWithPrompt(llm services.LLMService, voicemailResponseDe
 	}
 
 	return &VoicemailDetector{
-		DetectorBranch:  parallel,
-		GateProcessor:   ttsGate,
-		classification:  classProc,
+		DetectorBranch: parallel,
+		GateProcessor:  ttsGate,
+		classification: classProc,
 	}
 }
 

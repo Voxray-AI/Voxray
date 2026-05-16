@@ -21,4 +21,3 @@ func TestSampledSessionID_HashStable(t *testing.T) {
 		t.Fatalf("expected stable hash, got %q and %q", a, b)
 	}
 }
-

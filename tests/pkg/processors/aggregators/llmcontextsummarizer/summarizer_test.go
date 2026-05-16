@@ -22,11 +22,11 @@ func (c *collectProcessor) ProcessFrame(_ context.Context, f frames.Frame, _ pro
 	c.mu.Unlock()
 	return nil
 }
-func (c *collectProcessor) SetNext(processors.Processor)   {}
-func (c *collectProcessor) SetPrev(processors.Processor)   {}
+func (c *collectProcessor) SetNext(processors.Processor)  {}
+func (c *collectProcessor) SetPrev(processors.Processor)  {}
 func (c *collectProcessor) Setup(context.Context) error   { return nil }
 func (c *collectProcessor) Cleanup(context.Context) error { return nil }
-func (c *collectProcessor) Name() string                     { return "collect" }
+func (c *collectProcessor) Name() string                  { return "collect" }
 
 func (c *collectProcessor) got() []frames.Frame {
 	c.mu.Lock()
@@ -84,8 +84,8 @@ func TestProcessor_OverThreshold_EmitsRequest(t *testing.T) {
 	}
 	proc := llmcontextsummarizer.New("sum", llmCtx, llmcontextsummarizer.Config{
 		MaxUnsummarizedMessages: 20,
-		MinMessagesToKeep:      5,
-		AutoTrigger:            true,
+		MinMessagesToKeep:       5,
+		AutoTrigger:             true,
 	})
 	collector := &collectProcessor{}
 	proc.SetNext(collector)
@@ -138,9 +138,9 @@ func TestProcessor_SummaryResult_UpdatesContext(t *testing.T) {
 
 	// Apply result: summarize up to index 22, keep last 2 (indices 23,24). Context becomes [summary, msg, msg].
 	result := &frames.LLMContextSummaryResultFrame{
-		RequestID:            reqID,
-		Summary:              "Summarized.",
-		LastSummarizedIndex:   22,
+		RequestID:           reqID,
+		Summary:             "Summarized.",
+		LastSummarizedIndex: 22,
 	}
 	_ = proc.ProcessFrame(ctx, result, processors.Downstream)
 	if len(llmCtx.Messages) < 1 {

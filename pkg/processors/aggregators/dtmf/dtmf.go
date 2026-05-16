@@ -40,10 +40,10 @@ func New(name string, timeout time.Duration, terminationDigit frames.KeypadEntry
 		terminationDigit = frames.KeypadPound
 	}
 	return &Processor{
-		BaseProcessor:     processors.NewBaseProcessor(name),
-		Timeout:           timeout,
-		TerminationDigit:  terminationDigit,
-		Prefix:            prefix,
+		BaseProcessor:    processors.NewBaseProcessor(name),
+		Timeout:          timeout,
+		TerminationDigit: terminationDigit,
+		Prefix:           prefix,
 		PushInterruption: true,
 	}
 }

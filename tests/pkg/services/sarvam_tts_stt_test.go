@@ -21,12 +21,12 @@ func TestSarvamServices_FromConfig(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Provider:   services.ProviderSarvam,
+		Provider:    services.ProviderSarvam,
 		SttProvider: services.ProviderSarvam,
 		TtsProvider: services.ProviderSarvam,
-		STTModel:   "",
-		TTSModel:   "",
-		TTSVoice:   "",
+		STTModel:    "",
+		TTSModel:    "",
+		TTSVoice:    "",
 	}
 
 	llm, sttSvc, ttsSvc := services.NewServicesFromConfig(cfg)
@@ -47,4 +47,3 @@ func TestSarvamServices_FromConfig(t *testing.T) {
 		t.Fatalf("Sarvam TTS Speak failed: %v", err)
 	}
 }
-

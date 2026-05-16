@@ -137,4 +137,3 @@ func TestPipeline_CancelFramePropagation(t *testing.T) {
 		t.Errorf("m2 third frame expected CancelFrame, got %s", m2.received[2].FrameType())
 	}
 }
-

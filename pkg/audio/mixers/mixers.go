@@ -142,4 +142,3 @@ func (m *SimpleMixer) Close() error {
 	m.mu.Unlock()
 	return m.output.Close()
 }
-

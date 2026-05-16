@@ -73,4 +73,3 @@ func (p *AudioFilterProcessor) filterAudio(ar *frames.AudioRawFrame) {
 }
 
 var _ processors.Processor = (*AudioFilterProcessor)(nil)
-

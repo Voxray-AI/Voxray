@@ -19,4 +19,3 @@ type Stream interface {
 	Write(Frame) error
 	Close() error
 }
-

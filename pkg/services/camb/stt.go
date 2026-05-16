@@ -82,7 +82,7 @@ func (s *STTService) Transcribe(ctx context.Context, audio []byte, sampleRate, n
 		return nil, fmt.Errorf("camb STT: %s: %s", resp.Status, string(body))
 	}
 	var out struct {
-		Text     string `json:"text"`
+		Text       string `json:"text"`
 		Transcript string `json:"transcript"`
 	}
 	_ = json.Unmarshal(body, &out)

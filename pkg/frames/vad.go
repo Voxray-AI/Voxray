@@ -35,7 +35,7 @@ func (*VADUserStartedSpeakingFrame) FrameType() string { return "VADUserStartedS
 func NewVADUserStartedSpeakingFrame(startSecs float64) *VADUserStartedSpeakingFrame {
 	return &VADUserStartedSpeakingFrame{
 		ControlFrame: ControlFrame{Base: NewBase()},
-		StartSecs:   startSecs,
+		StartSecs:    startSecs,
 	}
 }
 
@@ -52,7 +52,7 @@ func (*VADUserStoppedSpeakingFrame) FrameType() string { return "VADUserStoppedS
 func NewVADUserStoppedSpeakingFrame(stopSecs float64) *VADUserStoppedSpeakingFrame {
 	return &VADUserStoppedSpeakingFrame{
 		ControlFrame: ControlFrame{Base: NewBase()},
-		StopSecs:    stopSecs,
+		StopSecs:     stopSecs,
 	}
 }
 

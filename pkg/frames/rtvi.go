@@ -8,8 +8,8 @@ package frames
 type RTVIClientMessageFrame struct {
 	SystemFrame
 	MsgID string         `json:"msg_id"`
-	Type  string         `json:"type"`  // e.g. "client-ready", "send-text"
-	Data  map[string]any `json:"data"`  // message payload
+	Type  string         `json:"type"` // e.g. "client-ready", "send-text"
+	Data  map[string]any `json:"data"` // message payload
 }
 
 func (*RTVIClientMessageFrame) FrameType() string { return "RTVIClientMessageFrame" }
@@ -32,9 +32,9 @@ func NewRTVIClientMessageFrame(msgID, typ string, data map[string]any) *RTVIClie
 // RTVIProcessor pushes this for bot-ready and error so they go out over the transport.
 type RTVIServerMessageFrame struct {
 	SystemFrame
-	Type   string         `json:"type"`   // e.g. "bot-ready", "error"
-	MsgID  string         `json:"id"`    // RTVI message id (wire field "id")
-	Data   map[string]any `json:"data"`
+	Type  string         `json:"type"` // e.g. "bot-ready", "error"
+	MsgID string         `json:"id"`   // RTVI message id (wire field "id")
+	Data  map[string]any `json:"data"`
 }
 
 func (*RTVIServerMessageFrame) FrameType() string { return "RTVIServerMessageFrame" }

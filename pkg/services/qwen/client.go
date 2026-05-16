@@ -2,8 +2,8 @@
 package qwen
 
 import (
-	openai "github.com/sashabaranov/go-openai"
 	"github.com/Voxray-AI/Voxray/pkg/config"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 const defaultQwenBaseURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"

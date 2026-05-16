@@ -37,4 +37,3 @@ func (s *SilenceUserTurnStopStrategy) OnUserStoppedSpeaking() {
 func (s *SilenceUserTurnStopStrategy) ShouldStopTurn() bool {
 	return s.stopped
 }
-

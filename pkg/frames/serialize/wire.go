@@ -37,7 +37,7 @@ const (
 
 	wireMessageFrameData = 1
 
-	wireVarint         = 0
+	wireVarint          = 0
 	wireLengthDelimited = 2
 )
 

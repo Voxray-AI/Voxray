@@ -118,4 +118,3 @@ func (b *AIServiceBase) cancel(ctx context.Context, frame *frames.CancelFrame) {
 	}()
 	b.Cancel(ctx, frame)
 }
-

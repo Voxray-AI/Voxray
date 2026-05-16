@@ -138,4 +138,3 @@ func (s *SQLStore) GetMessages(ctx context.Context, sessionID string) ([]Message
 	}
 	return out, nil
 }
-

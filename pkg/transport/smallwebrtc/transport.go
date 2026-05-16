@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/webrtc/v3"
 	opusdec "github.com/pion/opus"
+	"github.com/pion/webrtc/v3"
 
 	"github.com/Voxray-AI/Voxray/pkg/audio"
 	"github.com/Voxray-AI/Voxray/pkg/frames"
@@ -63,16 +63,16 @@ const (
 // Input receives frames from the remote peer (e.g. decoded mic audio); Output sends frames to the remote peer (e.g. TTS).
 // THREAD SAFETY: handleInboundTrack and runOutbound are the only writers to inCh/outCh respectively; Close is idempotent; do not send on Output after Close.
 type Transport struct {
-	cfg              *Config
-	pc               *webrtc.PeerConnection
-	inCh             chan frames.Frame
-	outCh            chan frames.Frame
-	closed           chan struct{}
-	once             sync.Once
-	firstInboundLog  sync.Once
-	maxDurationOnce  sync.Once
+	cfg               *Config
+	pc                *webrtc.PeerConnection
+	inCh              chan frames.Frame
+	outCh             chan frames.Frame
+	closed            chan struct{}
+	once              sync.Once
+	firstInboundLog   sync.Once
+	maxDurationOnce   sync.Once
 	inboundChunkCount uint64 // total audio chunks pushed to pipeline (for STT)
-	activeCounted    bool
+	activeCounted     bool
 }
 
 // Config holds SmallWebRTC options.
@@ -311,6 +311,7 @@ func (t *Transport) handleInboundTrack(track *webrtc.TrackRemote) {
 
 // outboundRunner sends TTS audio from outCh to the track. Set by opus_outbound_cgo.go when cgo is available.
 var outboundRunner = runOutboundDrain
+
 // outboundEncoderAvailable is set true by opus_outbound_cgo.go when the Opus encoder is built in.
 var outboundEncoderAvailable bool
 

@@ -2,8 +2,8 @@
 package mistral
 
 import (
-	openai "github.com/sashabaranov/go-openai"
 	"github.com/Voxray-AI/Voxray/pkg/config"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 const mistralBaseURL = "https://api.mistral.ai/v1"

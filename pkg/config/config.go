@@ -99,7 +99,7 @@ type Config struct {
 	PipelineInputQueueCap int `json:"pipeline_input_queue_cap,omitempty"`
 
 	// WSWriteCoalesceMs when > 0 enables WebSocket write coalescing: drain up to WSWriteCoalesceMaxFrames frames within this many ms before writing (reduces syscalls; adds latency). Default 0 = disabled.
-	WSWriteCoalesceMs     int `json:"ws_write_coalesce_ms,omitempty"`
+	WSWriteCoalesceMs        int `json:"ws_write_coalesce_ms,omitempty"`
 	WSWriteCoalesceMaxFrames int `json:"ws_write_coalesce_max_frames,omitempty"`
 
 	// TLS: enable TLS and cert/key paths. Can be overridden by VOXRAY_TLS_* env vars.
@@ -182,8 +182,8 @@ type TranscriptConfig struct {
 
 // MCPConfig configures an MCP server connection (stdio: command + args). Used to register MCP tools with the LLM.
 type MCPConfig struct {
-	Command     string   `json:"command"`               // executable (e.g. "npx", "go")
-	Args        []string `json:"args,omitempty"`        // arguments (e.g. ["-y", "mcp-server"] or ["run", "server.go"])
+	Command     string   `json:"command"`                // executable (e.g. "npx", "go")
+	Args        []string `json:"args,omitempty"`         // arguments (e.g. ["-y", "mcp-server"] or ["run", "server.go"])
 	ToolsFilter []string `json:"tools_filter,omitempty"` // if non-empty, only these tool names are registered
 }
 

@@ -12,8 +12,8 @@ import (
 // Serializer implements serialize.Serializer, SerializerWithSetup, and SerializerWithMessageType for Vonage.
 // Binary WebSocket messages = 16-bit PCM audio; text = JSON events.
 type Serializer struct {
-	SampleRate     int
-	VonageRate     int
+	SampleRate int
+	VonageRate int
 }
 
 // Params configures the Vonage serializer.
@@ -137,7 +137,7 @@ func (s *Serializer) Deserialize(data []byte) (frames.Frame, error) {
 }
 
 var (
-	_ serialize.Serializer                 = (*Serializer)(nil)
-	_ serialize.SerializerWithSetup        = (*Serializer)(nil)
+	_ serialize.Serializer                = (*Serializer)(nil)
+	_ serialize.SerializerWithSetup       = (*Serializer)(nil)
 	_ serialize.SerializerWithMessageType = (*Serializer)(nil)
 )

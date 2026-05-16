@@ -34,11 +34,11 @@ type Params struct {
 // NewSerializer returns a Plivo WebSocket serializer.
 func NewSerializer(streamID, callID, authID, authToken string, params *Params) *Serializer {
 	s := &Serializer{
-		StreamID:  streamID,
-		CallID:    callID,
-		AuthID:    authID,
-		AuthToken: authToken,
-		PlivoRate: 8000,
+		StreamID:   streamID,
+		CallID:     callID,
+		AuthID:     authID,
+		AuthToken:  authToken,
+		PlivoRate:  8000,
 		AutoHangUp: true,
 	}
 	if params != nil {
@@ -146,9 +146,13 @@ func (s *Serializer) hangUpCall() {
 // Deserialize implements serialize.Serializer.
 func (s *Serializer) Deserialize(data []byte) (frames.Frame, error) {
 	var msg struct {
-		Event  string `json:"event"`
-		Media  struct { Payload string `json:"payload"` } `json:"media"`
-		DTMF   struct { Digit string `json:"digit"` } `json:"dtmf"`
+		Event string `json:"event"`
+		Media struct {
+			Payload string `json:"payload"`
+		} `json:"media"`
+		DTMF struct {
+			Digit string `json:"digit"`
+		} `json:"dtmf"`
 	}
 	if err := json.Unmarshal(data, &msg); err != nil {
 		return nil, err
@@ -189,6 +193,6 @@ func (s *Serializer) Deserialize(data []byte) (frames.Frame, error) {
 }
 
 var (
-	_ serialize.Serializer           = (*Serializer)(nil)
+	_ serialize.Serializer          = (*Serializer)(nil)
 	_ serialize.SerializerWithSetup = (*Serializer)(nil)
 )

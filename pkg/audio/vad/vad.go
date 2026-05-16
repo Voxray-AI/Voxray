@@ -117,4 +117,3 @@ func (e *EnergyDetector) SetSampleRate(sampleRate int) {
 		e.detector.Analyzer.SetSampleRate(sampleRate)
 	}
 }
-

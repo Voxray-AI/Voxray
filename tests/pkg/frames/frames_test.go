@@ -58,4 +58,3 @@ func TestNewBaseWithID(t *testing.T) {
 		t.Errorf("NewBaseWithID(42) ID = %d, want 42", b.ID())
 	}
 }
-

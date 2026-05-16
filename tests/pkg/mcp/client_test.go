@@ -44,4 +44,3 @@ func TestStdioServerParams_ExecCmd(t *testing.T) {
 		t.Errorf("expected 2 args, got %d", len(cmd.Args))
 	}
 }
-

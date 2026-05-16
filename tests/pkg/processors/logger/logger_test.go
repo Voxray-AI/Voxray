@@ -31,4 +31,3 @@ func TestLogger_New(t *testing.T) {
 		t.Errorf("New: got %v", p)
 	}
 }
-

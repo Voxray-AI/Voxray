@@ -15,11 +15,11 @@ type QueuedItem struct {
 
 // FrameQueue is a queue that prioritizes system frames over data frames.
 type FrameQueue struct {
-	mu      sync.Mutex
-	system  []QueuedItem
-	data    []QueuedItem
-	wait    chan struct{}
-	closed  bool
+	mu     sync.Mutex
+	system []QueuedItem
+	data   []QueuedItem
+	wait   chan struct{}
+	closed bool
 }
 
 // NewFrameQueue returns a new FrameQueue.

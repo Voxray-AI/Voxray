@@ -2,9 +2,9 @@ package observers
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 
 	"github.com/Voxray-AI/Voxray/pkg/frames"
 	"github.com/Voxray-AI/Voxray/pkg/processors"
@@ -81,4 +81,3 @@ func (o *TranscriptObserver) flushAssistantLocked() {
 	o.seq++
 	_ = o.store.SaveMessage(context.Background(), o.sessionID, "assistant", text, time.Now().UTC(), o.seq)
 }
-

@@ -109,4 +109,3 @@ func (r *fileRecorder) Close() (LocalFileInfo, error) {
 		Format:    r.format,
 	}, nil
 }
-

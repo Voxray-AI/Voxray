@@ -216,7 +216,7 @@ func (s *Serializer) CreatePongResponse() ([]byte, error) {
 }
 
 var (
-	_ serialize.Serializer                 = (*Serializer)(nil)
-	_ serialize.SerializerWithSetup        = (*Serializer)(nil)
+	_ serialize.Serializer                = (*Serializer)(nil)
+	_ serialize.SerializerWithSetup       = (*Serializer)(nil)
 	_ serialize.SerializerWithMessageType = (*Serializer)(nil)
 )

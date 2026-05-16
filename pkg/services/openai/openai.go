@@ -8,11 +8,11 @@ import (
 	"io"
 	"sync"
 
-	openai "github.com/sashabaranov/go-openai"
 	"github.com/Voxray-AI/Voxray/pkg/adapters/schemas"
 	"github.com/Voxray-AI/Voxray/pkg/config"
 	"github.com/Voxray-AI/Voxray/pkg/frames"
 	"github.com/Voxray-AI/Voxray/pkg/services/llmapi"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 // Service implements services.LLMService and optionally services.LLMServiceWithTools.
@@ -20,9 +20,9 @@ type Service struct {
 	client *openai.Client
 	model  string
 
-	mu             sync.Mutex
-	toolsSchema    []schemas.FunctionSchema
-	toolsHandlers  map[string]llmapi.ToolHandler
+	mu            sync.Mutex
+	toolsSchema   []schemas.FunctionSchema
+	toolsHandlers map[string]llmapi.ToolHandler
 }
 
 // NewService creates an OpenAI LLM service. API key is read from config.GetEnv("OPENAI_API_KEY", "").
@@ -84,8 +84,8 @@ func (s *Service) Chat(ctx context.Context, messages []map[string]any, onToken f
 
 	var contentBuf string
 	toolCallsAccum := make(map[int]struct {
-		ID       string
-		Name     string
+		ID        string
+		Name      string
 		Arguments string
 	})
 
@@ -154,7 +154,7 @@ func (s *Service) Chat(ctx context.Context, messages []map[string]any, onToken f
 			}
 			assistantMsg := map[string]any{
 				"role":       "assistant",
-				"content":   contentBuf,
+				"content":    contentBuf,
 				"tool_calls": toolCallsList,
 			}
 			newMessages = append(newMessages, assistantMsg)

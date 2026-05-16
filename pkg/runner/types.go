@@ -55,11 +55,11 @@ type LiveKitRunnerArgs struct {
 // DialinSettings holds dial-in settings from the Daily webhook (PSTN/SIP).
 // Matches runner cloud and Daily.co webhook payload structure (camelCase from webhook).
 type DialinSettings struct {
-	CallID      string            `json:"callId"`
-	CallDomain  string            `json:"callDomain"`
-	To          string            `json:"To,omitempty"`
-	From        string            `json:"From,omitempty"`
-	SIPHeaders  map[string]string `json:"sipHeaders,omitempty"`
+	CallID     string            `json:"callId"`
+	CallDomain string            `json:"callDomain"`
+	To         string            `json:"To,omitempty"`
+	From       string            `json:"From,omitempty"`
+	SIPHeaders map[string]string `json:"sipHeaders,omitempty"`
 }
 
 // DailyDialinRequest is the request body for Daily PSTN dial-in webhook handler.

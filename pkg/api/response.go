@@ -26,7 +26,7 @@ const (
 // SuccessEnvelope is the standard success response shape: { "data": ..., "meta": ... }.
 type SuccessEnvelope struct {
 	Data interface{} `json:"data"`
-	Meta *Meta      `json:"meta,omitempty"`
+	Meta *Meta       `json:"meta,omitempty"`
 }
 
 // Meta holds optional response metadata (e.g. requestId, pagination).

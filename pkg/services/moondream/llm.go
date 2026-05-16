@@ -5,9 +5,9 @@ import (
 	"errors"
 	"io"
 
-	openai "github.com/sashabaranov/go-openai"
 	"github.com/Voxray-AI/Voxray/pkg/config"
 	"github.com/Voxray-AI/Voxray/pkg/frames"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 const DefaultLLMModel = "moondream-v1"

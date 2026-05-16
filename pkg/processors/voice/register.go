@@ -33,4 +33,3 @@ func init() {
 		return NewInterruptionControllerFromOptions(name, opts)
 	})
 }
-

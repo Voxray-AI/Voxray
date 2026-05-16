@@ -18,20 +18,20 @@ const defaultAPIURL = "https://api.daily.co/v1"
 
 // Config holds the result of configuring a Daily room (room URL, token, optional SIP endpoint).
 type Config struct {
-	RoomURL    string
-	Token      string
+	RoomURL     string
+	Token       string
 	SIPEndpoint string
 }
 
 // Options configures room and token creation.
 type Options struct {
-	APIKey             string
-	APIURL             string
-	RoomExpDurationHrs float64
+	APIKey              string
+	APIURL              string
+	RoomExpDurationHrs  float64
 	TokenExpDurationHrs float64
 	// SIP
-	SIPCallerPhone string
-	SIPEnableVideo bool
+	SIPCallerPhone  string
+	SIPEnableVideo  bool
 	SIPNumEndpoints int
 }
 

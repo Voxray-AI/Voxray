@@ -20,9 +20,9 @@ type Processor struct {
 	*processors.BaseProcessor
 	OnCompletion OnCompletion
 
-	mu        sync.Mutex
-	buf       strings.Builder
-	started   bool
+	mu      sync.Mutex
+	buf     strings.Builder
+	started bool
 }
 
 // New returns an LLM full-response aggregator. onCompletion may be nil.

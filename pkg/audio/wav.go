@@ -11,10 +11,10 @@ import (
 // Supports standard PCM WAV with "fmt " and "data" chunks.
 func DecodeWAVToPCM(wav []byte) (pcm []byte, sampleRate int, err error) {
 	const (
-		riff    = "RIFF"
-		wave    = "WAVE"
-		chunkFmt  = "fmt "
-		data    = "data"
+		riff     = "RIFF"
+		wave     = "WAVE"
+		chunkFmt = "fmt "
+		data     = "data"
 	)
 	if len(wav) < 44 {
 		return nil, 0, errors.New("wav: too short")
@@ -59,4 +59,3 @@ func DecodeWAVToPCM(wav []byte) (pcm []byte, sampleRate int, err error) {
 	}
 	return pcm, sampleRate, nil
 }
-

@@ -13,9 +13,9 @@ const graphAPIBase = "https://graph.facebook.com/v18.0"
 
 // Client is a WhatsApp Cloud API client for sending messages.
 type Client struct {
-	httpClient   *http.Client
-	accessToken  string
-	phoneID      string
+	httpClient  *http.Client
+	accessToken string
+	phoneID     string
 }
 
 // NewClient creates a WhatsApp Cloud API client. phoneID is the WhatsApp Business phone number ID.

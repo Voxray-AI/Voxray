@@ -15,15 +15,15 @@ import (
 
 // Serializer implements serialize.Serializer and serialize.SerializerWithSetup for Telnyx.
 type Serializer struct {
-	StreamID        string
-	CallControlID   string
-	APIKey          string
-	SampleRate      int
-	TelnyxRate      int
+	StreamID         string
+	CallControlID    string
+	APIKey           string
+	SampleRate       int
+	TelnyxRate       int
 	InboundEncoding  string // "PCMU" or "PCMA"
 	OutboundEncoding string // "PCMU" or "PCMA"
-	AutoHangUp      bool
-	hangUpOnce      sync.Once
+	AutoHangUp       bool
+	hangUpOnce       sync.Once
 }
 
 // Params configures the Telnyx serializer.
@@ -222,6 +222,6 @@ func (s *Serializer) Deserialize(data []byte) (frames.Frame, error) {
 }
 
 var (
-	_ serialize.Serializer           = (*Serializer)(nil)
+	_ serialize.Serializer          = (*Serializer)(nil)
 	_ serialize.SerializerWithSetup = (*Serializer)(nil)
 )

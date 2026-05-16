@@ -90,7 +90,7 @@ func TestTwilioSerializer_DeserializeDTMF(t *testing.T) {
 func TestTwilioSerializer_DeserializeMedia(t *testing.T) {
 	s := twilio.NewSerializer("stream-123", "", "", "", "", "", nil)
 	s.SampleRate = 16000
-	// Minimal µ-law payload (a few bytes) -> PCM -> should get AudioRawFrame
+	// Minimal u-law payload (a few bytes) -> PCM -> should get AudioRawFrame
 	ulaw := []byte{0xff, 0xfe, 0xfd, 0xfc}
 	payload := base64.StdEncoding.EncodeToString(ulaw)
 	msg, _ := json.Marshal(map[string]interface{}{

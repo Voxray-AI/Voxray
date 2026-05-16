@@ -75,4 +75,3 @@ type RealtimeSession interface {
 type RealtimeService interface {
 	NewSession(ctx context.Context, cfg RealtimeConfig) (RealtimeSession, error)
 }
-

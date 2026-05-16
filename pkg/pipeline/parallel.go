@@ -78,8 +78,10 @@ func NewParallelPipeline(branches [][]processors.Processor) (*ParallelPipeline, 
 	return pp, nil
 }
 
-func (pp *ParallelPipeline) sourceName(i int) string { return fmt.Sprintf("ParallelPipeline::Source%d", i) }
-func (pp *ParallelPipeline) sinkName(i int) string   { return fmt.Sprintf("ParallelPipeline::Sink%d", i) }
+func (pp *ParallelPipeline) sourceName(i int) string {
+	return fmt.Sprintf("ParallelPipeline::Source%d", i)
+}
+func (pp *ParallelPipeline) sinkName(i int) string { return fmt.Sprintf("ParallelPipeline::Sink%d", i) }
 
 func (pp *ParallelPipeline) onUpstreamFromBranch(ctx context.Context, f frames.Frame) error {
 	if pp.Prev() != nil {

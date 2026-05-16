@@ -64,7 +64,7 @@ func (s *TTSService) Speak(ctx context.Context, text string, sampleRate int) ([]
 		Text:         aws.String(text),
 		OutputFormat: types.OutputFormatPcm,
 		VoiceId:      types.VoiceId(s.voiceID),
-		Engine:      s.engine,
+		Engine:       s.engine,
 		SampleRate:   aws.String("16000"),
 	}
 	out, err := s.client.SynthesizeSpeech(ctx, input)

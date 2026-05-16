@@ -173,4 +173,3 @@ func newTestWebSocketClient(t *testing.T, ts *httptest.Server) (*websocket.Conn,
 	cancel := func() { _ = conn.Close() }
 	return conn, cancel
 }
-

@@ -80,11 +80,11 @@ func NewSyncFrame() *SyncFrame {
 // StartFrame initializes the pipeline (first frame pushed).
 type StartFrame struct {
 	SystemFrame
-	AudioInSampleRate   int  `json:"audio_in_sample_rate"`
-	AudioOutSampleRate  int  `json:"audio_out_sample_rate"`
-	AllowInterruptions  bool `json:"allow_interruptions"`
-	EnableMetrics       bool `json:"enable_metrics"`
-	EnableUsageMetrics  bool `json:"enable_usage_metrics"`
+	AudioInSampleRate  int  `json:"audio_in_sample_rate"`
+	AudioOutSampleRate int  `json:"audio_out_sample_rate"`
+	AllowInterruptions bool `json:"allow_interruptions"`
+	EnableMetrics      bool `json:"enable_metrics"`
+	EnableUsageMetrics bool `json:"enable_usage_metrics"`
 }
 
 func (*StartFrame) FrameType() string { return "StartFrame" }
@@ -92,7 +92,7 @@ func (*StartFrame) FrameType() string { return "StartFrame" }
 // NewStartFrame creates a StartFrame with defaults.
 func NewStartFrame() *StartFrame {
 	return &StartFrame{
-		SystemFrame:         SystemFrame{Base: NewBase()},
+		SystemFrame:        SystemFrame{Base: NewBase()},
 		AudioInSampleRate:  16000,
 		AudioOutSampleRate: 24000,
 	}
@@ -166,10 +166,10 @@ func NewErrorFrame(err string, fatal bool, processor string) *ErrorFrame {
 // TextFrame carries text (e.g. from LLM or for TTS).
 type TextFrame struct {
 	DataFrame
-	Text                   string `json:"text"`
-	SkipTTS                *bool  `json:"skip_tts,omitempty"`
+	Text                    string `json:"text"`
+	SkipTTS                 *bool  `json:"skip_tts,omitempty"`
 	IncludesInterFrameSpace bool   `json:"includes_inter_frame_spaces"`
-	AppendToContext        bool   `json:"append_to_context"`
+	AppendToContext         bool   `json:"append_to_context"`
 }
 
 func (*TextFrame) FrameType() string { return "TextFrame" }
@@ -191,8 +191,8 @@ func (*AggregatedTextFrame) FrameType() string { return "AggregatedTextFrame" }
 // NewAggregatedTextFrame creates an AggregatedTextFrame.
 func NewAggregatedTextFrame(text, aggregatedBy string) *AggregatedTextFrame {
 	t := &AggregatedTextFrame{
-		TextFrame:     TextFrame{DataFrame: DataFrame{Base: NewBase()}, Text: text, AppendToContext: true},
-		AggregatedBy:  aggregatedBy,
+		TextFrame:    TextFrame{DataFrame: DataFrame{Base: NewBase()}, Text: text, AppendToContext: true},
+		AggregatedBy: aggregatedBy,
 	}
 	return t
 }
@@ -211,10 +211,10 @@ func (*TranscriptionFrame) FrameType() string { return "TranscriptionFrame" }
 // NewTranscriptionFrame creates a TranscriptionFrame.
 func NewTranscriptionFrame(text, userID, timestamp string, finalized bool) *TranscriptionFrame {
 	return &TranscriptionFrame{
-		TextFrame:  TextFrame{DataFrame: DataFrame{Base: NewBase()}, Text: text, AppendToContext: true},
-		UserID:     userID,
-		Timestamp:  timestamp,
-		Finalized:  finalized,
+		TextFrame: TextFrame{DataFrame: DataFrame{Base: NewBase()}, Text: text, AppendToContext: true},
+		UserID:    userID,
+		Timestamp: timestamp,
+		Finalized: finalized,
 	}
 }
 
@@ -317,7 +317,9 @@ type ServiceSwitcherRequestMetadataFrame struct {
 	ServiceName string `json:"service_name"`
 }
 
-func (*ServiceSwitcherRequestMetadataFrame) FrameType() string { return "ServiceSwitcherRequestMetadataFrame" }
+func (*ServiceSwitcherRequestMetadataFrame) FrameType() string {
+	return "ServiceSwitcherRequestMetadataFrame"
+}
 
 // NewServiceSwitcherRequestMetadataFrame creates a request for the named service's metadata.
 func NewServiceSwitcherRequestMetadataFrame(serviceName string) *ServiceSwitcherRequestMetadataFrame {

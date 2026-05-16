@@ -19,7 +19,7 @@ type VADProcessor struct {
 	Analyzer             vad.Analyzer
 	SpeechActivityPeriod time.Duration
 
-	prevState   vad.State
+	prevState    vad.State
 	lastActivity time.Time
 }
 

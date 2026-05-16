@@ -21,11 +21,11 @@ type TelephonyCallData struct {
 	CallSid   string
 	Body      map[string]interface{}
 	// Telnyx
-	StreamID        string
-	CallControlID   string
-	OutboundEnc     string
-	InboundEnc      string
-	From, To        string
+	StreamID      string
+	CallControlID string
+	OutboundEnc   string
+	InboundEnc    string
+	From, To      string
 	// Plivo
 	StreamIDPlivo string
 	CallID        string

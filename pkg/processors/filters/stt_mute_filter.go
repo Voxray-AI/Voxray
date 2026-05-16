@@ -13,15 +13,15 @@ import (
 type STTMuteStrategy string
 
 const (
-	STTMuteFirstSpeech              STTMuteStrategy = "first_speech"                // mute until first bot speech detected
-	STTMuteUntilFirstBotComplete     STTMuteStrategy = "mute_until_first_bot_complete" // mute until first bot speech completes
-	STTMuteAlways                    STTMuteStrategy = "always"                      // mute whenever bot is speaking
-	STTMuteCustom                    STTMuteStrategy = "custom"                      // use ShouldMuteCallback
+	STTMuteFirstSpeech           STTMuteStrategy = "first_speech"                  // mute until first bot speech detected
+	STTMuteUntilFirstBotComplete STTMuteStrategy = "mute_until_first_bot_complete" // mute until first bot speech completes
+	STTMuteAlways                STTMuteStrategy = "always"                        // mute whenever bot is speaking
+	STTMuteCustom                STTMuteStrategy = "custom"                        // use ShouldMuteCallback
 )
 
 // STTMuteConfig configures STT muting. FirstSpeech and MuteUntilFirstBotComplete should not be used together.
 type STTMuteConfig struct {
-	Strategies        []STTMuteStrategy `json:"strategies"`
+	Strategies         []STTMuteStrategy                                              `json:"strategies"`
 	ShouldMuteCallback func(ctx context.Context, filter *STTMuteFilter) (bool, error) `json:"-"` // for Custom; set programmatically
 }
 

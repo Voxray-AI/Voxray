@@ -31,7 +31,7 @@ func TestWebsocketMaxDurationAfterFirstAudio(t *testing.T) {
 	defer cancelSrv()
 
 	srv := &ws.Server{
-		SessionTimeout: 0,
+		SessionTimeout:             0,
 		MaxDurationAfterFirstAudio: maxDur,
 		OnConn: func(c context.Context, tr *ws.ConnTransport) {
 			// Start read/write loops so the transport receives frames from the client.
@@ -127,4 +127,3 @@ func TestWebsocketMaxDurationAfterFirstAudio(t *testing.T) {
 		t.Fatalf("timeout waiting for server shutdown")
 	}
 }
-

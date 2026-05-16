@@ -22,4 +22,3 @@ func TestNewLLMService_UsesProvidedModel(t *testing.T) {
 		t.Fatalf("expected model %q, got %q", customModel, svc.model)
 	}
 }
-

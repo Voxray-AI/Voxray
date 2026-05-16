@@ -7,4 +7,3 @@ import "testing"
 func TestIntegrationPlaceholder(t *testing.T) {
 	t.Skip("placeholder – replace with real integration tests")
 }
-

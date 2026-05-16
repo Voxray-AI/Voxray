@@ -155,4 +155,3 @@ func BuildS3Key(basePath, callID, format string, t time.Time) string {
 	filename := fmt.Sprintf("%s.%s", callID, format)
 	return fmt.Sprintf("%s/%s/%s", basePath, datePath, filename)
 }
-

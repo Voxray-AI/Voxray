@@ -32,13 +32,13 @@ const (
 // SendTextData is the data payload for send-text (client).
 type SendTextData struct {
 	Content string        `json:"content"`
-	Options *SendTextOpts  `json:"options,omitempty"`
+	Options *SendTextOpts `json:"options,omitempty"`
 }
 
 // SendTextOpts options for send-text.
 type SendTextOpts struct {
-	RunImmediately  bool `json:"run_immediately"`
-	AudioResponse   bool `json:"audio_response"`
+	RunImmediately bool `json:"run_immediately"`
+	AudioResponse  bool `json:"audio_response"`
 }
 
 // BotReadyData is the data payload for bot-ready (server).

@@ -37,10 +37,10 @@ type ReportErrorFunc func(*frames.ErrorFrame)
 // connection verification (ping), and send-with-retry for WebSocket-based services.
 // Embed or compose with a type that implements WebSocketConnector.
 type WebsocketServiceBase struct {
-	Connector         WebSocketConnector
+	Connector        WebSocketConnector
 	ReconnectOnError bool
 
-	mu                 sync.Mutex
+	mu                  sync.Mutex
 	reconnectInProgress bool
 	disconnecting       bool
 }
@@ -48,8 +48,8 @@ type WebsocketServiceBase struct {
 // NewWebsocketServiceBase returns a base with the given connector and reconnect policy.
 func NewWebsocketServiceBase(connector WebSocketConnector, reconnectOnError bool) *WebsocketServiceBase {
 	return &WebsocketServiceBase{
-		Connector:         connector,
-		ReconnectOnError:  reconnectOnError,
+		Connector:        connector,
+		ReconnectOnError: reconnectOnError,
 	}
 }
 

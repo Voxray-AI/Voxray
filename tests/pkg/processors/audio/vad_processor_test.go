@@ -18,9 +18,9 @@ type fakeVADAnalyzer struct {
 	sr     int
 }
 
-func (f *fakeVADAnalyzer) SetSampleRate(sr int)         { f.sr = sr }
-func (f *fakeVADAnalyzer) SetParams(p vad.Params)      { f.params = p }
-func (f *fakeVADAnalyzer) Params() vad.Params          { return f.params }
+func (f *fakeVADAnalyzer) SetSampleRate(sr int)   { f.sr = sr }
+func (f *fakeVADAnalyzer) SetParams(p vad.Params) { f.params = p }
+func (f *fakeVADAnalyzer) Params() vad.Params     { return f.params }
 
 func (f *fakeVADAnalyzer) Analyze(_ []byte) (vad.State, float64, float64, error) {
 	if f.index >= len(f.states) {
@@ -44,9 +44,9 @@ func (c *vadCollectProcessor) ProcessFrame(_ context.Context, f frames.Frame, di
 
 func (c *vadCollectProcessor) SetNext(processors.Processor)  {}
 func (c *vadCollectProcessor) SetPrev(processors.Processor)  {}
-func (c *vadCollectProcessor) Setup(context.Context) error  { return nil }
+func (c *vadCollectProcessor) Setup(context.Context) error   { return nil }
 func (c *vadCollectProcessor) Cleanup(context.Context) error { return nil }
-func (c *vadCollectProcessor) Name() string                 { return "collector" }
+func (c *vadCollectProcessor) Name() string                  { return "collector" }
 
 func TestVADProcessor_EmitsStartAndStopFrames(t *testing.T) {
 	ctx := context.Background()

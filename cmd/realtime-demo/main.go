@@ -76,7 +76,7 @@ func main() {
 			Data:        chunk,
 			SampleRate:  sampleRate,
 			NumChannels: 1,
-			Timestamp:   now.Add(time.Duration(offset*int(time.Second)/max(1, len(pcm)))),
+			Timestamp:   now.Add(time.Duration(offset * int(time.Second) / max(1, len(pcm)))),
 		}
 		isSpeech, _ := detector.IsSpeech(f)
 		if !isSpeech {
@@ -103,4 +103,3 @@ func max(a, b int) int {
 	}
 	return b
 }
-

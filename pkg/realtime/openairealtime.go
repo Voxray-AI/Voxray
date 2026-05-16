@@ -28,8 +28,8 @@ const (
 
 // openAIRealtimeEvent is a generic JSON event from the Realtime API.
 type openAIRealtimeEvent struct {
-	Type string          `json:"type"`
-	EventID string       `json:"event_id,omitempty"`
+	Type    string `json:"type"`
+	EventID string `json:"event_id,omitempty"`
 	Session *struct {
 		Model string `json:"model,omitempty"`
 	} `json:"session,omitempty"`
@@ -128,8 +128,8 @@ func (s *openAIRealtimeAPISession) SendText(ctx context.Context, text string) er
 	payload := map[string]any{
 		"type": "conversation.item.create",
 		"item": map[string]any{
-			"type":  "message",
-			"role":  "user",
+			"type": "message",
+			"role": "user",
 			"content": []map[string]any{
 				{"type": "input_text", "text": text},
 			},

@@ -8,19 +8,19 @@ import (
 
 // LLMTokenUsage holds token usage for an LLM call.
 type LLMTokenUsage struct {
-	PromptTokens           int
-	CompletionTokens       int
-	TotalTokens            int
-	CacheReadInputTokens   int // optional
+	PromptTokens             int
+	CompletionTokens         int
+	TotalTokens              int
+	CacheReadInputTokens     int // optional
 	CacheCreationInputTokens int // optional
-	ReasoningTokens        int // optional
+	ReasoningTokens          int // optional
 }
 
 // TurnMetrics holds turn detection metrics.
 type TurnMetrics struct {
-	IsComplete           bool
-	Probability          float64
-	E2EProcessingTimeMs  float64
+	IsComplete          bool
+	Probability         float64
+	E2EProcessingTimeMs float64
 }
 
 // Metrics holds simple counters and latencies for pipeline/processors.
@@ -34,7 +34,7 @@ type Metrics struct {
 	FrameCount    int64         // frames processed
 	LastProcessed time.Time
 	// Structured usage (last recorded)
-	LastLLMUsage LLMTokenUsage
+	LastLLMUsage    LLMTokenUsage
 	LastTurnMetrics TurnMetrics
 }
 

@@ -51,4 +51,3 @@ func TestMaxDurationDoesNotFireAfterClose(t *testing.T) {
 		// ok
 	}
 }
-

@@ -71,7 +71,7 @@ func encodeULawSample(sample int16) uint8 {
 	}
 	mag := uint16(sample32)
 	exp := uint8(0)
-	for (64 << exp) <= mag && exp < maxExp {
+	for (64<<exp) <= mag && exp < maxExp {
 		exp++
 	}
 	mantissa := (sample32 >> (exp + 3)) & 0x0F

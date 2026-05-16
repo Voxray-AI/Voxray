@@ -18,11 +18,11 @@ const DefaultGoogleSTTModel = "latest_long"
 // STTService implements services.STTService using Google Cloud Speech-to-Text V2 (non-streaming Recognize).
 // Auth: GOOGLE_APPLICATION_CREDENTIALS or Application Default Credentials.
 type STTService struct {
-	client    *speech.Client
-	project   string
-	location  string
-	model     string
-	language  string // BCP-47 e.g. "en-US"; empty = auto-detect
+	client   *speech.Client
+	project  string
+	location string
+	model    string
+	language string // BCP-47 e.g. "en-US"; empty = auto-detect
 }
 
 // NewSTT creates a Google Cloud Speech-to-Text V2 STT service.

@@ -5,11 +5,12 @@
 //	go run ./cmd/evals -config scripts/evals/config/scenarios.json -voxray-config config.json
 //
 // Flags:
-//   -config        path to eval scenarios JSON (default: scripts/evals/config/scenarios.json)
-//   -voxray-config path to voxray config for API keys and provider (default: config.json)
-//   -scenario     run only scenario with this name (default: all)
-//   -out-dir      directory for results.json (default: scripts/evals/test-runs/<timestamp>)
-//   -v            verbose
+//
+//	-config        path to eval scenarios JSON (default: scripts/evals/config/scenarios.json)
+//	-voxray-config path to voxray config for API keys and provider (default: config.json)
+//	-scenario     run only scenario with this name (default: all)
+//	-out-dir      directory for results.json (default: scripts/evals/test-runs/<timestamp>)
+//	-v            verbose
 package main
 
 import (

@@ -44,4 +44,3 @@ func TestNewStrategy_KeywordMapsToMinWords(t *testing.T) {
 		t.Fatalf("expected interruption after two words with keyword strategy")
 	}
 }
-

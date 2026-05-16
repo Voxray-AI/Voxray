@@ -104,7 +104,7 @@ func (m *LLM) Chat(ctx context.Context, messages []map[string]any, onToken func(
 		onToken(&frames.LLMTextFrame{
 			TextFrame: frames.TextFrame{
 				DataFrame:       frames.DataFrame{Base: frames.NewBase()},
-				Text:           string(c),
+				Text:            string(c),
 				AppendToContext: true,
 			},
 		})

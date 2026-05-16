@@ -2,8 +2,8 @@
 package grok
 
 import (
-	openai "github.com/sashabaranov/go-openai"
 	"github.com/Voxray-AI/Voxray/pkg/config"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 const grokBaseURL = "https://api.x.ai/v1"

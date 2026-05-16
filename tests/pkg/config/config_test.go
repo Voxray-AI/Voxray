@@ -121,4 +121,3 @@ func TestPublicPipelineInfo(t *testing.T) {
 		t.Errorf("vad/transport: %+v", info)
 	}
 }
-

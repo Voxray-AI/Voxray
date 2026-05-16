@@ -33,4 +33,3 @@ func (b *sileroBackend) voiceConfidence(buf []byte, sampleRate int) (float64, er
 	}
 	return 0.5, nil
 }
-

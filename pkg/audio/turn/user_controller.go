@@ -181,4 +181,3 @@ func (c *UserTurnController) stopIdleTimer() {
 		c.idleTimer = nil
 	}
 }
-

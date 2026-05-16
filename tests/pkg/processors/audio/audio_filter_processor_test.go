@@ -42,4 +42,3 @@ func TestAudioFilterProcessor_appliesGainFilter(t *testing.T) {
 		t.Fatalf("expected NumFrames to be recomputed, got 0")
 	}
 }
-

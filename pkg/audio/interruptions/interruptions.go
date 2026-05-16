@@ -81,4 +81,3 @@ func NewStrategy(kind string, minWords int) Strategy {
 		return nil
 	}
 }
-

@@ -16,17 +16,17 @@ import (
 
 // Serializer implements serialize.Serializer and serialize.SerializerWithSetup for Twilio Media Streams.
 type Serializer struct {
-	StreamSid   string
-	CallSid     string
-	AccountSid  string
-	AuthToken   string
-	Region      string
-	Edge        string
-	SampleRate  int
-	TwilioRate  int
-	AutoHangUp  bool
-	hangUpOnce  sync.Once
-	hangUpDone  bool
+	StreamSid  string
+	CallSid    string
+	AccountSid string
+	AuthToken  string
+	Region     string
+	Edge       string
+	SampleRate int
+	TwilioRate int
+	AutoHangUp bool
+	hangUpOnce sync.Once
+	hangUpDone bool
 }
 
 // Params configures the Twilio serializer.
@@ -164,7 +164,7 @@ func (s *Serializer) hangUpCall() {
 // Deserialize implements serialize.Serializer.
 func (s *Serializer) Deserialize(data []byte) (frames.Frame, error) {
 	var msg struct {
-		Event string          `json:"event"`
+		Event string `json:"event"`
 		Media struct {
 			Payload string `json:"payload"`
 		} `json:"media"`
@@ -212,6 +212,6 @@ func (s *Serializer) Deserialize(data []byte) (frames.Frame, error) {
 
 // Ensure Serializer implements the interfaces.
 var (
-	_ serialize.Serializer           = (*Serializer)(nil)
+	_ serialize.Serializer          = (*Serializer)(nil)
 	_ serialize.SerializerWithSetup = (*Serializer)(nil)
 )

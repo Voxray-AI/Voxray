@@ -2,8 +2,8 @@
 package cerebras
 
 import (
-	openai "github.com/sashabaranov/go-openai"
 	"github.com/Voxray-AI/Voxray/pkg/config"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 const cerebrasBaseURL = "https://api.cerebras.ai/v1"

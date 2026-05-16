@@ -47,7 +47,7 @@ func (s *Source) Run(ctx context.Context) {
 // Sink is a processor that forwards all frames to a channel (for transport output).
 type Sink struct {
 	*processors.BaseProcessor
-	Out     chan<- frames.Frame
+	Out        chan<- frames.Frame
 	ttsLogOnce sync.Once
 }
 

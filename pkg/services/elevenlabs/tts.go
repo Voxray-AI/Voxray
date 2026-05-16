@@ -14,16 +14,16 @@ import (
 )
 
 const (
-	defaultTTSModel   = "eleven_multilingual_v2"
-	defaultOutputFmt  = "pcm_24000" // raw PCM 24kHz for pipeline compatibility
+	defaultTTSModel  = "eleven_multilingual_v2"
+	defaultOutputFmt = "pcm_24000" // raw PCM 24kHz for pipeline compatibility
 )
 
 // TTSService implements services.TTSService using ElevenLabs Text-to-Speech.
 type TTSService struct {
-	client   *http.Client
-	apiKey   string
-	voiceID  string
-	modelID  string
+	client    *http.Client
+	apiKey    string
+	voiceID   string
+	modelID   string
 	outputFmt string
 }
 

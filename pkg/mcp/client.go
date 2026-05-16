@@ -7,26 +7,26 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/Voxray-AI/Voxray/pkg/adapters/schemas"
 	"github.com/Voxray-AI/Voxray/pkg/logger"
 	"github.com/Voxray-AI/Voxray/pkg/services/llmapi"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // Client is an MCP client that discovers tools from an MCP server and can register
 // them with an LLM (Option A: LLMServiceWithTools).
 type Client struct {
-	ServerParams      StdioServerParams
-	ToolsFilter        []string                    // if non-nil, only these tool names are registered
-	ToolsOutputFilters map[string]func(any) any    // optional per-tool output transform
-	mu                sync.Mutex
+	ServerParams       StdioServerParams
+	ToolsFilter        []string                 // if non-nil, only these tool names are registered
+	ToolsOutputFilters map[string]func(any) any // optional per-tool output transform
+	mu                 sync.Mutex
 }
 
 // NewClient returns an MCP client for the given stdio server params.
 func NewClient(params StdioServerParams, toolsFilter []string, outputFilters map[string]func(any) any) *Client {
 	return &Client{
-		ServerParams:      params,
-		ToolsFilter:       toolsFilter,
+		ServerParams:       params,
+		ToolsFilter:        toolsFilter,
 		ToolsOutputFilters: outputFilters,
 	}
 }

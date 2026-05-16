@@ -23,11 +23,11 @@ const minBatchRunes = 30 // don't flush tiny fragments; wait for at least this m
 // Emits BotStartedSpeakingFrame before the first TTS audio in a response and BotStoppedSpeakingFrame after each segment for observers.
 type TTSProcessor struct {
 	*processors.BaseProcessor
-	TTS            services.TTSService
-	SampleRate     int
-	MaxBatchRunes  int   // max runes before flushing without sentence end (0 = use default)
-	buf            strings.Builder
-	botSpeaking    bool // true after we've pushed BotStartedSpeakingFrame this turn; reset on UserStartedSpeakingFrame/StartFrame
+	TTS           services.TTSService
+	SampleRate    int
+	MaxBatchRunes int // max runes before flushing without sentence end (0 = use default)
+	buf           strings.Builder
+	botSpeaking   bool // true after we've pushed BotStartedSpeakingFrame this turn; reset on UserStartedSpeakingFrame/StartFrame
 }
 
 // NewTTSProcessor returns a processor that speaks text and pushes TTSAudioRawFrame(s) downstream.

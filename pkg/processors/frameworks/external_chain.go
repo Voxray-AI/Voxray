@@ -27,12 +27,12 @@ func NewExternalChainProcessorFromOptions(name string, opts json.RawMessage) *Ex
 
 // ExternalChainOptions is the JSON shape for plugin_options["external_chain"].
 type ExternalChainOptions struct {
-	URL          string            `json:"url"`
-	Method       string            `json:"method"`        // default "POST"
-	Headers      map[string]string `json:"headers"`      // optional
-	TimeoutSec   int               `json:"timeout_sec"` // 0 = 30s default
-	Stream       bool              `json:"stream"`        // true = SSE or chunked streaming
-	TranscriptKey string           `json:"transcript_key"` // key for input text; default "input"
+	URL           string            `json:"url"`
+	Method        string            `json:"method"`         // default "POST"
+	Headers       map[string]string `json:"headers"`        // optional
+	TimeoutSec    int               `json:"timeout_sec"`    // 0 = 30s default
+	Stream        bool              `json:"stream"`         // true = SSE or chunked streaming
+	TranscriptKey string            `json:"transcript_key"` // key for input text; default "input"
 }
 
 // ExternalChainProcessor calls an external HTTP endpoint (e.g. Langchain/Strands sidecar) with the
@@ -157,7 +157,7 @@ func (p *ExternalChainProcessor) streamResponse(ctx context.Context, r io.Reader
 			continue
 		}
 		var chunk struct {
-			Text string `json:"text"`
+			Text    string `json:"text"`
 			Content string `json:"content"`
 		}
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {

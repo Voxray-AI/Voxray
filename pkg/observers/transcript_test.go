@@ -12,8 +12,8 @@ import (
 )
 
 type fakeStore struct {
-	mu    sync.Mutex
-	msgs  []storedMsg
+	mu   sync.Mutex
+	msgs []storedMsg
 }
 
 type storedMsg struct {
@@ -53,16 +53,16 @@ func TestTranscriptObserver_UserAndAssistant(t *testing.T) {
 	// Assistant response in two chunks, then TTSSpeakFrame to flush.
 	llmChunk1 := &frames.LLMTextFrame{
 		TextFrame: frames.TextFrame{
-			DataFrame:        frames.DataFrame{Base: frames.NewBase()},
-			Text:             "hi ",
-			AppendToContext:  true,
+			DataFrame:       frames.DataFrame{Base: frames.NewBase()},
+			Text:            "hi ",
+			AppendToContext: true,
 		},
 	}
 	llmChunk2 := &frames.LLMTextFrame{
 		TextFrame: frames.TextFrame{
-			DataFrame:        frames.DataFrame{Base: frames.NewBase()},
-			Text:             "there",
-			AppendToContext:  true,
+			DataFrame:       frames.DataFrame{Base: frames.NewBase()},
+			Text:            "there",
+			AppendToContext: true,
 		},
 	}
 	obs.OnFrameProcessed("llm", llmChunk1, processors.Downstream)
@@ -85,4 +85,3 @@ func TestTranscriptObserver_UserAndAssistant(t *testing.T) {
 		t.Errorf("unexpected seq values: %+v", store.msgs)
 	}
 }
-

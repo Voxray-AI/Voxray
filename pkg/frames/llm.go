@@ -56,7 +56,7 @@ func NewLLMRunFrame() *LLMRunFrame {
 type LLMMessagesUpdateFrame struct {
 	DataFrame
 	Messages []map[string]any `json:"messages"`
-	RunLLM   *bool             `json:"run_llm,omitempty"`
+	RunLLM   *bool            `json:"run_llm,omitempty"`
 }
 
 func (*LLMMessagesUpdateFrame) FrameType() string { return "LLMMessagesUpdateFrame" }
@@ -65,7 +65,7 @@ func (*LLMMessagesUpdateFrame) FrameType() string { return "LLMMessagesUpdateFra
 type LLMMessagesAppendFrame struct {
 	DataFrame
 	Messages []map[string]any `json:"messages"`
-	RunLLM   *bool             `json:"run_llm,omitempty"`
+	RunLLM   *bool            `json:"run_llm,omitempty"`
 }
 
 func (*LLMMessagesAppendFrame) FrameType() string { return "LLMMessagesAppendFrame" }
@@ -148,12 +148,12 @@ func NewTTSSpeakFrame(text string) *TTSSpeakFrame {
 // LLMContextSummaryRequestFrame requests context summarization (e.g. when token/message limit reached).
 type LLMContextSummaryRequestFrame struct {
 	DataFrame
-	RequestID             string       `json:"request_id"`
-	Context               *LLMContext  `json:"context"`
-	MinMessagesToKeep     int          `json:"min_messages_to_keep"`
-	TargetContextTokens   int          `json:"target_context_tokens"`
-	SummarizationPrompt   string       `json:"summarization_prompt,omitempty"`
-	SummarizationTimeout  int          `json:"summarization_timeout,omitempty"` // seconds
+	RequestID            string      `json:"request_id"`
+	Context              *LLMContext `json:"context"`
+	MinMessagesToKeep    int         `json:"min_messages_to_keep"`
+	TargetContextTokens  int         `json:"target_context_tokens"`
+	SummarizationPrompt  string      `json:"summarization_prompt,omitempty"`
+	SummarizationTimeout int         `json:"summarization_timeout,omitempty"` // seconds
 }
 
 func (*LLMContextSummaryRequestFrame) FrameType() string { return "LLMContextSummaryRequestFrame" }
@@ -161,10 +161,10 @@ func (*LLMContextSummaryRequestFrame) FrameType() string { return "LLMContextSum
 // LLMContextSummaryResultFrame carries the result of context summarization.
 type LLMContextSummaryResultFrame struct {
 	DataFrame
-	RequestID            string `json:"request_id"`
-	Summary              string `json:"summary"`
-	LastSummarizedIndex  int    `json:"last_summarized_index"`
-	Error                string `json:"error,omitempty"`
+	RequestID           string `json:"request_id"`
+	Summary             string `json:"summary"`
+	LastSummarizedIndex int    `json:"last_summarized_index"`
+	Error               string `json:"error,omitempty"`
 }
 
 func (*LLMContextSummaryResultFrame) FrameType() string { return "LLMContextSummaryResultFrame" }

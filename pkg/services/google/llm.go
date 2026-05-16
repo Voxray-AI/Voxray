@@ -49,9 +49,9 @@ func (s *LLMService) Chat(ctx context.Context, messages []map[string]any, onToke
 		}
 		tf := &frames.LLMTextFrame{}
 		tf.TextFrame = frames.TextFrame{
-			DataFrame:              frames.DataFrame{Base: frames.NewBase()},
-			Text:                   delta,
-			AppendToContext:        true,
+			DataFrame:               frames.DataFrame{Base: frames.NewBase()},
+			Text:                    delta,
+			AppendToContext:         true,
 			IncludesInterFrameSpace: true,
 		}
 		if onToken != nil {

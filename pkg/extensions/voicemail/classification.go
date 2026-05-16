@@ -24,7 +24,7 @@ type ClassificationProcessor struct {
 
 	processingResponse bool
 	responseBuffer     strings.Builder
-	decisionMade      bool
+	decisionMade       bool
 	voicemailDetected  bool
 	mu                 sync.Mutex
 
@@ -34,8 +34,8 @@ type ClassificationProcessor struct {
 	voicemailEvent   chan struct{}
 	voicemailEventMu sync.Mutex
 	delayCancel      context.CancelFunc
-	onConversation  func()
-	onVoicemail     func()
+	onConversation   func()
+	onVoicemail      func()
 }
 
 // NewClassificationProcessor creates a processor that classifies CONVERSATION vs VOICEMAIL from LLM output.
@@ -51,7 +51,7 @@ func NewClassificationProcessor(name string, gateNotifier, conversationNotifier,
 		gateNotifier:            gateNotifier,
 		conversationNotifier:    conversationNotifier,
 		voicemailNotifier:       voicemailNotifier,
-		voicemailDelaySecs:     voicemailResponseDelaySecs,
+		voicemailDelaySecs:      voicemailResponseDelaySecs,
 		voicemailDetectedNotify: make(chan struct{}, 1),
 		voicemailEvent:          make(chan struct{}),
 	}

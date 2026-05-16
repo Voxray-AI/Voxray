@@ -16,4 +16,3 @@ func sdkHeaders() map[string]string {
 		"User-Agent": fmt.Sprintf("github.com/Voxray-AI/Voxray/dev Go/%s", runtime.Version()),
 	}
 }
-

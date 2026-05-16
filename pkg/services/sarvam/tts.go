@@ -178,4 +178,3 @@ func (r *byteSliceReader) Read(p []byte) (int, error) {
 	r.i += n
 	return n, nil
 }
-

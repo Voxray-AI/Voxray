@@ -42,9 +42,9 @@ type Processor struct {
 	Context *frames.LLMContext
 	Config  Config
 
-	mu                       sync.Mutex
-	pendingRequestID         string
-	summarizationInProgress  bool
+	mu                      sync.Mutex
+	pendingRequestID        string
+	summarizationInProgress bool
 }
 
 // New returns a context summarizer. If cfg is zero value, DefaultConfig is used.
@@ -130,13 +130,13 @@ func (p *Processor) requestSummarization(ctx context.Context) {
 		timeout = 60
 	}
 	req := &frames.LLMContextSummaryRequestFrame{
-		DataFrame:              frames.DataFrame{Base: frames.NewBase()},
-		RequestID:              requestID,
-		Context:                p.Context,
-		MinMessagesToKeep:      p.Config.MinMessagesToKeep,
-		TargetContextTokens:    p.Config.TargetContextTokens,
-		SummarizationPrompt:    p.Config.SummarizationPrompt,
-		SummarizationTimeout:   timeout,
+		DataFrame:            frames.DataFrame{Base: frames.NewBase()},
+		RequestID:            requestID,
+		Context:              p.Context,
+		MinMessagesToKeep:    p.Config.MinMessagesToKeep,
+		TargetContextTokens:  p.Config.TargetContextTokens,
+		SummarizationPrompt:  p.Config.SummarizationPrompt,
+		SummarizationTimeout: timeout,
 	}
 	_ = p.PushDownstream(ctx, req)
 }

@@ -25,4 +25,3 @@ func TestSaveMessage_UninitializedDB(t *testing.T) {
 		t.Fatalf("expected error when calling SaveMessage with nil DB, got nil")
 	}
 }
-

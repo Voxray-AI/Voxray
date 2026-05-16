@@ -18,11 +18,11 @@ type OnContextUpdate func(msgs []map[string]any)
 // LLMProcessor runs the LLM on transcription/context and streams LLMTextFrame downstream.
 type LLMProcessor struct {
 	*processors.BaseProcessor
-	LLM            services.LLMService
-	SystemPrompt   string // optional; when set, sent as system message so the LLM replies as assistant
+	LLM             services.LLMService
+	SystemPrompt    string          // optional; when set, sent as system message so the LLM replies as assistant
 	OnContextUpdate OnContextUpdate // optional; called when msgs is updated (e.g. for IVR SetSavedMessages)
-	mu             sync.Mutex
-	msgs           []map[string]any
+	mu              sync.Mutex
+	msgs            []map[string]any
 }
 
 // NewLLMProcessor returns a processor that runs the LLM and streams text downstream.

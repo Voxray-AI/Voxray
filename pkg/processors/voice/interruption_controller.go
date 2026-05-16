@@ -106,4 +106,3 @@ func (p *InterruptionController) ProcessFrame(ctx context.Context, f frames.Fram
 }
 
 var _ processors.Processor = (*InterruptionController)(nil)
-

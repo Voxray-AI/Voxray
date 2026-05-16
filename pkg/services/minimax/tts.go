@@ -51,8 +51,8 @@ func (s *TTSService) Speak(ctx context.Context, text string, sampleRate int) ([]
 		sampleRate = 24000
 	}
 	payload := map[string]any{
-		"text":   text,
-		"model":  s.model,
+		"text":     text,
+		"model":    s.model,
 		"voice_id": s.voiceID,
 	}
 	body, err := json.Marshal(payload)

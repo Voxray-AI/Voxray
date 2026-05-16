@@ -22,11 +22,11 @@ func (c *collectProcessor) ProcessFrame(_ context.Context, f frames.Frame, _ pro
 	c.mu.Unlock()
 	return nil
 }
-func (c *collectProcessor) SetNext(processors.Processor)   {}
-func (c *collectProcessor) SetPrev(processors.Processor)   {}
+func (c *collectProcessor) SetNext(processors.Processor)  {}
+func (c *collectProcessor) SetPrev(processors.Processor)  {}
 func (c *collectProcessor) Setup(context.Context) error   { return nil }
 func (c *collectProcessor) Cleanup(context.Context) error { return nil }
-func (c *collectProcessor) Name() string                   { return "collect" }
+func (c *collectProcessor) Name() string                  { return "collect" }
 
 func mustDTMF(d frames.KeypadEntry) *frames.InputDTMFFrame {
 	f, err := frames.NewInputDTMFFrame(d)

@@ -22,7 +22,7 @@ import (
 
 const (
 	sttStreamingPath  = "/speech-to-text/ws"
-	sttModeTranscribe  = "transcribe"
+	sttModeTranscribe = "transcribe"
 )
 
 // transcribeRequest is the JSON sent to Sarvam WebSocket to send audio.

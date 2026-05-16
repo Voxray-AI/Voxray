@@ -13,10 +13,10 @@ import (
 // Serializer implements serialize.Serializer and serialize.SerializerWithSetup for Exotel.
 // Exotel uses PCM (not mu-law) in base64 for media events.
 type Serializer struct {
-	StreamSid   string
-	CallSid     string
-	SampleRate  int
-	ExotelRate  int
+	StreamSid  string
+	CallSid    string
+	SampleRate int
+	ExotelRate int
 }
 
 // Params configures the Exotel serializer.
@@ -95,9 +95,9 @@ func (s *Serializer) serializeAudio(pcm []byte, sampleRate int) ([]byte, bool, e
 	}
 	payload := base64.StdEncoding.EncodeToString(resampled)
 	out := map[string]interface{}{
-		"event":    "media",
+		"event":     "media",
 		"streamSid": s.StreamSid,
-		"media":   map[string]string{"payload": payload},
+		"media":     map[string]string{"payload": payload},
 	}
 	b, err := json.Marshal(out)
 	return b, false, err
@@ -150,6 +150,6 @@ func (s *Serializer) Deserialize(data []byte) (frames.Frame, error) {
 }
 
 var (
-	_ serialize.Serializer           = (*Serializer)(nil)
+	_ serialize.Serializer          = (*Serializer)(nil)
 	_ serialize.SerializerWithSetup = (*Serializer)(nil)
 )

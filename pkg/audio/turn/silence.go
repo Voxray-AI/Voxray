@@ -24,7 +24,7 @@ type bufferedChunk struct {
 type SilenceTurnAnalyzer struct {
 	mu sync.Mutex
 
-	params Params
+	params     Params
 	sampleRate int
 
 	initSampleRate *int // if set, overrides SetSampleRate until first set

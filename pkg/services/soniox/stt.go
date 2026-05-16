@@ -48,11 +48,11 @@ func (s *STTService) Transcribe(ctx context.Context, audio []byte, sampleRate, n
 	defer conn.Close()
 
 	configMsg := map[string]any{
-		"api_key":                 s.apiKey,
-		"model":                    s.model,
-		"audio_format":             "pcm_s16le",
-		"num_channels":             numChannels,
-		"sample_rate":              sampleRate,
+		"api_key":                   s.apiKey,
+		"model":                     s.model,
+		"audio_format":              "pcm_s16le",
+		"num_channels":              numChannels,
+		"sample_rate":               sampleRate,
 		"enable_endpoint_detection": false,
 	}
 	configBytes, err := json.Marshal(configMsg)
@@ -76,7 +76,10 @@ func (s *STTService) Transcribe(ctx context.Context, audio []byte, sampleRate, n
 				return
 			}
 			var msg struct {
-				Tokens  []struct { Text string `json:"text"`; IsFinal bool `json:"is_final"` } `json:"tokens"`
+				Tokens []struct {
+					Text    string `json:"text"`
+					IsFinal bool   `json:"is_final"`
+				} `json:"tokens"`
 				Finished bool `json:"finished"`
 			}
 			if err := json.Unmarshal(data, &msg); err != nil {

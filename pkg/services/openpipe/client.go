@@ -2,8 +2,8 @@
 package openpipe
 
 import (
-	openai "github.com/sashabaranov/go-openai"
 	"github.com/Voxray-AI/Voxray/pkg/config"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 const openpipeBaseURL = "https://app.openpipe.ai/api/v1"

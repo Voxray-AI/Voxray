@@ -18,8 +18,8 @@ type WakeNotifierFilterOptions struct {
 // WakeNotifierFilter forwards all frames; when a frame's type is in the allowed set and the predicate returns true, it calls notifier.Notify().
 type WakeNotifierFilter struct {
 	*processors.BaseProcessor
-	notifier *notifier.Notifier
-	types   map[string]struct{}
+	notifier  *notifier.Notifier
+	types     map[string]struct{}
 	predicate func(frames.Frame) bool
 }
 

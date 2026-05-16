@@ -71,4 +71,3 @@ func TestSilenceAnalyzeEndOfTurnAsyncMultipleCalls(t *testing.T) {
 		}
 	}
 }
-

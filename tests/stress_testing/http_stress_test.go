@@ -92,8 +92,8 @@ func TestHTTPStress_MockOfferEndpoint(t *testing.T) {
 	const concurrency = 50
 	const totalRequests = 250
 	var successCount atomic.Int32
-	var errorCount atomic.Int32   // request/connection errors
-	var non2xxCount atomic.Int32  // HTTP non-200 responses
+	var errorCount atomic.Int32  // request/connection errors
+	var non2xxCount atomic.Int32 // HTTP non-200 responses
 	var latenciesMu sync.Mutex
 	var latenciesMs []float64
 
@@ -172,8 +172,8 @@ func TestHTTPStress_MockOfferEndpoint_RampUpConcurrency(t *testing.T) {
 	const rampUpDuration = 3 * time.Second
 
 	var successCount atomic.Int32
-	var errorCount atomic.Int32   // request/connection errors
-	var non2xxCount atomic.Int32  // HTTP non-200 responses
+	var errorCount atomic.Int32  // request/connection errors
+	var non2xxCount atomic.Int32 // HTTP non-200 responses
 	var latenciesMu sync.Mutex
 	var latenciesMs []float64
 

@@ -41,4 +41,3 @@ func TestBaseAnalyzerStateTransitions(t *testing.T) {
 		t.Fatalf("expected state to move away from Quiet with speech-like buffer")
 	}
 }
-

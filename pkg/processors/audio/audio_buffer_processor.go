@@ -14,25 +14,25 @@ import (
 // EnableTurnAudio is true, OnUserTurnAudioData and OnBotTurnAudioData per turn.
 type AudioBufferProcessor struct {
 	*processors.BaseProcessor
-	SampleRate      int  // 0 = use from StartFrame
-	NumChannels     int  // 1 = mono mix, 2 = stereo interleave
-	BufferSize      int  // bytes; 0 = no buffered callbacks, only turn callbacks
+	SampleRate      int // 0 = use from StartFrame
+	NumChannels     int // 1 = mono mix, 2 = stereo interleave
+	BufferSize      int // bytes; 0 = no buffered callbacks, only turn callbacks
 	EnableTurnAudio bool
 
-	OnAudioData        func(merged []byte, sampleRate, numChannels int)
-	OnTrackAudioData   func(userBuf, botBuf []byte, sampleRate, numChannels int)
+	OnAudioData         func(merged []byte, sampleRate, numChannels int)
+	OnTrackAudioData    func(userBuf, botBuf []byte, sampleRate, numChannels int)
 	OnUserTurnAudioData func(buf []byte, sampleRate, numChannels int)
 	OnBotTurnAudioData  func(buf []byte, sampleRate, numChannels int)
 
-	sampleRate       int
-	bufferSize1s     int
-	recording        bool
-	userBuffer       []byte
-	botBuffer        []byte
-	userTurnBuffer   []byte
-	botTurnBuffer    []byte
-	userSpeaking     bool
-	botSpeaking      bool
+	sampleRate     int
+	bufferSize1s   int
+	recording      bool
+	userBuffer     []byte
+	botBuffer      []byte
+	userTurnBuffer []byte
+	botTurnBuffer  []byte
+	userSpeaking   bool
+	botSpeaking    bool
 }
 
 // NewAudioBufferProcessor returns an AudioBufferProcessor with the given config.
@@ -44,11 +44,11 @@ func NewAudioBufferProcessor(name string, sampleRate, numChannels, bufferSize in
 		numChannels = 1
 	}
 	return &AudioBufferProcessor{
-		BaseProcessor:     processors.NewBaseProcessor(name),
-		SampleRate:        sampleRate,
-		NumChannels:       numChannels,
-		BufferSize:        bufferSize,
-		EnableTurnAudio:   enableTurnAudio,
+		BaseProcessor:   processors.NewBaseProcessor(name),
+		SampleRate:      sampleRate,
+		NumChannels:     numChannels,
+		BufferSize:      bufferSize,
+		EnableTurnAudio: enableTurnAudio,
 	}
 }
 

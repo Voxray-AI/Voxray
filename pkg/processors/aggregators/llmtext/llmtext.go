@@ -26,7 +26,7 @@ func New(name string, agg textaggregator.Aggregator) *Processor {
 	}
 	return &Processor{
 		BaseProcessor: processors.NewBaseProcessor(name),
-		Aggregator:     agg,
+		Aggregator:    agg,
 	}
 }
 

@@ -87,4 +87,3 @@ func (g *GainFilter) Apply(audio []byte, _ int, _ int) []byte {
 	}
 	return out
 }
-

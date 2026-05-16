@@ -100,7 +100,7 @@ func TestMockPipeline_Stress(t *testing.T) {
 	cfg.Concurrency = 50
 	cfg.Duration = 8 * time.Second
 	cfg.PerSessionTimeout = 4 * time.Second
-	cfg.PerSessionMocks = true  // avoid shared-mock contention so test doesn't hang
+	cfg.PerSessionMocks = true // avoid shared-mock contention so test doesn't hang
 	cfg.TotalSessions = 15     // bounded run so test always finishes
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

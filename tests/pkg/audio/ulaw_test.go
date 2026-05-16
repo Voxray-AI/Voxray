@@ -23,7 +23,7 @@ func TestEncodeDecodeULawRoundTrip(t *testing.T) {
 		if i+1 >= len(out) {
 			break
 		}
-		// Allow some tolerance for µ-law quantization
+		// Allow some tolerance for u-law quantization
 		orig := int16(pcm[i]) | int16(pcm[i+1])<<8
 		dec := int16(out[i]) | int16(out[i+1])<<8
 		diff := orig - dec
@@ -37,7 +37,7 @@ func TestEncodeDecodeULawRoundTrip(t *testing.T) {
 }
 
 func TestDecodeULawKnownValues(t *testing.T) {
-	// µ-law 0xff is often silence or near-silence
+	// u-law 0xff is often silence or near-silence
 	ulaw := []byte{0xff, 0x7f}
 	out := audio.DecodeULaw(ulaw)
 	if len(out) != 4 {
@@ -77,7 +77,7 @@ func TestULawRoundTripLarger(t *testing.T) {
 	}
 	out := audio.DecodeULaw(ulaw)
 	if !bytes.Equal(out, pcm) {
-		// µ-law is lossy; at least length should match
+		// u-law is lossy; at least length should match
 		if len(out) != len(pcm) {
 			t.Fatalf("round-trip length: got %d want %d", len(out), len(pcm))
 		}

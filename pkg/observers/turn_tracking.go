@@ -18,18 +18,18 @@ const defaultTurnEndTimeoutSecs = 2.5
 type TurnTrackingObserver struct {
 	mu sync.Mutex
 
-	turnCount        int
-	isTurnActive     bool
-	isBotSpeaking    bool
-	hasBotSpoken     bool
-	turnStartTimeNs  int64
-	turnEndTimeout   time.Duration
-	endTurnTimer     *time.Timer
-	onTurnStarted    func(turnCount int)
-	onTurnEnded      func(turnCount int, durationSecs float64, interrupted bool)
-	processedIDs     map[uint64]struct{}
-	idHistory        []uint64
-	maxFrames        int
+	turnCount       int
+	isTurnActive    bool
+	isBotSpeaking   bool
+	hasBotSpoken    bool
+	turnStartTimeNs int64
+	turnEndTimeout  time.Duration
+	endTurnTimer    *time.Timer
+	onTurnStarted   func(turnCount int)
+	onTurnEnded     func(turnCount int, durationSecs float64, interrupted bool)
+	processedIDs    map[uint64]struct{}
+	idHistory       []uint64
+	maxFrames       int
 }
 
 // TurnTrackingOption configures TurnTrackingObserver.
@@ -69,7 +69,7 @@ func NewTurnTrackingObserver(opts ...TurnTrackingOption) *TurnTrackingObserver {
 		turnEndTimeout: time.Duration(defaultTurnEndTimeoutSecs * float64(time.Second)),
 		processedIDs:   make(map[uint64]struct{}),
 		idHistory:      make([]uint64, 0, defaultMaxFrames),
-		maxFrames:     defaultMaxFrames,
+		maxFrames:      defaultMaxFrames,
 	}
 	for _, opt := range opts {
 		opt(o)

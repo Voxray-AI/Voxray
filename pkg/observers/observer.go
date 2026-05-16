@@ -81,11 +81,11 @@ func (o *ObservingProcessor) ProcessFrame(ctx context.Context, f frames.Frame, d
 	return err
 }
 
-func (o *ObservingProcessor) SetNext(p processors.Processor)   { o.Inner.SetNext(p) }
-func (o *ObservingProcessor) SetPrev(p processors.Processor)   { o.Inner.SetPrev(p) }
+func (o *ObservingProcessor) SetNext(p processors.Processor)    { o.Inner.SetNext(p) }
+func (o *ObservingProcessor) SetPrev(p processors.Processor)    { o.Inner.SetPrev(p) }
 func (o *ObservingProcessor) Setup(ctx context.Context) error   { return o.Inner.Setup(ctx) }
-func (o *ObservingProcessor) Cleanup(ctx context.Context) error   { return o.Inner.Cleanup(ctx) }
-func (o *ObservingProcessor) Name() string { return o.Inner.Name() }
+func (o *ObservingProcessor) Cleanup(ctx context.Context) error { return o.Inner.Cleanup(ctx) }
+func (o *ObservingProcessor) Name() string                      { return o.Inner.Name() }
 
 // WrapWithObserver returns a processor that forwards to p then notifies observer (after inner has run).
 func WrapWithObserver(p processors.Processor, observer Observer) processors.Processor {

@@ -142,4 +142,3 @@ func TestDecodeByType_UnknownType(t *testing.T) {
 		t.Error("DecodeByType(unknown type) should return error")
 	}
 }
-

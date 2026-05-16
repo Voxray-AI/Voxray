@@ -112,12 +112,12 @@ func (s *TTSService) Speak(ctx context.Context, text string, sampleRate int) ([]
 		return nil, fmt.Errorf("xtts: voice %q not in studio_speakers", voice)
 	}
 	payload := map[string]any{
-		"text":               cleanXTTSText(text),
-		"language":           s.language,
-		"speaker_embedding":  emb.SpeakerEmbedding,
-		"gpt_cond_latent":    emb.GptCondLatent,
-		"add_wav_header":     false,
-		"stream_chunk_size":  20,
+		"text":              cleanXTTSText(text),
+		"language":          s.language,
+		"speaker_embedding": emb.SpeakerEmbedding,
+		"gpt_cond_latent":   emb.GptCondLatent,
+		"add_wav_header":    false,
+		"stream_chunk_size": 20,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

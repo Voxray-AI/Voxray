@@ -66,7 +66,7 @@ type ConnTransport struct {
 	once       sync.Once
 
 	// writeCoalesceMs when > 0 enables write coalescing: drain up to writeCoalesceMaxFrames frames within this many ms before writing (reduces syscalls; adds latency). Set via ConnTransportOptions.
-	writeCoalesceMs     int
+	writeCoalesceMs        int
 	writeCoalesceMaxFrames int
 
 	// WriteMessageFunc, when non-nil, is used instead of conn.WriteMessage in writeOne (e.g. for tests to count or capture writes). When nil, conn.WriteMessage is used.
@@ -427,7 +427,7 @@ type Server struct {
 	// GetSerializer if non-nil is called per request to choose the frame serializer (e.g. RTVI when query has rtvi=1).
 	GetSerializer func(r *http.Request) serialize.Serializer
 	// WriteCoalesceMs when > 0 enables write coalescing on each ConnTransport (drain up to WriteCoalesceMaxFrames within this many ms).
-	WriteCoalesceMs     int
+	WriteCoalesceMs        int
 	WriteCoalesceMaxFrames int
 
 	// MaxDurationAfterFirstAudio when > 0 starts a one-shot max-duration
@@ -461,10 +461,10 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		connCtx, cancelConn := context.WithCancel(ctx)
 		if s.WriteCoalesceMs > 0 || s.MaxDurationAfterFirstAudio > 0 {
 			opts = &ConnTransportOptions{
-				WriteCoalesceMs:           s.WriteCoalesceMs,
-				WriteCoalesceMaxFrames:   s.WriteCoalesceMaxFrames,
+				WriteCoalesceMs:            s.WriteCoalesceMs,
+				WriteCoalesceMaxFrames:     s.WriteCoalesceMaxFrames,
 				MaxDurationAfterFirstAudio: s.MaxDurationAfterFirstAudio,
-				OnMaxDurationTimeout:     cancelConn,
+				OnMaxDurationTimeout:       cancelConn,
 			}
 		}
 		tr := NewConnTransport(conn, 64, 64, ser, opts)
@@ -572,10 +572,10 @@ func (s *Server) ServeWithListener(ctx context.Context, listener net.Listener) e
 		var tr *ConnTransport
 		if s.WriteCoalesceMs > 0 || s.MaxDurationAfterFirstAudio > 0 {
 			opts = &ConnTransportOptions{
-				WriteCoalesceMs:           s.WriteCoalesceMs,
-				WriteCoalesceMaxFrames:   s.WriteCoalesceMaxFrames,
+				WriteCoalesceMs:            s.WriteCoalesceMs,
+				WriteCoalesceMaxFrames:     s.WriteCoalesceMaxFrames,
 				MaxDurationAfterFirstAudio: s.MaxDurationAfterFirstAudio,
-				OnMaxDurationTimeout:     cancelConn,
+				OnMaxDurationTimeout:       cancelConn,
 			}
 		}
 		tr = NewConnTransport(conn, 64, 64, ser, opts)

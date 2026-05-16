@@ -91,4 +91,3 @@ func TestPipelineTask_Cancel(t *testing.T) {
 		t.Error("expected HasFinished() true after Cancel")
 	}
 }
-

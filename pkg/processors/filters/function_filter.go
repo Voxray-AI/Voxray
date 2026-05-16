@@ -14,7 +14,7 @@ type FunctionFilterPredicate func(f frames.Frame) bool
 // FunctionFilterOptions is the JSON shape for plugin_options["function_filter"].
 // The actual filter predicate cannot be set via config; use NewFunctionFilter for that.
 type FunctionFilterOptions struct {
-	Direction          string `json:"direction"`           // "downstream", "upstream", or "" for both
+	Direction          string `json:"direction"` // "downstream", "upstream", or "" for both
 	FilterSystemFrames bool   `json:"filter_system_frames"`
 }
 
@@ -23,7 +23,7 @@ type FunctionFilterOptions struct {
 type FunctionFilter struct {
 	*processors.BaseProcessor
 	Filter             FunctionFilterPredicate
-	Direction           processors.Direction // 0 = both
+	Direction          processors.Direction // 0 = both
 	FilterSystemFrames bool
 }
 
@@ -37,7 +37,7 @@ func NewFunctionFilter(name string, filter FunctionFilterPredicate, direction pr
 		filter = func(frames.Frame) bool { return true }
 	}
 	return &FunctionFilter{
-		BaseProcessor:       processors.NewBaseProcessor(name),
+		BaseProcessor:      processors.NewBaseProcessor(name),
 		Filter:             filter,
 		Direction:          direction,
 		FilterSystemFrames: filterSystemFrames,

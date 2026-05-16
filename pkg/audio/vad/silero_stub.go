@@ -16,4 +16,3 @@ var ErrSileroUnavailable = errors.New("silero VAD is not available in this build
 func NewSileroAnalyzer(p Params, sampleRate int) (Analyzer, error) {
 	return nil, ErrSileroUnavailable
 }
-

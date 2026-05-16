@@ -14,9 +14,9 @@ type FilterFunc func(ctx context.Context, f frames.Frame, dir Direction) bool
 // Used by ServiceSwitcher to gate frames so only the active service receives them.
 type FilterProcessor struct {
 	*BaseProcessor
-	Filter  FilterFunc
-	dir     Direction // filter applies to this direction; opposite direction is always forwarded
-	name    string
+	Filter FilterFunc
+	dir    Direction // filter applies to this direction; opposite direction is always forwarded
+	name   string
 }
 
 // NewFilterProcessor returns a processor that forwards downstream frames when filter(ctx, f, Downstream) is true,

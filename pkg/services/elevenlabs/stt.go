@@ -43,7 +43,7 @@ func pcmToWAV(pcm []byte, sampleRate, numChannels int) []byte {
 
 const (
 	elevenlabsAPIBase = "https://api.elevenlabs.io/v1"
-	defaultSTTModel  = "scribe_v1"
+	defaultSTTModel   = "scribe_v1"
 )
 
 // sharedElevenlabsTransport is reused by STT and TTS clients to pool TCP connections.
@@ -55,10 +55,10 @@ var sharedElevenlabsTransport = &http.Transport{
 
 // sttResponse is the JSON response from ElevenLabs speech-to-text convert endpoint.
 type sttResponse struct {
-	Text               string `json:"text"`
-	LanguageCode       string `json:"language_code"`
+	Text                string  `json:"text"`
+	LanguageCode        string  `json:"language_code"`
 	LanguageProbability float64 `json:"language_probability"`
-	TranscriptionID    string `json:"transcription_id"`
+	TranscriptionID     string  `json:"transcription_id"`
 }
 
 // STTService implements services.STTService using ElevenLabs Speech-to-Text (Scribe).

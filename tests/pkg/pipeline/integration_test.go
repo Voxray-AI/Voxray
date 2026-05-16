@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio/turn"
 	"github.com/Voxray-AI/Voxray/pkg/audio/vad"
 	"github.com/Voxray-AI/Voxray/pkg/frames"
 	"github.com/Voxray-AI/Voxray/pkg/pipeline"
 	"github.com/Voxray-AI/Voxray/pkg/processors"
 	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
-	"github.com/Voxray-AI/Voxray/pkg/audio/turn"
 )
 
 // sinkCollector is a simple sink processor used to collect frames at the end of
@@ -68,8 +68,8 @@ func (a *voiceTestAnalyzer) SpeechTriggered() bool {
 	return a.samples > 0
 }
 
-func (*voiceTestAnalyzer) SetSampleRate(int) {}
-func (a *voiceTestAnalyzer) Clear()          { a.samples = 0 }
+func (*voiceTestAnalyzer) SetSampleRate(int)          {}
+func (a *voiceTestAnalyzer) Clear()                   { a.samples = 0 }
 func (*voiceTestAnalyzer) UpdateVADStartSecs(float64) {}
 func (*voiceTestAnalyzer) UpdateParams(turn.Params)   {}
 
@@ -145,4 +145,3 @@ func TestVoiceTurnIntegration(t *testing.T) {
 		t.Fatalf("expected concatenated audio length %d, got %d", expectedLen, len(gotAudio.Audio))
 	}
 }
-

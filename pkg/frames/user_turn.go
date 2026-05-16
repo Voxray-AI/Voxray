@@ -42,4 +42,3 @@ func (*UserIdleFrame) FrameType() string { return "UserIdleFrame" }
 func NewUserIdleFrame() *UserIdleFrame {
 	return &UserIdleFrame{ControlFrame: ControlFrame{Base: NewBase()}}
 }
-

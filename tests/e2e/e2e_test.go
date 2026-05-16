@@ -6,4 +6,3 @@ import "testing"
 func TestE2EPlaceholder(t *testing.T) {
 	t.Skip("placeholder – add CLI/service-level e2e tests here")
 }
-

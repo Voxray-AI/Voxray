@@ -22,9 +22,9 @@ func (f *fakeVAD) IsSpeech(_ audio.Frame) (bool, error) {
 func (f *fakeVAD) SetSampleRate(_ int) {}
 
 type fakeAnalyzer struct {
-	state          turn.EndOfTurnState
+	state           turn.EndOfTurnState
 	speechTriggered bool
-	resultCh       chan turn.EndOfTurnResult
+	resultCh        chan turn.EndOfTurnResult
 }
 
 func (f *fakeAnalyzer) AppendAudio(_ []byte, _ bool) turn.EndOfTurnState {
@@ -335,4 +335,3 @@ func TestTurnProcessorBargeInEmitsUserStartedSpeakingWhenReSpeaking(t *testing.T
 		t.Fatalf("after re-speak (barge-in): expected 2 UserStartedSpeakingFrames total, got %d", startedCount)
 	}
 }
-

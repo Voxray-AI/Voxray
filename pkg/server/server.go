@@ -12,22 +12,22 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/swaggo/http-swagger"
 	_ "github.com/Voxray-AI/Voxray/docs" // register generated Swagger spec
 	"github.com/Voxray-AI/Voxray/pkg/api"
 	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
 	"github.com/Voxray-AI/Voxray/pkg/logger"
 	"github.com/Voxray-AI/Voxray/pkg/metrics"
+	rtvi "github.com/Voxray-AI/Voxray/pkg/processors/frameworks/rtvi"
 	"github.com/Voxray-AI/Voxray/pkg/runner"
-	"github.com/Voxray-AI/Voxray/pkg/transport"
 	"github.com/Voxray-AI/Voxray/pkg/runner/daily"
+	"github.com/Voxray-AI/Voxray/pkg/transcripts"
+	"github.com/Voxray-AI/Voxray/pkg/transport"
 	"github.com/Voxray-AI/Voxray/pkg/transport/smallwebrtc"
 	ws "github.com/Voxray-AI/Voxray/pkg/transport/websocket"
-	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
-	rtvi "github.com/Voxray-AI/Voxray/pkg/processors/frameworks/rtvi"
-	"github.com/Voxray-AI/Voxray/pkg/transcripts"
+	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/swaggo/http-swagger"
 )
 
 // webrtcOfferResponse is the JSON body for successful POST /webrtc/offer responses.
@@ -115,9 +115,9 @@ type idempotencyEntry struct {
 
 // IdempotencyStore caches responses by idempotency key (e.g. for POST /start). Safe for concurrent use.
 type IdempotencyStore struct {
-	mu   sync.RWMutex
-	m    map[string]idempotencyEntry
-	ttl  time.Duration
+	mu  sync.RWMutex
+	m   map[string]idempotencyEntry
+	ttl time.Duration
 }
 
 // NewIdempotencyStore returns a store with the given TTL (e.g. 24*time.Hour). Entries are not proactively cleaned; they are ignored once expired.
@@ -445,10 +445,10 @@ func registerHandlers(mux *http.ServeMux, cfg *config.Config, ctx context.Contex
 
 			connCtx, cancelConn := context.WithCancel(ctx)
 			tr := smallwebrtc.NewTransport(&smallwebrtc.Config{
-				ICEServers: cfg.WebRTCICEServers,
-				MaxDuration: rtcMaxDuration,
+				ICEServers:           cfg.WebRTCICEServers,
+				MaxDuration:          rtcMaxDuration,
 				OnMaxDurationTimeout: cancelConn,
-				OnClosed: cancelConn,
+				OnClosed:             cancelConn,
 			})
 			answer, err := tr.HandleOffer(req.Offer)
 			if err != nil {
@@ -526,9 +526,9 @@ func registerTelephonyRoutes(mux *http.ServeMux, cfg *config.Config, ctx context
 				_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?><Response><Connect><Stream url="` + wsURL + `"/></Connect></Response>`))
 			case "exotel":
 				api.RespondJSON(w, r, http.StatusOK, map[string]interface{}{
-					"error":         "Exotel doesn't use POST webhooks",
-					"websocketUrl":  wsURL,
-					"note":          "Configure the WebSocket URL above in your Exotel App Bazaar Voicebot Applet",
+					"error":        "Exotel doesn't use POST webhooks",
+					"websocketUrl": wsURL,
+					"note":         "Configure the WebSocket URL above in your Exotel App Bazaar Voicebot Applet",
 				}, nil)
 			}
 			return
@@ -585,9 +585,9 @@ func registerDailyRoutes(mux *http.ServeMux, cfg *config.Config, ctx context.Con
 	apiKey := cfg.GetAPIKey("daily_api_key", "DAILY_API_KEY")
 	getOpts := func() daily.Options {
 		return daily.Options{
-			APIKey:               apiKey,
-			RoomExpDurationHrs:   2,
-			TokenExpDurationHrs:  2,
+			APIKey:              apiKey,
+			RoomExpDurationHrs:  2,
+			TokenExpDurationHrs: 2,
 		}
 	}
 
@@ -719,9 +719,9 @@ func registerRunnerWebRTCRoutes(mux *http.ServeMux, cfg *config.Config, ctx cont
 		var data map[string]interface{}
 		if req.CreateDailyRoom {
 			opts := daily.Options{
-				APIKey:               cfg.GetAPIKey("daily_api_key", "DAILY_API_KEY"),
-				RoomExpDurationHrs:   2,
-				TokenExpDurationHrs:  2,
+				APIKey:              cfg.GetAPIKey("daily_api_key", "DAILY_API_KEY"),
+				RoomExpDurationHrs:  2,
+				TokenExpDurationHrs: 2,
 			}
 			c, err := daily.Configure(ctx, opts)
 			if err != nil {
@@ -851,10 +851,10 @@ func registerRunnerWebRTCRoutes(mux *http.ServeMux, cfg *config.Config, ctx cont
 		}
 		connCtx, cancelConn := context.WithCancel(ctx)
 		tr := smallwebrtc.NewTransport(&smallwebrtc.Config{
-			ICEServers: cfg.WebRTCICEServers,
-			MaxDuration: rtcMaxDuration,
+			ICEServers:           cfg.WebRTCICEServers,
+			MaxDuration:          rtcMaxDuration,
 			OnMaxDurationTimeout: cancelConn,
-			OnClosed: cancelConn,
+			OnClosed:             cancelConn,
 		})
 		answer, err := tr.HandleOffer(offerReq.SDP)
 		if err != nil {
@@ -913,9 +913,9 @@ func StartServers(ctx context.Context, cfg *config.Config, onTransport func(ctx 
 	}
 
 	server := &ws.Server{
-		Host:           cfg.Host,
-		Port:           port,
-		SessionTimeout: ws.DefaultSessionTimeout,
+		Host:                       cfg.Host,
+		Port:                       port,
+		SessionTimeout:             ws.DefaultSessionTimeout,
 		MaxDurationAfterFirstAudio: rtcMaxDuration,
 		OnConn: func(c context.Context, tr *ws.ConnTransport) {
 			if onTransport != nil {
@@ -925,7 +925,7 @@ func StartServers(ctx context.Context, cfg *config.Config, onTransport func(ctx 
 		RegisterHandlers: func(mux *http.ServeMux) {
 			registerHandlers(mux, cfg, ctx, onTransport, sessionStore, sessionRegistry, pipelineStore, transcriptFetcher)
 		},
-		GetSerializer:         getWebSocketSerializer,
+		GetSerializer:          getWebSocketSerializer,
 		WriteCoalesceMs:        cfg.WSWriteCoalesceMs,
 		WriteCoalesceMaxFrames: cfg.WSWriteCoalesceMaxFrames,
 	}
@@ -976,9 +976,9 @@ func StartServersWithListener(ctx context.Context, listener net.Listener, cfg *c
 	}
 
 	server := &ws.Server{
-		Host:           cfg.Host,
-		Port:           0,
-		SessionTimeout: ws.DefaultSessionTimeout,
+		Host:                       cfg.Host,
+		Port:                       0,
+		SessionTimeout:             ws.DefaultSessionTimeout,
 		MaxDurationAfterFirstAudio: rtcMaxDuration,
 		OnConn: func(c context.Context, tr *ws.ConnTransport) {
 			if onTransport != nil {
@@ -988,7 +988,7 @@ func StartServersWithListener(ctx context.Context, listener net.Listener, cfg *c
 		RegisterHandlers: func(mux *http.ServeMux) {
 			registerHandlers(mux, cfg, ctx, onTransport, sessionStore, sessionRegistry, pipelineStore, transcriptFetcher)
 		},
-		GetSerializer:         getWebSocketSerializer,
+		GetSerializer:          getWebSocketSerializer,
 		WriteCoalesceMs:        cfg.WSWriteCoalesceMs,
 		WriteCoalesceMaxFrames: cfg.WSWriteCoalesceMaxFrames,
 	}
