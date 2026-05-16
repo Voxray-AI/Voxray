@@ -1,4 +1,4 @@
-module voxray-go
+module github.com/Voxray-AI/Voxray
 
 go 1.25.0
 
