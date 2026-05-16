@@ -1,4 +1,4 @@
-﻿// Package llmfullresponse provides a processor that aggregates LLM text between
+// Package llmfullresponse provides a processor that aggregates LLM text between
 // LLMFullResponseStartFrame and LLMFullResponseEndFrame and invokes a callback on completion or interruption.
 package llmfullresponse
 
@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // OnCompletion is called when a full response ends (completed=true) or is interrupted (completed=false).

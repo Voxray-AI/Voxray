@@ -1,4 +1,4 @@
-﻿// Package userresponse provides a processor that aggregates TranscriptionFrame into a single TextFrame when the user turn ends (e.g. UserStoppedSpeakingFrame).
+// Package userresponse provides a processor that aggregates TranscriptionFrame into a single TextFrame when the user turn ends (e.g. UserStoppedSpeakingFrame).
 package userresponse
 
 import (
@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // Processor buffers TranscriptionFrame text and emits one TextFrame when the user turn ends.

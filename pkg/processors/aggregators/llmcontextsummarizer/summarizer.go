@@ -1,4 +1,4 @@
-﻿// Package llmcontextsummarizer provides a processor that monitors LLM context size and
+// Package llmcontextsummarizer provides a processor that monitors LLM context size and
 // emits LLMContextSummaryRequestFrame when thresholds are exceeded; applies results from LLMContextSummaryResultFrame.
 package llmcontextsummarizer
 
@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // Config holds summarizer thresholds and options.

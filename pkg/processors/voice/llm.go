@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/metrics"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/metrics"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 // OnContextUpdate is called whenever the LLM context (msgs) is updated. Used by IVR to capture conversation for mode switching.

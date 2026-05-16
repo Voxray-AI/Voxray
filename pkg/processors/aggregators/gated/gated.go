@@ -1,4 +1,4 @@
-﻿// Package gated provides a gated aggregator that buffers frames when the gate is
+// Package gated provides a gated aggregator that buffers frames when the gate is
 // closed and releases them when the gate opens (custom open/close predicates).
 package gated
 
@@ -6,8 +6,8 @@ import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // GateFunc returns true when the frame should open or close the gate.

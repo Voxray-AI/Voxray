@@ -1,4 +1,4 @@
-﻿// Package pipeline provides ParallelPipeline for concurrent frame processing.
+// Package pipeline provides ParallelPipeline for concurrent frame processing.
 package pipeline
 
 import (
@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 func parallelIsLifecycleFrame(f frames.Frame) bool {

@@ -1,9 +1,9 @@
-﻿package deepseek_test
+package deepseek_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/deepseek"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/deepseek"
 )
 
 func TestBuild(t *testing.T) {

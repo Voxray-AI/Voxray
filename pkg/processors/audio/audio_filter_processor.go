@@ -3,9 +3,9 @@ package audio
 import (
 	"context"
 
-	audiofilters "voxray-go/pkg/audio/filters"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	audiofilters "github.com/Voxray-AI/Voxray/pkg/audio/filters"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // AudioFilterProcessor applies a configured chain of audio filters to raw

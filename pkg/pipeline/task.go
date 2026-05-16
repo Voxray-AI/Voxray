@@ -1,12 +1,12 @@
-﻿// Package pipeline provides Task and PipelineTask for queue-based pipeline execution.
+// Package pipeline provides Task and PipelineTask for queue-based pipeline execution.
 package pipeline
 
 import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 // TaskParams holds optional parameters for running a task (e.g. for future use).

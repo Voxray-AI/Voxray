@@ -1,12 +1,12 @@
-﻿// Package observers provides turn tracking observer for conversation flow monitoring.
+// Package observers provides turn tracking observer for conversation flow monitoring.
 package observers
 
 import (
 	"sync"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 const defaultMaxFrames = 100

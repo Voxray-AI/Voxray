@@ -14,9 +14,9 @@ import (
 	"strings"
 	"sync"
 
-	"voxray-go/pkg/api"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/api"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 // WebhookPayload is the structure of a WhatsApp Cloud API webhook POST body.

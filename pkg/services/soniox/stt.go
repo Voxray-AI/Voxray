@@ -10,8 +10,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 const sonioxWSURL = "wss://stt-rt.soniox.com/transcribe-websocket"

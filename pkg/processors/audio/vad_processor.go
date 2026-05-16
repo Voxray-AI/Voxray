@@ -1,13 +1,13 @@
-﻿// Package audio provides audio processors (VAD, buffer/merge/turn callbacks).
+// Package audio provides audio processors (VAD, buffer/merge/turn callbacks).
 package audio
 
 import (
 	"context"
 	"time"
 
-	"voxray-go/pkg/audio/vad"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/audio/vad"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // VADProcessor processes audio frames through voice activity detection and

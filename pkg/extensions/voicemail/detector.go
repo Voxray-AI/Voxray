@@ -1,12 +1,12 @@
-﻿// Package voicemail provides VoicemailDetector for outbound call classification.
+// Package voicemail provides VoicemailDetector for outbound call classification.
 package voicemail
 
 import (
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/voice"
-	"voxray-go/pkg/services"
-	"voxray-go/pkg/sync/notifier"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
+	"github.com/Voxray-AI/Voxray/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/sync/notifier"
 )
 
 // ClassifierResponseInstruction is the required suffix for custom prompts.

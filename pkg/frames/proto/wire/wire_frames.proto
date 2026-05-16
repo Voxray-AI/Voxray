@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "voxray-go/pkg/frames/proto/wire";
+option go_package = "github.com/Voxray-AI/Voxray/pkg/frames/proto/wire";
 
 // FrameEnvelope wraps a frame with type discriminator and payload (JSON or binary).
 message FrameEnvelope {

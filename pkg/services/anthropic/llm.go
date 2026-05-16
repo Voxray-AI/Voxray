@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // DefaultLLMModel is the default Anthropic model when none is specified.

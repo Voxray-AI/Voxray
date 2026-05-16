@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"time"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 // DefaultSarvamTTSModel is the default Sarvam TTS model (bulbul v2).

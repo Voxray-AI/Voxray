@@ -1,12 +1,12 @@
-﻿package services_test
+package services_test
 
 import (
 	"context"
 	"os"
 	"testing"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 // TestSarvamServices_FromConfig wires Sarvam STT/TTS via the shared factory.

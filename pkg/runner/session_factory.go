@@ -1,11 +1,11 @@
-﻿package runner
+package runner
 
 import (
 	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 )
 
 const defaultSessionTTLSecs = 3600

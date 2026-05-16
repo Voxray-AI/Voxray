@@ -1,4 +1,4 @@
-﻿// Package genesys provides Genesys AudioHook WebSocket protocol serializer.
+// Package genesys provides Genesys AudioHook WebSocket protocol serializer.
 // Protocol: text = JSON (open/opened/close/closed/ping/pong/update/event), binary = PCMU at 8kHz.
 package genesys
 
@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"sync/atomic"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
 )
 
 const protocolVersion = "2"

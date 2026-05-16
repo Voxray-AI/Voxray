@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors/voice"
-	"voxray-go/pkg/services/mock"
-	"voxray-go/pkg/transport/memory"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
+	"github.com/Voxray-AI/Voxray/pkg/services/mock"
+	"github.com/Voxray-AI/Voxray/pkg/transport/memory"
 )
 
 // ConnectionPattern defines how sessions are started (burst = all at once, ramp = staggered).

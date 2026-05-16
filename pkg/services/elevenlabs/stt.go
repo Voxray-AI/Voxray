@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"time"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // pcmToWAV wraps raw 16-bit little-endian PCM in a minimal WAV header for API upload.

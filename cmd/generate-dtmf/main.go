@@ -1,4 +1,4 @@
-﻿// generate-dtmf generates DTMF WAV files (0-9, *, #) using pkg/audio.
+// generate-dtmf generates DTMF WAV files (0-9, *, #) using pkg/audio.
 // Usage: go run ./cmd/generate-dtmf [output_dir]
 // Default output dir is current directory.
 package main
@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"voxray-go/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
 )
 
 const (

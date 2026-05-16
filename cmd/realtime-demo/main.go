@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	"os"
 	"time"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/audio/vad"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/realtime"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio/vad"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/realtime"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 // realtime-demo is a small CLI that wires together:

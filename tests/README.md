@@ -3,7 +3,7 @@
 ## Layout and conventions
 
 - **Unit tests**
-  - Live under `tests/pkg/**` as external tests (`package <pkg>_test`, import `voxray-go/pkg/...`). Run with `go test ./tests/pkg/...`.
+  - Live under `tests/pkg/**` as external tests (`package <pkg>_test`, import `github.com/Voxray-AI/Voxray/pkg/...`). Run with `go test ./tests/pkg/...`.
   - Build/smoke tests for `cmd/`, `examples/`, and `docs` live under `tests/cmd/**`, `tests/examples/**`, and `tests/docs/` and ensure those packages compile (e.g. via `go build`).
   - A few tests remain in `pkg/**` where they rely on unexported APIs (e.g. `pkg/audio/turn`, `pkg/audio/vad`, `pkg/processors/voice`, `pkg/services/anthropic`, `pkg/services/google`).
   - Use Go's standard `testing` package plus `testify` for assertions and helpers.

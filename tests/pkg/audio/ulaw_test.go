@@ -1,10 +1,10 @@
-ï»¿package audio_test
+package audio_test
 
 import (
 	"bytes"
 	"testing"
 
-	"voxray-go/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
 )
 
 func TestEncodeDecodeULawRoundTrip(t *testing.T) {
@@ -23,7 +23,7 @@ func TestEncodeDecodeULawRoundTrip(t *testing.T) {
 		if i+1 >= len(out) {
 			break
 		}
-		// Allow some tolerance for Î¼-law quantization
+		// Allow some tolerance for µ-law quantization
 		orig := int16(pcm[i]) | int16(pcm[i+1])<<8
 		dec := int16(out[i]) | int16(out[i+1])<<8
 		diff := orig - dec
@@ -37,7 +37,7 @@ func TestEncodeDecodeULawRoundTrip(t *testing.T) {
 }
 
 func TestDecodeULawKnownValues(t *testing.T) {
-	// Î¼-law 0xff is often silence or near-silence
+	// µ-law 0xff is often silence or near-silence
 	ulaw := []byte{0xff, 0x7f}
 	out := audio.DecodeULaw(ulaw)
 	if len(out) != 4 {
@@ -77,7 +77,7 @@ func TestULawRoundTripLarger(t *testing.T) {
 	}
 	out := audio.DecodeULaw(ulaw)
 	if !bytes.Equal(out, pcm) {
-		// Î¼-law is lossy; at least length should match
+		// µ-law is lossy; at least length should match
 		if len(out) != len(pcm) {
 			t.Fatalf("round-trip length: got %d want %d", len(out), len(pcm))
 		}

@@ -1,4 +1,4 @@
-﻿// Package serialize implements binary frame wire encoding/decoding
+// Package serialize implements binary frame wire encoding/decoding
 // without depending on generated descriptor (avoids init issues when protoc is not available).
 package serialize
 
@@ -8,7 +8,7 @@ import (
 	"io"
 	"strconv"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // Wire field numbers (from wire_frames.proto).

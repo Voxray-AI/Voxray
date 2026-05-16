@@ -10,10 +10,10 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
-	"voxray-go/pkg/transport"
-	ws "voxray-go/pkg/transport/websocket"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/transport"
+	ws "github.com/Voxray-AI/Voxray/pkg/transport/websocket"
 )
 
 // TestWebsocketServer_StartAndEcho verifies that the WebSocket server upgrades

@@ -1,13 +1,13 @@
-﻿package audio_test
+package audio_test
 
 import (
 	"context"
 	"testing"
 
-	"voxray-go/pkg/audio/vad"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio/vad"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/audio"
 )
 
 // fakeVADAnalyzer returns a fixed sequence of states for testing.

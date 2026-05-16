@@ -1,9 +1,9 @@
-﻿// Package grok provides xAI Grok-backed LLM via OpenAI-compatible API.
+// Package grok provides xAI Grok-backed LLM via OpenAI-compatible API.
 package grok
 
 import (
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 )
 
 const grokBaseURL = "https://api.x.ai/v1"

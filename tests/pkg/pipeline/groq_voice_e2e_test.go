@@ -1,4 +1,4 @@
-﻿package pipeline_test
+package pipeline_test
 
 import (
 	"context"
@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/voice"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 func saveTTSAudioAsWAV(path string, pcm []byte, sampleRate, numChannels int) error {
@@ -220,7 +220,7 @@ func TestGroqVoicePipeline_E2E(t *testing.T) {
 	sink := pipeline.NewSink("sink", outCh)
 
 	t.Logf("LLM model: %s", cfg.Model)
-	// Pipeline: STT input logger → STT → STT output/LLM input logger → LLM → LLM output/TTS input logger → TTS → TTS output logger → sink.
+	// Pipeline: STT input logger ? STT ? STT output/LLM input logger ? LLM ? LLM output/TTS input logger ? TTS ? TTS output logger ? sink.
 	pl.Link(sttInputLogger, sttProc, sttOutputLLMInputLogger, llmProc, llmOutputTTSInputLogger, ttsProc, ttsOutputLogger, sink)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

@@ -1,9 +1,9 @@
-﻿package wire_test
+package wire_test
 
 import (
 	"testing"
 
-	"voxray-go/pkg/frames/proto/wire"
+	"github.com/Voxray-AI/Voxray/pkg/frames/proto/wire"
 )
 
 func TestFrameEnvelope_MarshalUnmarshalRoundTrip(t *testing.T) {

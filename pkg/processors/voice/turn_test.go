@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/audio/turn"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio/turn"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 type fakeVAD struct {

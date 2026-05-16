@@ -1,9 +1,9 @@
-﻿package logger_test
+package logger_test
 
 import (
 	"testing"
 
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 func TestInfo(t *testing.T) {

@@ -1,14 +1,14 @@
-﻿package ivr_test
+package ivr_test
 
 import (
 	"context"
 	"sync"
 	"testing"
 
-	"voxray-go/pkg/extensions/ivr"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/extensions/ivr"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 func TestIVRProcessor_DTMFAndStatus(t *testing.T) {

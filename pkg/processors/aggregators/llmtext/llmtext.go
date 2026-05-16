@@ -1,13 +1,13 @@
-﻿// Package llmtext provides a processor that converts LLMTextFrame to AggregatedTextFrame
+// Package llmtext provides a processor that converts LLMTextFrame to AggregatedTextFrame
 // using a configurable text aggregator (e.g. sentence-based).
 package llmtext
 
 import (
 	"context"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/utils/textaggregator"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/utils/textaggregator"
 )
 
 // Processor converts LLMTextFrame into AggregatedTextFrame via a text aggregator.

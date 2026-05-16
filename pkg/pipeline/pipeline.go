@@ -5,9 +5,9 @@ import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // Pipeline holds a linear chain of processors and orchestrates the flow of frames through them.

@@ -1,4 +1,4 @@
-﻿// Package dtmf provides a DTMF aggregator that accumulates InputDTMFFrame digits
+// Package dtmf provides a DTMF aggregator that accumulates InputDTMFFrame digits
 // and emits TranscriptionFrame on timeout, termination digit (#), or EndFrame/CancelFrame.
 package dtmf
 
@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // Processor aggregates DTMF digits and flushes as TranscriptionFrame for LLM context.

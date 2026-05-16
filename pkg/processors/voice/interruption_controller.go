@@ -3,9 +3,9 @@ package voice
 import (
 	"context"
 
-	"voxray-go/pkg/audio/interruptions"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/audio/interruptions"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // InterruptionController observes bot speech and user transcripts and, when

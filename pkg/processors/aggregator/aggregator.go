@@ -1,13 +1,13 @@
-﻿// Package aggregator provides a processor that collects text frames and emits a single aggregated frame (e.g. sentence).
+// Package aggregator provides a processor that collects text frames and emits a single aggregated frame (e.g. sentence).
 package aggregator
 
 import (
 	"context"
 	"strings"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/utils/sentence"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/utils/sentence"
 )
 
 // Processor collects TextFrame (and LLMTextFrame) chunks and emits one TextFrame when a sentence boundary is seen or buffer exceeds max size.

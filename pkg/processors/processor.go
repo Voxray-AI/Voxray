@@ -1,10 +1,10 @@
-﻿// Package processors provides the frame processor abstraction and built-in processors.
+// Package processors provides the frame processor abstraction and built-in processors.
 package processors
 
 import (
 	"context"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // Direction is the frame flow direction.

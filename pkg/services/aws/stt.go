@@ -1,4 +1,4 @@
-﻿package aws
+package aws
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/transcribestreaming"
 	"github.com/aws/aws-sdk-go-v2/service/transcribestreaming/types"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // AWS Transcribe streaming supports 8000 and 16000 Hz.

@@ -1,4 +1,4 @@
-﻿// Package websocket: WebsocketServiceBase provides reconnection, backoff, and send-with-retry
+// Package websocket: WebsocketServiceBase provides reconnection, backoff, and send-with-retry
 // for services that hold a long-lived WebSocket (e.g. realtime, Sarvam streaming).
 package websocket
 
@@ -9,9 +9,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/utils"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/utils"
 )
 
 // WebSocketConnector is implemented by services that own a WebSocket connection.

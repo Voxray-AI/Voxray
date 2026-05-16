@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	audiofilters "voxray-go/pkg/audio/filters"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	procaudio "voxray-go/pkg/processors/audio"
+	audiofilters "github.com/Voxray-AI/Voxray/pkg/audio/filters"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	procaudio "github.com/Voxray-AI/Voxray/pkg/processors/audio"
 )
 
 func TestAudioFilterProcessor_appliesGainFilter(t *testing.T) {

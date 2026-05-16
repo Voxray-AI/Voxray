@@ -1,6 +1,6 @@
 # Extensions
 
-This document describes the **IVR** and **Voicemail** extensions and how to use them in voxray-go pipelines.
+This document describes the **IVR** and **Voicemail** extensions and how to use them in github.com/Voxray-AI/Voxray pipelines.
 
 ---
 
@@ -22,10 +22,10 @@ IVR sits **downstream of the LLM**. When the IVR processor needs to switch mode 
 
 ```go
 import (
-    "voxray-go/pkg/extensions/ivr"
-    "voxray-go/pkg/pipeline"
-    "voxray-go/pkg/processors/voice"
-    "voxray-go/pkg/services"
+    "github.com/Voxray-AI/Voxray/pkg/extensions/ivr"
+    "github.com/Voxray-AI/Voxray/pkg/pipeline"
+    "github.com/Voxray-AI/Voxray/pkg/processors/voice"
+    "github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 // Build a pipeline: Turn -> STT -> IVRNavigator -> TTS -> Sink
@@ -79,8 +79,8 @@ The detector runs two branches in parallel: one that only applies the conversati
 
 ```go
 import (
-    "voxray-go/pkg/extensions/voicemail"
-    "voxray-go/pkg/pipeline"
+    "github.com/Voxray-AI/Voxray/pkg/extensions/voicemail"
+    "github.com/Voxray-AI/Voxray/pkg/pipeline"
 )
 
 classifierLLM := ... // fast LLM for classification

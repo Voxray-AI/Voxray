@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors/voice"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 // DefaultEvalTimeout is used when scenario TimeoutSecs is zero.

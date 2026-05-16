@@ -1,9 +1,9 @@
-﻿package transport_test
+package transport_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/transport"
+	_ "github.com/Voxray-AI/Voxray/pkg/transport"
 )
 
 func TestBuild(t *testing.T) {

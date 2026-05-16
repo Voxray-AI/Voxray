@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"voxray-go/pkg/evals"
+	"github.com/Voxray-AI/Voxray/pkg/evals"
 )
 
 func main() {

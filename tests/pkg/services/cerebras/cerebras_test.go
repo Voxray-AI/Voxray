@@ -1,9 +1,9 @@
-﻿package cerebras_test
+package cerebras_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/cerebras"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/cerebras"
 )
 
 func TestBuild(t *testing.T) {

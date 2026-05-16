@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"time"
 
-	audiofilters "voxray-go/pkg/audio/filters"
-	"voxray-go/pkg/audio/vad"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
+	audiofilters "github.com/Voxray-AI/Voxray/pkg/audio/filters"
+	"github.com/Voxray-AI/Voxray/pkg/audio/vad"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // AudioFilterProcessorOptions describes JSON options for the

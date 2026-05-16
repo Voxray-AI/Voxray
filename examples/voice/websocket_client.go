@@ -1,15 +1,15 @@
-﻿package main
+package main
 
 import (
 	"context"
 	"log"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/transport/websocket"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/transport/websocket"
 )
 
-// Simple example client that connects to a running voxray-go server over
+// Simple example client that connects to a running github.com/Voxray-AI/Voxray server over
 // WebSocket and sends a StartFrame followed by a TTSSpeakFrame, then logs
 // any frames received from the server.
 func main() {

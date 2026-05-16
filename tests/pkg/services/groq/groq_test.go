@@ -1,9 +1,9 @@
-﻿package groq_test
+package groq_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/groq"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/groq"
 )
 
 func TestBuild(t *testing.T) {

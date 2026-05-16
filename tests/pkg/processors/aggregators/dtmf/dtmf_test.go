@@ -1,4 +1,4 @@
-﻿package dtmf_test
+package dtmf_test
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/aggregators/dtmf"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/aggregators/dtmf"
 )
 
 type collectProcessor struct {

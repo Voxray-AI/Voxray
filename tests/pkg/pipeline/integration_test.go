@@ -1,17 +1,17 @@
-﻿package pipeline_test
+package pipeline_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/audio/vad"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/voice"
-	"voxray-go/pkg/audio/turn"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio/vad"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
+	"github.com/Voxray-AI/Voxray/pkg/audio/turn"
 )
 
 // sinkCollector is a simple sink processor used to collect frames at the end of

@@ -1,11 +1,11 @@
-﻿package logger
+package logger
 
 import (
 	"context"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // Processor logs each frame and forwards it.

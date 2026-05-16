@@ -8,9 +8,9 @@ import (
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"voxray-go/pkg/adapters/schemas"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/services/llmapi"
+	"github.com/Voxray-AI/Voxray/pkg/adapters/schemas"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/services/llmapi"
 )
 
 // Client is an MCP client that discovers tools from an MCP server and can register

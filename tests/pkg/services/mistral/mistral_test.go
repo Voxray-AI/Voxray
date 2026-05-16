@@ -1,9 +1,9 @@
-﻿package mistral_test
+package mistral_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/mistral"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/mistral"
 )
 
 func TestBuild(t *testing.T) {

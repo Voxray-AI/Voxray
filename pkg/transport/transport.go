@@ -1,10 +1,10 @@
-﻿// Package transport defines the transport interface for pipeline input/output.
+// Package transport defines the transport interface for pipeline input/output.
 package transport
 
 import (
 	"context"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // Transport provides frame input and output for a pipeline (e.g. WebSocket client).

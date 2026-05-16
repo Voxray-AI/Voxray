@@ -1,4 +1,4 @@
-﻿package filters_test
+package filters_test
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/filters"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/filters"
 )
 
 // collectProcessor appends all frames it receives to a slice for tests.

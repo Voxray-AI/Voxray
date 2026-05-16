@@ -12,7 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // TestWriteCoalescing_Disabled verifies that when WriteCoalesceMs is 0, each frame results in exactly one write.

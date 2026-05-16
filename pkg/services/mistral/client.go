@@ -1,9 +1,9 @@
-﻿// Package mistral provides Mistral AI-backed LLM via OpenAI-compatible API.
+// Package mistral provides Mistral AI-backed LLM via OpenAI-compatible API.
 package mistral
 
 import (
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 )
 
 const mistralBaseURL = "https://api.mistral.ai/v1"

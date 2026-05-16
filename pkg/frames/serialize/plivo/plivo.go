@@ -1,4 +1,4 @@
-﻿// Package plivo provides Plivo Audio Streaming WebSocket protocol serializer.
+// Package plivo provides Plivo Audio Streaming WebSocket protocol serializer.
 package plivo
 
 import (
@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"sync"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
 )
 
 // Serializer implements serialize.Serializer and serialize.SerializerWithSetup for Plivo.

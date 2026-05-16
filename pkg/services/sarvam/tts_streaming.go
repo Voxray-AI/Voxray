@@ -1,4 +1,4 @@
-﻿// Package sarvam: WebSocket streaming TTS per
+// Package sarvam: WebSocket streaming TTS per
 // https://docs.sarvam.ai/api-reference-docs/api-guides-tutorials/text-to-speech/streaming-api
 
 package sarvam
@@ -15,9 +15,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 const ttsStreamingPath = "/text-to-speech/ws"

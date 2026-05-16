@@ -1,17 +1,17 @@
-﻿// Package exotel provides Exotel Media Streams WebSocket protocol serializer.
+// Package exotel provides Exotel Media Streams WebSocket protocol serializer.
 package exotel
 
 import (
 	"encoding/base64"
 	"encoding/json"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
 )
 
 // Serializer implements serialize.Serializer and serialize.SerializerWithSetup for Exotel.
-// Exotel uses PCM (not μ-law) in base64 for media events.
+// Exotel uses PCM (not mu-law) in base64 for media events.
 type Serializer struct {
 	StreamSid   string
 	CallSid     string
@@ -126,7 +126,7 @@ func (s *Serializer) Deserialize(data []byte) (frames.Frame, error) {
 		if err != nil || len(decoded) == 0 {
 			return nil, nil
 		}
-		// Exotel sends PCM (no μ-law)
+		// Exotel sends PCM (no �-law)
 		sr := s.SampleRate
 		if sr == 0 {
 			sr = 16000

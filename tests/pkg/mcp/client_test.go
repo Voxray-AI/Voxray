@@ -1,10 +1,10 @@
-﻿package mcp_test
+package mcp_test
 
 import (
 	"context"
 	"testing"
 
-	"voxray-go/pkg/mcp"
+	"github.com/Voxray-AI/Voxray/pkg/mcp"
 )
 
 func TestConvertMCPToolToSchema(t *testing.T) {

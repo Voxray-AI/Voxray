@@ -1,11 +1,11 @@
-﻿package turn
+package turn
 
 import (
 	"context"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 // UserTurnController manages high-level user turn state: when a user turn

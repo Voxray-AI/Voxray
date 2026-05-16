@@ -1,12 +1,12 @@
-﻿package pipeline
+package pipeline
 
 import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // DownstreamCallback is called when a frame is emitted downstream (e.g. from a sink).

@@ -1,13 +1,13 @@
-﻿// Package voicemail provides voicemail detection for outbound calls (human vs voicemail).
+// Package voicemail provides voicemail detection for outbound calls (human vs voicemail).
 package voicemail
 
 import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/sync/notifier"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/sync/notifier"
 )
 
 // NotifierGate is a base gate that starts open and closes permanently when the notifier signals.

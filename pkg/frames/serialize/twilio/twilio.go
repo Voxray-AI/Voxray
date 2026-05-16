@@ -1,4 +1,4 @@
-﻿// Package twilio provides Twilio Media Streams WebSocket protocol serializer.
+// Package twilio provides Twilio Media Streams WebSocket protocol serializer.
 package twilio
 
 import (
@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
 )
 
 // Serializer implements serialize.Serializer and serialize.SerializerWithSetup for Twilio Media Streams.

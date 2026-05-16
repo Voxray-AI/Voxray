@@ -1,10 +1,10 @@
-﻿package rtvi
+package rtvi
 
 import (
 	"encoding/json"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
 )
 
 // Serializer converts between pipeline frames and RTVI protocol JSON. Use when the transport speaks RTVI (e.g. WebSocket with ?rtvi=1).

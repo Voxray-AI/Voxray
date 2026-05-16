@@ -1,12 +1,12 @@
-﻿// Package vonage provides Vonage Audio Connector WebSocket serializer.
+// Package vonage provides Vonage Audio Connector WebSocket serializer.
 package vonage
 
 import (
 	"encoding/json"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
 )
 
 // Serializer implements serialize.Serializer, SerializerWithSetup, and SerializerWithMessageType for Vonage.

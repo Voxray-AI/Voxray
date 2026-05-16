@@ -1,13 +1,13 @@
-﻿// Package gatedcontext provides a processor that holds LLMContextFrame until a notifier signals release.
+// Package gatedcontext provides a processor that holds LLMContextFrame until a notifier signals release.
 package gatedcontext
 
 import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/utils/notifier"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/utils/notifier"
 )
 
 // Processor holds the latest LLMContextFrame until Notify() is called on the notifier, then pushes it.

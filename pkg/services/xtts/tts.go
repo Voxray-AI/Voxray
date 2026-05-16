@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 const defaultXTTSBaseURL = "http://localhost:8000"

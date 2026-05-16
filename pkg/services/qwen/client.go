@@ -1,9 +1,9 @@
-﻿// Package qwen provides Alibaba DashScope Qwen LLM via OpenAI-compatible API.
+// Package qwen provides Alibaba DashScope Qwen LLM via OpenAI-compatible API.
 package qwen
 
 import (
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 )
 
 const defaultQwenBaseURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"

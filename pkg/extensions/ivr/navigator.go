@@ -1,13 +1,13 @@
-﻿// Package ivr provides IVRNavigator pipeline helper.
+// Package ivr provides IVRNavigator pipeline helper.
 package ivr
 
 import (
 	"fmt"
 
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/voice"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 // Default classifier prompt for IVR vs conversation detection.

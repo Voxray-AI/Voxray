@@ -1,4 +1,4 @@
-﻿// Package sarvam: WebSocket streaming STT per
+// Package sarvam: WebSocket streaming STT per
 // https://docs.sarvam.ai/api-reference-docs/api-guides-tutorials/speech-to-text/streaming-api
 
 package sarvam
@@ -16,8 +16,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 const (

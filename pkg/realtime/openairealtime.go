@@ -15,9 +15,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 const (

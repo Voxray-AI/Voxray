@@ -1,9 +1,9 @@
-﻿package plugin_test
+package plugin_test
 
 import (
 	"testing"
 
-	"voxray-go/pkg/plugin"
+	"github.com/Voxray-AI/Voxray/pkg/plugin"
 )
 
 func TestBuild(t *testing.T) {

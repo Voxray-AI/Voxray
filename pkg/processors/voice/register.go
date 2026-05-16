@@ -3,9 +3,9 @@ package voice
 import (
 	"encoding/json"
 
-	"voxray-go/pkg/audio/interruptions"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/audio/interruptions"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // InterruptionControllerOptions describes JSON options for the

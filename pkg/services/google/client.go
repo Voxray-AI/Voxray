@@ -1,10 +1,10 @@
-﻿// Package google provides Google Gemini LLM, Vertex AI LLM, and Google Cloud STT/TTS services.
+// Package google provides Google Gemini LLM, Vertex AI LLM, and Google Cloud STT/TTS services.
 package google
 
 import (
 	"context"
 
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 
 	"google.golang.org/genai"
 )

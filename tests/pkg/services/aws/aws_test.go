@@ -1,9 +1,9 @@
-﻿package aws_test
+package aws_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/aws"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/aws"
 )
 
 func TestBuild(t *testing.T) {

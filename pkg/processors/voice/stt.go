@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/metrics"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/metrics"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 // MinSTTBufferMs is the default minimum audio to buffer before calling STT (500ms).

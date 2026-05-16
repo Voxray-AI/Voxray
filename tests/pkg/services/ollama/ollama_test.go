@@ -1,9 +1,9 @@
-﻿package ollama_test
+package ollama_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/ollama"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/ollama"
 )
 
 func TestBuild(t *testing.T) {

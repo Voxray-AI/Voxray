@@ -15,19 +15,19 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/swaggo/http-swagger"
-	_ "voxray-go/docs" // register generated Swagger spec
-	"voxray-go/pkg/api"
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/metrics"
-	"voxray-go/pkg/runner"
-	"voxray-go/pkg/transport"
-	"voxray-go/pkg/runner/daily"
-	"voxray-go/pkg/transport/smallwebrtc"
-	ws "voxray-go/pkg/transport/websocket"
-	"voxray-go/pkg/frames/serialize"
-	rtvi "voxray-go/pkg/processors/frameworks/rtvi"
-	"voxray-go/pkg/transcripts"
+	_ "github.com/Voxray-AI/Voxray/docs" // register generated Swagger spec
+	"github.com/Voxray-AI/Voxray/pkg/api"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/metrics"
+	"github.com/Voxray-AI/Voxray/pkg/runner"
+	"github.com/Voxray-AI/Voxray/pkg/transport"
+	"github.com/Voxray-AI/Voxray/pkg/runner/daily"
+	"github.com/Voxray-AI/Voxray/pkg/transport/smallwebrtc"
+	ws "github.com/Voxray-AI/Voxray/pkg/transport/websocket"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
+	rtvi "github.com/Voxray-AI/Voxray/pkg/processors/frameworks/rtvi"
+	"github.com/Voxray-AI/Voxray/pkg/transcripts"
 )
 
 // webrtcOfferResponse is the JSON body for successful POST /webrtc/offer responses.

@@ -1,11 +1,11 @@
-﻿// Package pipeline provides PipelineProcessor to use a Pipeline as a Processor node.
+// Package pipeline provides PipelineProcessor to use a Pipeline as a Processor node.
 package pipeline
 
 import (
 	"context"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // PipelineProcessor wraps a Pipeline so it can be used as a Processor (e.g. inside ParallelPipeline).

@@ -1,12 +1,12 @@
-﻿package filters
+package filters
 
 import (
 	"context"
 	"encoding/json"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/sync/notifier"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/sync/notifier"
 )
 
 // WakeNotifierFilterOptions is the JSON shape for plugin_options["wake_notifier_filter"].

@@ -1,4 +1,4 @@
-﻿// Package memory provides an in-memory transport for testing and stress testing.
+// Package memory provides an in-memory transport for testing and stress testing.
 // It implements transport.Transport using channels only (no WebRTC). Callers push
 // frames via SendInput and read pipeline output via Out().
 package memory
@@ -7,8 +7,8 @@ import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/transport"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/transport"
 )
 
 const defaultBuf = 128

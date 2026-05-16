@@ -1,4 +1,4 @@
-﻿// Package services defines interfaces and implementations for LLM, STT, and TTS.
+// Package services defines interfaces and implementations for LLM, STT, and TTS.
 // These align conceptually with common LLM/STT/TTS service abstractions and
 // websocket/realtime session handling. See pkg/services/factory.go for provider wiring.
 package services
@@ -6,8 +6,8 @@ package services
 import (
 	"context"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/services/llmapi"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/services/llmapi"
 )
 
 // LLMService provides chat completion; may stream text frames. Re-exported from llmapi.

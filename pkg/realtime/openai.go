@@ -1,14 +1,14 @@
-﻿package realtime
+package realtime
 
 import (
 	"context"
 	"fmt"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/services"
-	openaillm "voxray-go/pkg/services/openai"
-	sttservice "voxray-go/pkg/services/stt"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/services"
+	openaillm "github.com/Voxray-AI/Voxray/pkg/services/openai"
+	sttservice "github.com/Voxray-AI/Voxray/pkg/services/stt"
 )
 
 // OpenAIRealtime provides a minimal OpenAI-backed implementation of

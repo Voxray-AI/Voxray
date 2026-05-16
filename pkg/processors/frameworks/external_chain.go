@@ -1,4 +1,4 @@
-﻿package frameworks
+package frameworks
 
 import (
 	"bufio"
@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // NewExternalChainProcessorFromOptions builds an ExternalChainProcessor from plugin_options. If opts is nil or empty, url is empty (no-op).

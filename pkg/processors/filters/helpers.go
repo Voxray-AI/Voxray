@@ -1,6 +1,6 @@
-﻿package filters
+package filters
 
-import "voxray-go/pkg/frames"
+import "github.com/Voxray-AI/Voxray/pkg/frames"
 
 // isLifecycleFrame returns true for Start, End, Cancel, Stop (and Error).
 // These frames are always passed through by frame_filter, null_filter, function_filter.

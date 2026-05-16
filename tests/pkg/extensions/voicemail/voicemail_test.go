@@ -1,14 +1,14 @@
-﻿package voicemail_test
+package voicemail_test
 
 import (
 	"context"
 	"testing"
 
-	"voxray-go/pkg/extensions/voicemail"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/services"
-	"voxray-go/pkg/sync/notifier"
+	"github.com/Voxray-AI/Voxray/pkg/extensions/voicemail"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/sync/notifier"
 )
 
 // mockLLM implements services.LLMService for tests.

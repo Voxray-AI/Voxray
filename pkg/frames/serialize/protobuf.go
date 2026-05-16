@@ -1,4 +1,4 @@
-﻿// Package serialize provides binary envelope encoding using wire.FrameEnvelope (wire_frames.proto).
+// Package serialize provides binary envelope encoding using wire.FrameEnvelope (wire_frames.proto).
 // ProtoEncoder/ProtoDecoder use standard protobuf wire format; ReadProtoEnvelope reads length-prefixed envelopes from a stream.
 package serialize
 
@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"io"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/proto/wire"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/proto/wire"
 )
 
 // ProtoEncoder encodes a Frame to binary envelope format (wire.FrameEnvelope: type + payload).

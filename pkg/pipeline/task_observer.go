@@ -1,13 +1,13 @@
-﻿// Package pipeline provides TaskObserver, a proxy observer that processes observer events asynchronously.
+// Package pipeline provides TaskObserver, a proxy observer that processes observer events asynchronously.
 package pipeline
 
 import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/observers"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/observers"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 const defaultTaskObserverQueueSize = 256

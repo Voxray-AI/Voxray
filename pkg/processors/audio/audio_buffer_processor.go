@@ -3,9 +3,9 @@ package audio
 import (
 	"context"
 
-	audiopkg "voxray-go/pkg/audio"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	audiopkg "github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // AudioBufferProcessor buffers user and bot audio, resamples to a target rate,

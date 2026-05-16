@@ -1,9 +1,9 @@
-﻿package whatsapp_test
+package whatsapp_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/transport/whatsapp"
+	_ "github.com/Voxray-AI/Voxray/pkg/transport/whatsapp"
 )
 
 func TestBuild(t *testing.T) {

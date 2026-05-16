@@ -1,12 +1,12 @@
-﻿package echo_test
+package echo_test
 
 import (
 	"context"
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/echo"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/echo"
 )
 
 func TestEcho_ProcessFrame(t *testing.T) {

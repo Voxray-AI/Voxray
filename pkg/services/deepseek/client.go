@@ -1,9 +1,9 @@
-﻿// Package deepseek provides DeepSeek-backed LLM via OpenAI-compatible API.
+// Package deepseek provides DeepSeek-backed LLM via OpenAI-compatible API.
 package deepseek
 
 import (
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 )
 
 const deepseekBaseURL = "https://api.deepseek.com/v1"

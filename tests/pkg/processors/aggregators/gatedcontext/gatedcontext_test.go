@@ -1,4 +1,4 @@
-﻿package gatedcontext_test
+package gatedcontext_test
 
 import (
 	"context"
@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/aggregators/gatedcontext"
-	"voxray-go/pkg/utils/notifier"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/aggregators/gatedcontext"
+	"github.com/Voxray-AI/Voxray/pkg/utils/notifier"
 )
 
 type collectProcessor struct {

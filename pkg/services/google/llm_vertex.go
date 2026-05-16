@@ -1,9 +1,9 @@
-﻿package google
+package google
 
 import (
 	"context"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 
 	"google.golang.org/genai"
 )

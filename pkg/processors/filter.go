@@ -1,10 +1,10 @@
-﻿// Package processors provides FilterProcessor for conditional frame forwarding.
+// Package processors provides FilterProcessor for conditional frame forwarding.
 package processors
 
 import (
 	"context"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // FilterFunc returns true if the frame should be forwarded in the given direction.

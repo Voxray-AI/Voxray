@@ -1,12 +1,12 @@
-﻿// Package llmapi defines LLM and tool-calling interfaces so that implementers (e.g. openai)
+// Package llmapi defines LLM and tool-calling interfaces so that implementers (e.g. openai)
 // and consumers (e.g. mcp) can depend on it without import cycles with the full services package.
 package llmapi
 
 import (
 	"context"
 
-	"voxray-go/pkg/adapters/schemas"
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/adapters/schemas"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // LLMService provides chat completion; may stream text frames.

@@ -1,12 +1,12 @@
-﻿package vonage_test
+package vonage_test
 
 import (
 	"encoding/json"
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
-	"voxray-go/pkg/frames/serialize/vonage"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize/vonage"
 )
 
 func TestVonageSerializer_SerializeWithType_AudioBinary(t *testing.T) {

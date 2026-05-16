@@ -1,9 +1,9 @@
-﻿package services_test
+package services_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services"
+	_ "github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 func TestBuild(t *testing.T) {

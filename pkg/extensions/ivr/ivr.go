@@ -1,4 +1,4 @@
-﻿// Package ivr provides Interactive Voice Response (IVR) navigation components for
+// Package ivr provides Interactive Voice Response (IVR) navigation components for
 // automated IVR phone system navigation using LLM-based decision making and DTMF.
 package ivr
 
@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/utils/patternaggregator"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/utils/patternaggregator"
 )
 
 // IVRStatus represents the current state of IVR navigation.

@@ -1,10 +1,10 @@
-﻿package rtvi
+package rtvi
 
 import (
 	"encoding/json"
 
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 func init() {

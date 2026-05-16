@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors/voice"
-	"voxray-go/pkg/services/mock"
-	"voxray-go/pkg/transport/memory"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
+	"github.com/Voxray-AI/Voxray/pkg/services/mock"
+	"github.com/Voxray-AI/Voxray/pkg/transport/memory"
 )
 
 // minAudioBytes is the minimum audio to trigger STT (voice.MinSTTBufferMs = 500ms at 16kHz mono 16-bit).

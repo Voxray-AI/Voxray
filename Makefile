@@ -1,4 +1,4 @@
-# voxray-go – build and run
+# github.com/Voxray-AI/Voxray – build and run
 BINARY_NAME := voxray
 MAIN_PKG := ./cmd/voxray
 

@@ -9,10 +9,10 @@ import (
 	"sync"
 
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/adapters/schemas"
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/services/llmapi"
+	"github.com/Voxray-AI/Voxray/pkg/adapters/schemas"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/services/llmapi"
 )
 
 // Service implements services.LLMService and optionally services.LLMServiceWithTools.

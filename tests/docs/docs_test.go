@@ -1,9 +1,9 @@
-﻿package docs_test
+package docs_test
 
 import (
 	"testing"
 
-	_ "voxray-go/docs"
+	_ "github.com/Voxray-AI/Voxray/docs"
 )
 
 func TestBuild(t *testing.T) {

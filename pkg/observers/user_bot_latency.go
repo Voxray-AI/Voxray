@@ -1,12 +1,12 @@
-﻿// Package observers provides user-to-bot latency observer.
+// Package observers provides user-to-bot latency observer.
 package observers
 
 import (
 	"sync"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // UserBotLatencyObserver measures time from user stopped speaking to bot started speaking.

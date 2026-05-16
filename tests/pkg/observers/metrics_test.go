@@ -1,10 +1,10 @@
-﻿package observers_test
+package observers_test
 
 import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/observers"
+	"github.com/Voxray-AI/Voxray/pkg/observers"
 )
 
 func TestNewMetrics(t *testing.T) {

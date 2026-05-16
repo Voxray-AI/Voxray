@@ -1,9 +1,9 @@
-﻿package frames_test
+package frames_test
 
 import (
 	"testing"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 func TestNewStartFrame(t *testing.T) {

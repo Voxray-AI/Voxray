@@ -1,12 +1,12 @@
-﻿package groq
+package groq
 
 import (
 	"context"
 	"errors"
 	"io"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 
 	openai "github.com/sashabaranov/go-openai"
 )

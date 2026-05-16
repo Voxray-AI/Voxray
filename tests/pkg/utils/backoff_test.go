@@ -1,10 +1,10 @@
-﻿package utils_test
+package utils_test
 
 import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/utils"
+	"github.com/Voxray-AI/Voxray/pkg/utils"
 )
 
 func TestExponentialBackoff(t *testing.T) {

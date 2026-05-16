@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // OpenAIService implements services.STTService using OpenAI Whisper.

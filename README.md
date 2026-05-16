@@ -34,7 +34,7 @@ Config-driven Go server for building real-time voice agents. Wire together speec
 
 ## Overview
 
-Voxray-AI (`voxray-go`) is a **config-driven Go server** for building **real-time voice agents** over **WebSocket** and **WebRTC**. It wires together **STT**, **LLM**, and **TTS** providers into low-latency streaming pipelines. Pipelines, providers, and transports are defined via JSON config, making it easy to swap services and deploy to your own infrastructure.
+Voxray-AI (`github.com/Voxray-AI/Voxray`) is a **config-driven Go server** for building **real-time voice agents** over **WebSocket** and **WebRTC**. It wires together **STT**, **LLM**, and **TTS** providers into low-latency streaming pipelines. Pipelines, providers, and transports are defined via JSON config, making it easy to swap services and deploy to your own infrastructure.
 
 For architecture and pipeline details, see [Architecture](docs/ARCHITECTURE.md).
 

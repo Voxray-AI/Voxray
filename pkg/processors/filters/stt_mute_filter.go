@@ -1,12 +1,12 @@
-﻿package filters
+package filters
 
 import (
 	"context"
 	"encoding/json"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // STTMuteStrategy determines when STT is muted.

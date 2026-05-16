@@ -1,11 +1,11 @@
-﻿package config_test
+package config_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 )
 
 func TestLoadConfig(t *testing.T) {

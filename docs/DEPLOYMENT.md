@@ -1,4 +1,4 @@
-# Voxray-Go Deployment Guide
+# github.com/Voxray-AI/Voxray Deployment Guide
 
 This document covers production deployment: environment variables, health checks, TLS, scaling, and security.
 
@@ -105,9 +105,9 @@ readinessProbe:
 
 ## Docker
 
-- **Build:** `docker build -t voxray-go .`
+- **Build:** `docker build -t github.com/Voxray-AI/Voxray .`
 - **Run:** Mount config and set port, e.g.  
-  `docker run -p 8080:8080 -v $(pwd)/config.json:/app/config.json voxray-go`
+  `docker run -p 8080:8080 -v $(pwd)/config.json:/app/config.json github.com/Voxray-AI/Voxray`
 - **docker-compose:** See root `docker-compose.yml`. Run with `docker compose up`; mount your `config.json`. Optionally enable the Redis service and set `session_store=redis` and `redis_url` for multi-instance sessions.
 
 ---

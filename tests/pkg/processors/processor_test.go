@@ -1,11 +1,11 @@
-﻿package processors_test
+package processors_test
 
 import (
 	"context"
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 func TestNewBaseProcessor(t *testing.T) {

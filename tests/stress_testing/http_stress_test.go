@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors/voice"
-	"voxray-go/pkg/services/mock"
-	"voxray-go/pkg/transport"
-	"voxray-go/pkg/transport/memory"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
+	"github.com/Voxray-AI/Voxray/pkg/services/mock"
+	"github.com/Voxray-AI/Voxray/pkg/transport"
+	"github.com/Voxray-AI/Voxray/pkg/transport/memory"
 )
 
 // httpClientTimeout is the per-request timeout for the stress test HTTP client (industry practice: avoid hanging on slow responses).

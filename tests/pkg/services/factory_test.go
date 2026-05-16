@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 // TestNewLLMFromConfig_ConstructsAllSupportedProviders verifies that the factory

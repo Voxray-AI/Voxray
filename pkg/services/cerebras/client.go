@@ -1,9 +1,9 @@
-﻿// Package cerebras provides Cerebras inference API-backed LLM via OpenAI-compatible API.
+// Package cerebras provides Cerebras inference API-backed LLM via OpenAI-compatible API.
 package cerebras
 
 import (
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 )
 
 const cerebrasBaseURL = "https://api.cerebras.ai/v1"

@@ -16,10 +16,10 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/api"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/api"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 // checkOrigin allows same-origin, same-host, or localhost/127.0.0.1 for development.

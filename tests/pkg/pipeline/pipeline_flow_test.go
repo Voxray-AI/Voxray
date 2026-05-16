@@ -1,12 +1,12 @@
-﻿package pipeline_test
+package pipeline_test
 
 import (
 	"context"
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // mockProcessor is a simple processor that records the frames it receives.

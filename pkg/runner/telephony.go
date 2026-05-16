@@ -1,15 +1,15 @@
-﻿// Package runner provides runner telephony WebSocket parsing and serializer construction.
+// Package runner provides runner telephony WebSocket parsing and serializer construction.
 package runner
 
 import (
 	"encoding/json"
 	"io"
 
-	"voxray-go/pkg/frames/serialize"
-	"voxray-go/pkg/frames/serialize/exotel"
-	"voxray-go/pkg/frames/serialize/plivo"
-	"voxray-go/pkg/frames/serialize/telnyx"
-	"voxray-go/pkg/frames/serialize/twilio"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize/exotel"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize/plivo"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize/telnyx"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize/twilio"
 )
 
 // TelephonyCallData holds provider-specific call identifiers and options.

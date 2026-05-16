@@ -1,10 +1,10 @@
-﻿package schemas_test
+package schemas_test
 
 import (
 	"encoding/json"
 	"testing"
 
-	"voxray-go/pkg/adapters/schemas"
+	"github.com/Voxray-AI/Voxray/pkg/adapters/schemas"
 )
 
 func TestAdapterTypeConstants(t *testing.T) {

@@ -1,9 +1,9 @@
-﻿package smallwebrtc_test
+package smallwebrtc_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/transport/smallwebrtc"
+	_ "github.com/Voxray-AI/Voxray/pkg/transport/smallwebrtc"
 )
 
 func TestBuild(t *testing.T) {

@@ -1,13 +1,13 @@
-﻿package twilio_test
+package twilio_test
 
 import (
 	"encoding/base64"
 	"encoding/json"
 	"testing"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize/twilio"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize/twilio"
 )
 
 func TestTwilioSerializer_SerializeDeserialize_Media(t *testing.T) {
@@ -90,7 +90,7 @@ func TestTwilioSerializer_DeserializeDTMF(t *testing.T) {
 func TestTwilioSerializer_DeserializeMedia(t *testing.T) {
 	s := twilio.NewSerializer("stream-123", "", "", "", "", "", nil)
 	s.SampleRate = 16000
-	// Minimal μ-law payload (a few bytes) -> PCM -> should get AudioRawFrame
+	// Minimal �-law payload (a few bytes) -> PCM -> should get AudioRawFrame
 	ulaw := []byte{0xff, 0xfe, 0xfd, 0xfc}
 	payload := base64.StdEncoding.EncodeToString(ulaw)
 	msg, _ := json.Marshal(map[string]interface{}{

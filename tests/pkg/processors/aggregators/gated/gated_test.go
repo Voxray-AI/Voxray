@@ -1,13 +1,13 @@
-﻿package gated_test
+package gated_test
 
 import (
 	"context"
 	"sync"
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/aggregators/gated"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/aggregators/gated"
 )
 
 type collectProcessor struct {

@@ -1,7 +1,7 @@
-﻿// Package serialize provides binary frame protobuf encode/decode for frames.
+// Package serialize provides binary frame protobuf encode/decode for frames.
 package serialize
 
-import "voxray-go/pkg/frames"
+import "github.com/Voxray-AI/Voxray/pkg/frames"
 
 // ProtoEncode encodes a Frame to binary protobuf format (wire-compatible with common frame schemas).
 // Returns nil, nil if the frame type is not serializable in this format.

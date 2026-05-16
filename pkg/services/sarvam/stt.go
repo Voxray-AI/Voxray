@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"time"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 // DefaultSarvamSTTModel is the default Sarvam STT model when none is specified.

@@ -1,12 +1,12 @@
-﻿package logger_test
+package logger_test
 
 import (
 	"context"
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/logger"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/logger"
 )
 
 func TestLogger_ProcessFrame(t *testing.T) {

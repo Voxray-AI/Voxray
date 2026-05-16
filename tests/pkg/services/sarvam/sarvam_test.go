@@ -1,9 +1,9 @@
-﻿package sarvam_test
+package sarvam_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/sarvam"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/sarvam"
 )
 
 func TestBuild(t *testing.T) {

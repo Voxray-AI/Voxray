@@ -1,4 +1,4 @@
-﻿// Package processors: AIServiceBase provides a base for AI services with settings,
+// Package processors: AIServiceBase provides a base for AI services with settings,
 // Start/Stop/Cancel lifecycle, and optional metrics sync (mirrors upstream ai_service.py).
 package processors
 
@@ -6,8 +6,8 @@ import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 // ServiceSettings holds runtime settings for an AI service (model, voice, etc.).

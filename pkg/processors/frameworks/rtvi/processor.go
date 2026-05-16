@@ -1,12 +1,12 @@
-﻿package rtvi
+package rtvi
 
 import (
 	"context"
 	"encoding/json"
 	"sync"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // RTVISender sends RTVI protocol messages to the client (e.g. bot-ready, error). Optional; when nil, processor does not send.
@@ -82,7 +82,7 @@ func (p *RTVIProcessor) ProcessFrame(ctx context.Context, f frames.Frame, dir pr
 		p.mu.Unlock()
 		botReady := frames.NewRTVIServerMessageFrame(TypeBotReady, "", map[string]any{
 			"version": version,
-			"about":   map[string]any{"library": "voxray-go"},
+			"about":   map[string]any{"library": "github.com/Voxray-AI/Voxray"},
 		})
 		if sender != nil {
 			_ = sender.SendRTVIMessage(&Message{Label: MessageLabel, Type: TypeBotReady, ID: "", Data: botReady.Data})

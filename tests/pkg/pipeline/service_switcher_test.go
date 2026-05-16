@@ -1,13 +1,13 @@
-﻿package pipeline_test
+package pipeline_test
 
 import (
 	"context"
 	"sync"
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // serviceSwitcherMock is a processor that records received frames for testing which branch is active.

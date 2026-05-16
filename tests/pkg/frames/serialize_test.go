@@ -1,10 +1,10 @@
-﻿package frames_test
+package frames_test
 
 import (
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
 )
 
 // TestEncoderDecoderRoundTrip verifies that frames can be encoded to the JSON

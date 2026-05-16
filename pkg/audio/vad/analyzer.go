@@ -1,10 +1,10 @@
-﻿package vad
+package vad
 
 import (
 	"math"
 	"sync"
 
-	"voxray-go/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
 )
 
 // State represents the high-level VAD state.
@@ -79,7 +79,7 @@ type Analyzer interface {
 	// Analyze consumes audio for this stream, updates internal state, and
 	// returns the current state, last confidence, and last smoothed volume.
 	//
-	// Audio is expected to be 16‑bit PCM mono, matching audio.Frame/Data.
+	// Audio is expected to be 16-bit PCM mono, matching audio.Frame/Data.
 	Analyze(buf []byte) (State, float64, float64, error)
 }
 

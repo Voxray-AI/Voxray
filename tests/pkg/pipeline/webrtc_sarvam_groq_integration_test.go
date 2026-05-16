@@ -20,13 +20,13 @@ import (
 
 	"github.com/pion/webrtc/v3"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors/voice"
-	"voxray-go/pkg/server"
-	"voxray-go/pkg/services"
-	"voxray-go/pkg/transport"
-	"voxray-go/pkg/transport/smallwebrtc"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors/voice"
+	"github.com/Voxray-AI/Voxray/pkg/server"
+	"github.com/Voxray-AI/Voxray/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/transport"
+	"github.com/Voxray-AI/Voxray/pkg/transport/smallwebrtc"
 )
 
 const (

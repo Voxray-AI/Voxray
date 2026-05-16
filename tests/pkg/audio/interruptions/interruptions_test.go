@@ -3,7 +3,7 @@ package interruptions_test
 import (
 	"testing"
 
-	"voxray-go/pkg/audio/interruptions"
+	"github.com/Voxray-AI/Voxray/pkg/audio/interruptions"
 )
 
 func TestMinWordsStrategy_ShouldInterruptAtThreshold(t *testing.T) {

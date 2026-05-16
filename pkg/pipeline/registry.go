@@ -1,4 +1,4 @@
-﻿// Package pipeline provides a processor registry for dynamic loading by name from config.
+// Package pipeline provides a processor registry for dynamic loading by name from config.
 package pipeline
 
 import (
@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // ProcessorConstructor builds a processor from a name and optional JSON options (nil = use defaults).

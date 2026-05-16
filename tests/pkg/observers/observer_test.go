@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/observers"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/filters"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/observers"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/filters"
 )
 
 func TestNoopObserver_OnFrameProcessed(t *testing.T) {

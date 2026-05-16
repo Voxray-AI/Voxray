@@ -1,12 +1,12 @@
-﻿package audio_test
+package audio_test
 
 import (
 	"context"
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
-	"voxray-go/pkg/processors/audio"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/processors/audio"
 )
 
 func TestAudioBufferProcessor_TurnCallbacks(t *testing.T) {

@@ -1,9 +1,9 @@
-﻿package vad
+package vad
 
 import (
 	"math"
 
-	"voxray-go/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
 )
 
 // Detector decides whether a given audio frame contains speech.

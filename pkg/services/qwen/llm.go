@@ -1,4 +1,4 @@
-﻿package qwen
+package qwen
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"io"
 
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // DefaultLLMModel is the default Qwen model when none is specified.

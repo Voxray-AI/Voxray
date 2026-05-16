@@ -1,7 +1,7 @@
-﻿// Package serialize provides frame serialization interfaces and implementations.
+// Package serialize provides frame serialization interfaces and implementations.
 package serialize
 
-import "voxray-go/pkg/frames"
+import "github.com/Voxray-AI/Voxray/pkg/frames"
 
 // Serializer converts frames to/from wire format (e.g. JSON envelope or binary protobuf).
 type Serializer interface {

@@ -66,7 +66,7 @@ function App() {
   const [backendUrl] = useState("");
   const [pipelineInfo, setPipelineInfo] = useState(null);
   const [logLines, setLogLines] = useState([
-    "[boot] voxray-go v0.4.2 — pipeline runner ready",
+    "[boot] github.com/Voxray-AI/Voxray v0.4.2 — pipeline runner ready",
     "[boot] transports: ws, webrtc(opus) — cgo enabled",
   ]);
 

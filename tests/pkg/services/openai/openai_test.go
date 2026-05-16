@@ -1,9 +1,9 @@
-﻿package openai_test
+package openai_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/openai"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/openai"
 )
 
 func TestBuild(t *testing.T) {

@@ -1,9 +1,9 @@
-﻿package audio_test
+package audio_test
 
 import (
 	"testing"
 
-	"voxray-go/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
 )
 
 func TestPCM16MonoNumFrames(t *testing.T) {

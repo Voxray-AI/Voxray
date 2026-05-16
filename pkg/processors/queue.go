@@ -1,10 +1,10 @@
-﻿package processors
+package processors
 
 import (
 	"context"
 	"sync"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // QueuedItem holds a frame, direction, and optional callback.

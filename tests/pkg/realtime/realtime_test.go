@@ -3,8 +3,8 @@ package realtime_test
 import (
 	"testing"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/realtime"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/realtime"
 )
 
 // TestNewFromConfig_OpenAI verifies that realtime.NewFromConfig returns a non-nil

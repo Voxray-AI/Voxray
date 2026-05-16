@@ -1,4 +1,4 @@
-﻿package filters
+package filters
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // WakeCheckFilterOptions is the JSON shape for plugin_options["wake_check_filter"].

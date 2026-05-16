@@ -9,9 +9,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
-	ws "voxray-go/pkg/transport/websocket"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
+	ws "github.com/Voxray-AI/Voxray/pkg/transport/websocket"
 )
 
 func TestWebsocketMaxDurationAfterFirstAudio(t *testing.T) {

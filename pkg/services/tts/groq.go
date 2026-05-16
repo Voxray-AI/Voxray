@@ -1,14 +1,14 @@
-﻿// Package tts provides TTS service implementations (OpenAI TTS, Groq TTS).
+// Package tts provides TTS service implementations (OpenAI TTS, Groq TTS).
 package tts
 
 import (
 	"context"
 	"io"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/services/groq"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/services/groq"
 
 	openai "github.com/sashabaranov/go-openai"
 )

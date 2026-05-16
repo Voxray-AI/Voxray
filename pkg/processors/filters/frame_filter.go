@@ -1,11 +1,11 @@
-﻿package filters
+package filters
 
 import (
 	"context"
 	"encoding/json"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // FrameFilterOptions is the JSON shape for plugin_options["frame_filter"].

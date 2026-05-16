@@ -1,9 +1,9 @@
-﻿package qwen_test
+package qwen_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/qwen"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/qwen"
 )
 
 func TestBuild(t *testing.T) {

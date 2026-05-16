@@ -1,10 +1,10 @@
-﻿package mixers
+package mixers
 
 import (
 	"io"
 	"sync"
 
-	"voxray-go/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
 )
 
 // Mixer mixes one or more input audio streams into a single output stream.

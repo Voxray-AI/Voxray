@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"voxray-go/pkg/config"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 func main() {

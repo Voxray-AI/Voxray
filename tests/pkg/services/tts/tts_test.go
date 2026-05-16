@@ -1,9 +1,9 @@
-﻿package tts_test
+package tts_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/tts"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/tts"
 )
 
 func TestBuild(t *testing.T) {

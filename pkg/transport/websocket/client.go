@@ -9,9 +9,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/frames/serialize"
-	"voxray-go/pkg/logger"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames/serialize"
+	"github.com/Voxray-AI/Voxray/pkg/logger"
 )
 
 // ClientTransport is an outbound WebSocket transport that connects to a Voxray server.

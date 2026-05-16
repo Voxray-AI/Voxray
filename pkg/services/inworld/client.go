@@ -2,7 +2,7 @@ package inworld
 
 import (
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 )
 
 const inworldBaseURL = "https://api.inworld.ai/v1"

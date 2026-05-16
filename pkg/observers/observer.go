@@ -4,8 +4,8 @@ package observers
 import (
 	"context"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/processors"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/processors"
 )
 
 // Ensure ObservingProcessor implements processors.Processor.

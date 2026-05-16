@@ -1,8 +1,8 @@
-﻿// Package groq provides Groq-backed LLM, STT, and TTS via OpenAI-compatible API.
+// Package groq provides Groq-backed LLM, STT, and TTS via OpenAI-compatible API.
 package groq
 
 import (
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 
 	openai "github.com/sashabaranov/go-openai"
 )

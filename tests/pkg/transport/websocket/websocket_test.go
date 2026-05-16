@@ -1,9 +1,9 @@
-﻿package websocket_test
+package websocket_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/transport/websocket"
+	_ "github.com/Voxray-AI/Voxray/pkg/transport/websocket"
 )
 
 func TestBuild(t *testing.T) {

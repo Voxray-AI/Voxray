@@ -1,11 +1,11 @@
-﻿package mixers_test
+package mixers_test
 
 import (
 	"io"
 	"testing"
 
-	"voxray-go/pkg/audio"
-	"voxray-go/pkg/audio/mixers"
+	"github.com/Voxray-AI/Voxray/pkg/audio"
+	"github.com/Voxray-AI/Voxray/pkg/audio/mixers"
 )
 
 func TestNewSimpleMixer(t *testing.T) {

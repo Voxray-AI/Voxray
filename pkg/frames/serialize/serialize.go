@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"voxray-go/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
 )
 
 // Envelope is the JSON envelope for wire format (type + payload).

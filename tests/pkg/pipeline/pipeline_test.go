@@ -1,14 +1,14 @@
-﻿package pipeline_test
+package pipeline_test
 
 import (
 	"context"
 	"sync"
 	"testing"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/pipeline"
-	"voxray-go/pkg/processors/echo"
-	"voxray-go/pkg/processors/filters"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/pipeline"
+	"github.com/Voxray-AI/Voxray/pkg/processors/echo"
+	"github.com/Voxray-AI/Voxray/pkg/processors/filters"
 )
 
 func TestPipeline_Add_Push(t *testing.T) {

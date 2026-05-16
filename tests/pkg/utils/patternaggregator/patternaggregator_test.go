@@ -1,10 +1,10 @@
-﻿package patternaggregator_test
+package patternaggregator_test
 
 import (
 	"reflect"
 	"testing"
 
-	"voxray-go/pkg/utils/patternaggregator"
+	"github.com/Voxray-AI/Voxray/pkg/utils/patternaggregator"
 )
 
 func TestAggregator_Feed(t *testing.T) {

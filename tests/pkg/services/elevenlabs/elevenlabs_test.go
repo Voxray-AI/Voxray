@@ -1,9 +1,9 @@
-﻿package elevenlabs_test
+package elevenlabs_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/elevenlabs"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/elevenlabs"
 )
 
 func TestBuild(t *testing.T) {

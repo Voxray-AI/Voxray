@@ -1,9 +1,9 @@
-﻿package whisper_test
+package whisper_test
 
 import (
 	"testing"
 
-	_ "voxray-go/pkg/services/whisper"
+	_ "github.com/Voxray-AI/Voxray/pkg/services/whisper"
 )
 
 func TestBuild(t *testing.T) {

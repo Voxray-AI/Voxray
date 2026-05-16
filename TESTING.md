@@ -27,7 +27,7 @@ smoke test against the live API.
 
 - **Centralized package/unit tests**
   - Add `*_test.go` files under `tests/pkg/**`, mirroring the structure of `pkg/**` (e.g. `tests/pkg/pipeline/pipeline_test.go` for `pkg/pipeline`).
-  - Tests are written as external packages (e.g. `package pipeline_test`) that import the code under test via `voxray-go/pkg/...`.
+  - Tests are written as external packages (e.g. `package pipeline_test`) that import the code under test via `github.com/Voxray-AI/Voxray/pkg/...`.
   - `go test ./...` automatically finds and runs these tests because `tests` is part of the module tree.
 - **Top-level `tests/` folder**
   - Integration tests live under `tests/integration/`.

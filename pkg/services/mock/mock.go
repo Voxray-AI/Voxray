@@ -1,4 +1,4 @@
-﻿// Package mock provides mock STT, LLM, and TTS services for testing and stress testing
+// Package mock provides mock STT, LLM, and TTS services for testing and stress testing
 // without calling real APIs. All mocks are configurable (response text, audio length, optional latency).
 package mock
 
@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"voxray-go/pkg/frames"
-	"voxray-go/pkg/services"
+	"github.com/Voxray-AI/Voxray/pkg/frames"
+	"github.com/Voxray-AI/Voxray/pkg/services"
 )
 
 // Ensure mocks implement interfaces.

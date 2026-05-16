@@ -1,9 +1,9 @@
-﻿// Package ollama provides Ollama-backed LLM via OpenAI-compatible API (localhost or custom base URL).
+// Package ollama provides Ollama-backed LLM via OpenAI-compatible API (localhost or custom base URL).
 package ollama
 
 import (
 	openai "github.com/sashabaranov/go-openai"
-	"voxray-go/pkg/config"
+	"github.com/Voxray-AI/Voxray/pkg/config"
 )
 
 const defaultOllamaBaseURL = "http://localhost:11434/v1"
