@@ -483,7 +483,7 @@ function TopBar({ transport, setTweak, stateDot, stateLabel, sessionClock }) {
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <Wordmark />
         <span style={{ ...mono(10.5), color: "var(--dim)", letterSpacing: "0.16em", whiteSpace: "nowrap" }}>
-          v0.4.2 · GO 1.25 · APACHE-2.0
+          v0.2.0 · GO 1.25 · APACHE-2.0
         </span>
       </div>
       <nav style={{ display: "flex", gap: 22, ...mono(11), color: "var(--dim)", textTransform: "uppercase", letterSpacing: "0.12em", whiteSpace: "nowrap" }}>
