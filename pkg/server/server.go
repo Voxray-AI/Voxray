@@ -185,6 +185,8 @@ func routeName(path, fallback string) string {
 	switch {
 	case path == "/health" || path == "/api/v1/health":
 		return "health"
+	case path == "/config" || path == "/api/v1/config":
+		return "config"
 	case path == "/ready" || path == "/api/v1/ready":
 		return "ready"
 	case path == "/webrtc/offer" || path == "/api/v1/webrtc/offer":
@@ -349,6 +351,17 @@ func registerHandlers(mux *http.ServeMux, cfg *config.Config, ctx context.Contex
 	})
 	mux.Handle("/health", wrapWithMetrics(cfg, "health", handleHealth))
 	mux.Handle("/api/v1/health", wrapWithMetrics(cfg, "health", handleHealth))
+	// Public pipeline config (providers/models) for web UI; no API keys.
+	handleConfig := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			api.RespondError(w, r, &api.APIError{StatusCode: http.StatusMethodNotAllowed, Code: api.CodeBadRequest, Message: "Method not allowed"})
+			return
+		}
+		info := cfg.PublicPipelineInfo()
+		api.RespondJSON(w, r, http.StatusOK, info, nil)
+	})
+	mux.Handle("/config", wrapWithMetrics(cfg, "config", handleConfig))
+	mux.Handle("/api/v1/config", wrapWithMetrics(cfg, "config", handleConfig))
 	// Metrics (Prometheus text format) exposed from shared registry.
 	// Keep endpoint present even when disabled so scrape configs don't break;
 	// it will simply export an empty/zeroed registry in that case.

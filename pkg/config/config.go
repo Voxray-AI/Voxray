@@ -246,6 +246,43 @@ func (c *Config) TTSProvider() string {
 	return c.Provider
 }
 
+// PublicPipelineInfo is safe to expose to browser clients (no API keys or secrets).
+type PublicPipelineInfo struct {
+	SttProvider string `json:"stt_provider"`
+	LlmProvider string `json:"llm_provider"`
+	TtsProvider string `json:"tts_provider"`
+	SttModel    string `json:"stt_model,omitempty"`
+	SttLanguage string `json:"stt_language,omitempty"`
+	LlmModel    string `json:"llm_model,omitempty"`
+	TtsModel    string `json:"tts_model,omitempty"`
+	TtsVoice    string `json:"tts_voice,omitempty"`
+	VadType     string `json:"vad_type"`
+	Transport   string `json:"transport"`
+}
+
+// PublicPipelineInfo returns non-sensitive pipeline labels for UI display.
+func (c *Config) PublicPipelineInfo() PublicPipelineInfo {
+	if c == nil {
+		return PublicPipelineInfo{VadType: "energy"}
+	}
+	transport := c.Transport
+	if transport == "" {
+		transport = "websocket"
+	}
+	return PublicPipelineInfo{
+		SttProvider: c.STTProvider(),
+		LlmProvider: c.LLMProvider(),
+		TtsProvider: c.TTSProvider(),
+		SttModel:    c.STTModel,
+		SttLanguage: c.STTLanguage,
+		LlmModel:    c.Model,
+		TtsModel:    c.TTSModel,
+		TtsVoice:    c.TTSVoice,
+		VadType:     c.VADBackendOrDefault(),
+		Transport:   transport,
+	}
+}
+
 // TurnEnabled returns true when turn detection is set to "silence".
 func (c *Config) TurnEnabled() bool {
 	return c.TurnDetection == "silence"

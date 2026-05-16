@@ -98,3 +98,27 @@ func TestTurnEnabled(t *testing.T) {
 	}
 }
 
+func TestPublicPipelineInfo(t *testing.T) {
+	c := &config.Config{
+		Provider:    "openai",
+		SttProvider: "sarvam",
+		LlmProvider: "groq",
+		TtsProvider: "sarvam",
+		Model:       "llama-3.1-8b-instant",
+		STTModel:    "saarika:v2.5",
+		TTSModel:    "bulbul:v2",
+		VADType:     "energy",
+		Transport:   "both",
+	}
+	info := c.PublicPipelineInfo()
+	if info.SttProvider != "sarvam" || info.LlmProvider != "groq" || info.TtsProvider != "sarvam" {
+		t.Errorf("providers: %+v", info)
+	}
+	if info.LlmModel != "llama-3.1-8b-instant" || info.SttModel != "saarika:v2.5" || info.TtsModel != "bulbul:v2" {
+		t.Errorf("models: %+v", info)
+	}
+	if info.VadType != "energy" || info.Transport != "both" {
+		t.Errorf("vad/transport: %+v", info)
+	}
+}
+
