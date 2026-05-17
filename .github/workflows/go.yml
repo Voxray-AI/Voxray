@@ -25,7 +25,14 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test ./...
+      run: go test -coverprofile=coverage.txt -covermode=atomic ./...
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: coverage.txt
+        fail_ci_if_error: true
 
   # CONCURRENCY: race detector job catches data races introduced in concurrent refactors.
   race:

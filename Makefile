@@ -2,7 +2,7 @@
 BINARY_NAME := voxray
 MAIN_PKG := ./cmd/voxray
 
-.PHONY: build build-voice run run-voice clean test tidy proto swagger lint lint-fix evals
+.PHONY: build build-voice run run-voice clean test test-cover tidy proto swagger lint lint-fix evals
 
 # proto: generate Go from wire_frames.proto (requires protoc and protoc-gen-go)
 proto:
@@ -28,6 +28,10 @@ clean:
 
 test:
 	go test ./...
+
+# test-cover: run tests and write coverage.txt for local inspection or Codecov upload
+test-cover:
+	go test -short -coverprofile=coverage.txt -covermode=atomic ./...
 
 tidy:
 	go mod tidy
