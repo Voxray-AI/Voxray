@@ -1,0 +1,68 @@
+---
+title: "OpenAI"
+description: "Full-stack voice provider: STT, LLM, TTS, and Realtime. The default provider when no explicit provider is set."
+---
+
+## Capabilities
+
+<CardGroup cols={4}>
+     
+</CardGroup>
+
+## Quick Config
+
+```json
+{
+  "stt_provider": "openai",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "llm_provider": "openai",
+  "model": "gpt-4o-mini",
+  "tts_provider": "openai",
+  "tts_voice": "nova",
+  "api_keys": { "openai": "sk-..." }
+}
+```
+
+## Available LLM Models
+
+| Model | Context | Description |
+| --- | --- | --- |
+| `gpt-4o-mini` | 128k | Fast, cost-efficient; recommended default |
+| `gpt-4o` | 128k | Highest reasoning quality |
+| `gpt-4.1-mini` | 1M | Latest mini-class |
+| `gpt-4.1` | 1M | Latest full model |
+
+## TTS Voices
+
+| Voice | Character |
+| --- | --- |
+| `nova` | Bright and energetic (recommended) |
+| `alloy` | Neutral, balanced |
+| `echo` | Deep and resonant |
+| `onyx` | Clear and confident |
+| `shimmer` | Soft and calm |
+
+## Realtime Mode
+
+```json
+{
+  "provider": "openai",
+  "model": "gpt-4o-realtime-preview",
+  "api_keys": { "openai": "sk-..." }
+}
+```
+
+## Tool Calling (MCP)
+
+OpenAI implements `LLMServiceWithTools`. Configure MCP in your config to enable tool calling:
+
+```json
+{
+  "llm_provider": "openai",
+  "model": "gpt-4o-mini",
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/data"]
+  }
+}
+```

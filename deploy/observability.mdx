@@ -1,0 +1,102 @@
+---
+title: "Observability"
+description: "Health endpoints, Prometheus metrics, structured logging, and alerting for Voxray in production."
+---
+
+## Health endpoints
+
+| Endpoint | Purpose | Success | Failure condition |
+| --- | --- | --- | --- |
+| `GET /health` | **Liveness** | `200 OK` | Process not running |
+| `GET /ready` | **Readiness** | `200 OK` | `503` if Redis unreachable |
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+```
+
+---
+
+## Prometheus metrics
+
+Voxray exposes metrics at `GET /metrics` in Prometheus text exposition format.
+
+```yaml
+scrape_configs:
+  - job_name: voxray
+    static_configs:
+      - targets: ["voxray-host:8080"]
+    metrics_path: /metrics
+    scrape_interval: 15s
+```
+
+<Warning>
+  `/metrics` is **unauthenticated by default**. Restrict access using a firewall rule or network policy.
+</Warning>
+
+## Metric reference
+
+### HTTP metrics
+
+| Metric | Type | Description |
+| --- | --- | --- |
+| `http_requests_total` | Counter | Total HTTP requests by method, route, status |
+| `http_request_duration_seconds` | Histogram | Request duration |
+| `http_active_connections` | Gauge | Current active connections |
+
+### AI pipeline metrics
+
+| Metric | Type | Description |
+| --- | --- | --- |
+| `stt_time_to_first_token_seconds` | Histogram | Time to first transcription token |
+| `llm_time_to_first_token_seconds` | Histogram | Time to first LLM token |
+| `tts_time_to_first_audio_chunk_seconds` | Histogram | Time to first audio chunk |
+| `stt_errors_total` | Counter | STT errors |
+| `llm_errors_total` | Counter | LLM errors |
+| `tts_errors_total` | Counter | TTS errors |
+
+## Alerting
+
+```yaml
+groups:
+  - name: voxray
+    rules:
+      - alert: VoxrayLLMHighTTFT
+        expr: histogram_quantile(0.95, rate(llm_time_to_first_token_seconds_bucket[5m])) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM p95 time-to-first-token above 2s"
+
+      - alert: VoxrayRecordingFailures
+        expr: rate(recording_jobs_failed_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recording upload jobs failing"
+```
+
+---
+
+## Structured logging
+
+```json
+{
+  "json_logs": true,
+  "log_level": "info"
+}
+```
+
+Each log line becomes a single JSON object compatible with Fluentd, Grafana Loki, CloudWatch, and Datadog.
+
+<Tip>
+  Always run with `json_logs: true` and `log_level: info` in production.
+</Tip>

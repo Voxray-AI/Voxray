@@ -1,0 +1,70 @@
+---
+title: "Phone Calls with Twilio"
+description: "Connect a real phone number to your Voxray agent. Callers dial in over PSTN, Twilio bridges the call via WebSocket."
+---
+
+## What you'll build
+
+1. Twilio receives a PSTN call and sends a **POST webhook** to your server
+2. Voxray responds with **TwiML XML** pointing to `/telephony/ws`
+3. Twilio opens a **WebSocket** for bidirectional audio
+4. Audio flows through STT → LLM → TTS in real time
+
+## Prerequisites
+
+- Voxray binary
+- Twilio account with a phone number
+- Groq API key
+- [ngrok](https://ngrok.com/) for local tunnelling
+
+## Steps
+
+<Steps>
+  <Step title="Start your ngrok tunnel">
+    ```bash
+    ngrok http 8080
+    # Note your HTTPS forwarding URL, e.g. https://abc123.ngrok.io
+    ```
+  </Step>
+  <Step title="Configure Voxray">
+    ```json config.json
+    {
+      "host": "localhost",
+      "port": 8080,
+      "runner_transport": "twilio",
+      "proxy_host": "abc123.ngrok.io",
+      "stt_provider": "groq",
+      "llm_provider": "groq",
+      "tts_provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "api_keys": { "groq": "gsk_..." }
+    }
+    ```
+
+    <Warning>
+      `proxy_host` must be a bare hostname — no `https://` prefix, no trailing slash.
+    </Warning>
+  </Step>
+  <Step title="Start Voxray">
+    ```bash
+    ./voxray -config config.json
+    ```
+  </Step>
+  <Step title="Configure Twilio webhook">
+    1. In the Twilio Console, go to **Phone Numbers → Active Numbers**
+    2. Under **Voice & Fax → A call comes in**, set webhook to `https://abc123.ngrok.io` (POST)
+    3. Save configuration
+  </Step>
+  <Step title="Call your number">
+    Dial your Twilio number. You should hear the agent respond within 1–2 seconds.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| Twilio error **11200** | Check `proxy_host` matches your ngrok URL exactly |
+| **404** when Twilio POSTs | Remove `https://` from `proxy_host` |
+| One-way audio | Check provider API key and logs for errors |
+| ngrok URL changed | Update `proxy_host` and Twilio webhook URL |

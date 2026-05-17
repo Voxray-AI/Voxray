@@ -1,0 +1,112 @@
+---
+title: "Telephony"
+description: "Connect Voxray to phone networks via Twilio, Telnyx, Plivo, Exotel, Daily.co, or LiveKit."
+---
+
+## How telephony works
+
+Voxray handles phone calls through a two-phase handshake: an HTTP webhook that returns provider-specific XML or JSON, followed by a long-lived media WebSocket that carries the actual audio.
+
+```text
+Phone call arrives
+      │
+      ▼
+POST /          ← provider webhook; Voxray responds with XML/JSON
+      │
+      ▼
+GET /telephony/ws   ← provider opens WebSocket; audio flows both ways
+      │
+      ▼
+Transport → Runner → Pipeline (VAD → STT → LLM → TTS → Sink)
+```
+
+## Supported transports
+
+| Transport | Provider | `runner_transport` value | Audio format |
+| --- | --- | --- | --- |
+| Twilio | Twilio | `"twilio"` | G.711 μ-law 8 kHz |
+| Telnyx | Telnyx | `"telnyx"` | G.711 μ-law 8 kHz |
+| Plivo | Plivo | `"plivo"` | G.711 μ-law 8 kHz |
+| Exotel | Exotel | `"exotel"` | G.711 μ-law 8 kHz |
+| Daily.co | Daily | `"daily"` | Opus 48 kHz |
+| LiveKit | LiveKit | `"livekit"` | Opus 48 kHz |
+
+## Base configuration
+
+```json
+{
+  "runner_transport": "twilio",
+  "proxy_host": "your-domain.com",
+  "port": 8080,
+  "stt_provider": "groq",
+  "llm_provider": "groq",
+  "tts_provider": "groq",
+  "model": "llama-3.1-8b-instant"
+}
+```
+
+<Warning>
+  `proxy_host` must be a bare hostname — no `https://`, no trailing slash. Correct: `"your-domain.com"`. Wrong: `"https://your-domain.com"`.
+</Warning>
+
+## Provider-specific setup
+
+<Tabs>
+  <Tab title="Twilio">
+    1. In Twilio console, under your phone number's Voice Configuration, set the webhook to `https://{proxy_host}/` with HTTP method `POST`.
+
+    ```json
+    {
+      "runner_transport": "twilio",
+      "proxy_host": "bot.example.com",
+      "stt_provider": "groq",
+      "llm_provider": "openai",
+      "tts_provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+    ```
+  </Tab>
+  <Tab title="Telnyx">
+    1. Create a TeXML application in the Telnyx portal.
+    2. Set the "Voice URL" to `https://{proxy_host}/`.
+
+    ```json
+    {
+      "runner_transport": "telnyx",
+      "proxy_host": "bot.example.com",
+      "stt_provider": "groq",
+      "llm_provider": "groq",
+      "tts_provider": "groq",
+      "model": "llama-3.1-8b-instant"
+    }
+    ```
+  </Tab>
+  <Tab title="Daily.co">
+    ```bash
+    export DAILY_API_KEY=your-daily-api-key
+    ```
+
+    ```json
+    {
+      "runner_transport": "daily",
+      "proxy_host": "bot.example.com",
+      "stt_provider": "groq",
+      "llm_provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Local development with ngrok
+
+```bash
+./voxray --config config.json
+ngrok http 8080
+```
+
+Set `proxy_host` to the ngrok hostname (without `https://`).
+
+<Note>
+  ngrok free tier generates a new URL on each restart. Update `proxy_host` and your provider webhook URL each time.
+</Note>

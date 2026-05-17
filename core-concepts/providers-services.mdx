@@ -1,0 +1,78 @@
+---
+title: "Providers & Services"
+description: "How Voxray abstracts STT, LLM, and TTS behind Go interfaces, and how to select any supported provider by changing a single config value."
+---
+
+## What are services?
+
+Voxray organizes all AI calls behind three Go interfaces: `STTService`, `LLMService`, and `TTSService`. The rest of the pipeline never imports a provider SDK directly. Swap from OpenAI Whisper to Groq’s transcription endpoint by changing one key in `config.json`.
+
+## Service interfaces
+
+```go
+// STTService — batch transcription.
+type STTService interface {
+    Transcribe(ctx context.Context, audio []byte, sampleRate, numChannels int) ([]*frames.TranscriptionFrame, error)
+}
+
+// TTSService — batch synthesis.
+type TTSService interface {
+    Speak(ctx context.Context, text string, sampleRate int) ([]*frames.TTSAudioRawFrame, error)
+}
+
+// LLMService — chat completion with optional token streaming.
+type LLMService interface {
+    Chat(ctx context.Context, messages []map[string]any, onToken func(*frames.LLMTextFrame)) error
+}
+```
+
+## Factory functions
+
+| Function | Purpose |
+| --- | --- |
+| `NewLLMFromConfig(cfg, provider, model)` | Returns an `LLMService` for `provider` |
+| `NewSTTFromConfig(cfg, provider)` | Returns an `STTService` for `provider` |
+| `NewTTSFromConfig(cfg, provider, model, voice)` | Returns a `TTSService` for `provider` |
+| `NewServicesFromConfig(cfg)` | Resolves all three services at once |
+
+## API key resolution
+
+1. `config.api_keys[serviceName]` — value in the JSON config
+2. Environment variable — e.g. `OPENAI_API_KEY`
+3. Empty string — authentication will fail at first API call
+
+## Provider support matrix
+
+| Provider | Config Key | STT | LLM | TTS | Realtime | API Key Env Var |
+| --- | --- | :-: | :-: | :-: | :-: | --- |
+| OpenAI | `openai` | Yes | Yes | Yes | Yes | `OPENAI_API_KEY` |
+| Groq | `groq` | Yes | Yes | Yes | No | `GROQ_API_KEY` |
+| Anthropic | `anthropic` | No | Yes | No | No | `ANTHROPIC_API_KEY` |
+| Grok (xAI) | `grok` | No | Yes | No | No | `XAI_API_KEY` |
+| Cerebras | `cerebras` | No | Yes | No | No | `CEREBRAS_API_KEY` |
+| Mistral | `mistral` | No | Yes | No | No | `MISTRAL_API_KEY` |
+| DeepSeek | `deepseek` | No | Yes | No | No | `DEEPSEEK_API_KEY` |
+| AWS | `aws` | Yes | Yes | Yes | No | `AWS_SECRET_ACCESS_KEY` |
+| Google | `google` | Yes | Yes | Yes | No | `GOOGLE_API_KEY` |
+| Ollama | `ollama` | No | Yes | No | No | `OLLAMA_API_KEY` |
+| ElevenLabs | `elevenlabs` | Yes | No | Yes | No | `ELEVENLABS_API_KEY` |
+| Sarvam | `sarvam` | Yes | No | Yes | No | `SARVAM_API_KEY` |
+| Hume | `hume` | No | No | Yes | Yes | `HUME_API_KEY` |
+| Neuphonic | `neuphonic` | No | No | Yes | No | `NEUPHONIC_API_KEY` |
+| Whisper | `whisper` | Yes | No | No | No | `WHISPER_API_KEY` |
+
+## Realtime providers
+
+Some providers expose a single bidirectional session that merges STT, LLM, and TTS. Use `realtime.NewFromConfig(cfg, provider)` to construct; never call the individual factory functions.
+
+| Provider | Notes |
+| --- | --- |
+| **OpenAI Realtime** | Low-latency via `gpt-4o-realtime-*`; supports function calling |
+| **Hume** | Emotion-aware voice |
+| **Inworld** | Game/character-oriented |
+
+Realtime path:
+
+```text
+AudioIn → RealtimeSession.SendAudio() ► RealtimeSession.Events() → AudioOut/TextOut
+```

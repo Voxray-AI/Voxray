@@ -1,0 +1,121 @@
+---
+title: "Production Deployment"
+description: "Checklist, TLS configuration, logging, resource limits, and graceful shutdown for running Voxray in production."
+---
+
+## Pre-launch checklist
+
+- TLS enabled — on-server (`tls_enable: true`) or terminated at a reverse proxy
+- `server_api_key` set — protects `/start`, `/webrtc/offer`, `/sessions/{id}/api/offer`, and `/ws`
+- `cors_allowed_origins` restricted to your front-end domain(s)
+- `log_level: "info"` — do not ship `"debug"` to production
+- `json_logs: true` — required for structured log aggregation
+- `/metrics` endpoint firewalled or access-controlled
+- API keys in environment variables, not in `config.json`
+- Session store set to `"redis"` for multi-instance deployments
+- Health and readiness probes configured
+
+---
+
+## TLS configuration
+
+<Tabs>
+  <Tab title="On-server TLS">
+    ```json
+    {
+      "host": "0.0.0.0",
+      "port": 8443,
+      "tls_enable": true,
+      "tls_cert_file": "/etc/voxray/tls/server.crt",
+      "tls_key_file": "/etc/voxray/tls/server.key"
+    }
+    ```
+  </Tab>
+  <Tab title="Reverse proxy (nginx)">
+    ```nginx
+    server {
+        listen 443 ssl;
+        server_name voxray.example.com;
+        ssl_certificate     /etc/nginx/tls/fullchain.pem;
+        ssl_certificate_key /etc/nginx/tls/privkey.pem;
+        location / {
+            proxy_pass         http://voxray:8080;
+            proxy_http_version 1.1;
+            proxy_set_header   Upgrade $http_upgrade;
+            proxy_set_header   Connection "Upgrade";
+            proxy_set_header   Host $host;
+            proxy_read_timeout 3600s;
+        }
+    }
+    ```
+
+    <Warning>
+      Without the `Upgrade` and `Connection` headers, WebSocket connections will be rejected.
+    </Warning>
+  </Tab>
+</Tabs>
+
+---
+
+## Logging configuration
+
+| Config key | Values | Default |
+| --- | --- | --- |
+| `log_level` | `"debug"`, `"info"`, `"warn"`, `"error"` | `"info"` |
+| `json_logs` | `true` / `false` | `false` |
+
+---
+
+## Resource limits
+
+| Concurrent sessions | Recommended memory | Recommended CPU |
+| --- | --- | --- |
+| 1–10 | 256 MB | 0.5 vCPU |
+| 10–50 | 1 GB | 2 vCPU |
+| 50–200 | 4 GB | 4–8 vCPU |
+
+---
+
+## Health and readiness probes
+
+| Endpoint | Probe type | Returns |
+| --- | --- | --- |
+| `GET /health` | Liveness | `200 {"status":"ok"}` always |
+| `GET /ready` | Readiness | `200` / `503` if Redis unreachable |
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 2
+  periodSeconds: 5
+```
+
+---
+
+## Graceful shutdown
+
+Voxray handles `SIGTERM` and drains in-flight requests before exiting.
+
+```yaml
+spec:
+  terminationGracePeriodSeconds: 60
+```
+
+---
+
+## Prometheus metrics
+
+`GET /metrics` returns Prometheus text format.
+
+<Warning>
+  The `/metrics` endpoint is unauthenticated. Firewall it in production.
+</Warning>

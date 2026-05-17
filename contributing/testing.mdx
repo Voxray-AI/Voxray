@@ -1,0 +1,112 @@
+---
+title: "Testing"
+description: "Test structure, how to run tests, and testing conventions for Voxray contributors"
+---
+
+Voxray's test suite spans three layers: unit tests, integration tests, and end-to-end tests.
+
+## Test Categories
+
+| Category | Location | Requirements | Run command |
+| --- | --- | --- | --- |
+| **Unit** | `pkg/**/*_test.go` and `tests/pkg/...` | None | `go test ./pkg/... ./tests/pkg/...` |
+| **Integration** | `tests/integration/...` | Docker services; API keys | `go test ./tests/integration/...` |
+| **End-to-end** | `tests/e2e/...` | Full stack running | `go test ./tests/e2e/...` |
+
+<Note>
+  Provider-specific tests are automatically skipped when the corresponding `*_API_KEY` environment variable is not set.
+</Note>
+
+## Running Tests
+
+```bash
+# All tests
+go test ./...
+
+# Race detection (run before every PR)
+go test -race -timeout 5m ./...
+
+# Integration tests
+docker-compose up -d
+VOXRAY_CONFIG=./configs/test.json go test ./tests/integration/...
+```
+
+<Warning>
+  A PR that introduces a data race will be rejected. Always run with `-race` before opening a pull request.
+</Warning>
+
+## Integration Test Requirements
+
+```go
+func TestSarvamSTT_Integration(t *testing.T) {
+    apiKey := os.Getenv("SARVAM_API_KEY")
+    if apiKey == "" {
+        t.Skip("SARVAM_API_KEY not set; skipping integration test")
+    }
+    // ...
+}
+```
+
+## Writing Good Tests
+
+### Testing processors
+
+```go
+type captureSink struct {
+    processors.BaseProcessor
+    received []frames.Frame
+}
+
+func (s *captureSink) ProcessFrame(_ context.Context, f frames.Frame, dir processors.Direction) error {
+    if dir == processors.Downstream {
+        s.received = append(s.received, f)
+    }
+    return nil
+}
+
+func TestMyProcessor_PassesAudioFrameDownstream(t *testing.T) {
+    ctx := context.Background()
+    sink := &captureSink{}
+    proc := myprocessor.New()
+    proc.SetNext(sink)
+
+    audioFrame := &frames.AudioRawFrame{Data: make([]byte, 320)}
+    if err := proc.ProcessFrame(ctx, audioFrame, processors.Downstream); err != nil {
+        t.Fatalf("ProcessFrame returned error: %v", err)
+    }
+
+    if len(sink.received) != 1 {
+        t.Fatalf("expected 1 frame at sink, got %d", len(sink.received))
+    }
+}
+```
+
+### Testing services with httptest
+
+```go
+func TestLLMService_Chat_StreamsTokens(t *testing.T) {
+    srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "text/event-stream")
+        fmt.Fprintln(w, `data: {"choices":[{"delta":{"content":"hello"}}]}`)
+        fmt.Fprintln(w, `data: [DONE]`)
+    }))
+    defer srv.Close()
+
+    svc := myprovider.NewLLMServiceWithBaseURL(srv.URL, "fake-key", "test-model")
+    var tokens []string
+    err := svc.Chat(context.Background(), []map[string]any{{"role": "user", "content": "hi"}},
+        func(f *frames.LLMTextFrame) { tokens = append(tokens, f.Text) })
+
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+}
+```
+
+## Makefile Targets
+
+| Target | Description |
+| --- | --- |
+| `make test` | Run all tests |
+| `make build` | Build the main binary |
+| `make evals` | Run provider quality evaluations |

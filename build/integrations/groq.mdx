@@ -1,0 +1,45 @@
+---
+title: "Groq"
+description: "Ultra-low-latency STT, LLM, and TTS provider powered by Groq's custom LPU hardware."
+---
+
+## Capabilities
+
+Groq covers all three pipeline stages with a single API key. 5–10x faster than equivalent GPU-based providers.
+
+## Quick Config
+
+```json
+{
+  "stt_provider": "groq",
+  "llm_provider": "groq",
+  "tts_provider": "groq",
+  "model": "llama-3.1-8b-instant",
+  "stt_model": "whisper-large-v3-turbo",
+  "api_keys": { "groq": "gsk_..." }
+}
+```
+
+Get a free key at [console.groq.com](https://console.groq.com).
+
+## Available LLM Models
+
+| Model | Speed | Description |
+| --- | --- | --- |
+| `llama-3.1-8b-instant` | Fastest | Default; best latency |
+| `llama-3.1-70b-versatile` | Fast | Higher quality |
+| `mixtral-8x7b-32768` | Fast | Strong reasoning |
+| `gemma2-9b-it` | Fast | Structured outputs |
+
+## Available STT Models
+
+| Model | Speed | Notes |
+| --- | --- | --- |
+| `whisper-large-v3-turbo` | Fast | Recommended default |
+| `whisper-large-v3` | Moderate | Maximum accuracy |
+
+## Limitations
+
+- No MCP tool calling
+- No Realtime mode
+- Rate limits on free tier (per model/day)

@@ -1,0 +1,116 @@
+---
+title: "Docker Compose"
+description: "Run Voxray locally or on a single host with Docker Compose."
+---
+
+The repository ships a `docker-compose.yml` for local development and single-node deployments.
+
+<Info>
+  Docker Compose is the right tool for local development and single-host staging. For production at scale, use Kubernetes. See the [scaling guide](/deploy/scaling).
+</Info>
+
+## docker-compose.yml
+
+```yaml title="docker-compose.yml"
+services:
+  voxray:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - VOXRAY_CONFIG=/app/config.json
+    volumes:
+      - ./config.json:/app/config.json:ro
+    # Optional: use Redis for session store when scaling horizontally
+    # depends_on:
+    #   - redis
+
+  # Uncomment to use Redis-backed session store
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+
+# volumes:
+#   redis_data:
+```
+
+## Basic usage
+
+```bash
+# Build and start in the foreground
+docker compose up
+
+# Build and start detached
+docker compose up -d --build
+
+# View logs
+docker compose logs -f voxray
+
+# Stop
+docker compose down
+```
+
+## Environment variable injection
+
+**Option A: Inline in docker-compose.yml**
+
+```yaml
+environment:
+  - VOXRAY_CONFIG=/app/config.json
+  - GROQ_API_KEY=gsk_...
+  - OPENAI_API_KEY=sk-...
+```
+
+**Option B: .env file (recommended)**
+
+```bash title=".env"
+GROQ_API_KEY=gsk_...
+OPENAI_API_KEY=sk-...
+VOXRAY_LOG_LEVEL=info
+```
+
+<Warning>
+  Add `.env` to `.gitignore` so secrets are never committed.
+</Warning>
+
+## Enabling Redis for session persistence
+
+Uncomment the Redis service in `docker-compose.yml`:
+
+```yaml
+services:
+  voxray:
+    environment:
+      - session_store=redis
+      - redis_url=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+```
+
+## Common commands reference
+
+```bash
+docker compose up                    # Start (foreground)
+docker compose up -d --build         # Start (detached)
+docker compose up -d --scale voxray=2  # 2 replicas
+docker compose logs -f voxray        # Tail logs
+docker compose restart voxray        # Restart after config change
+docker compose down                  # Stop, preserve volumes
+docker compose down -v               # Stop, remove volumes
+```
+
+## Next steps
+
+- [Docker](/deploy/docker) — single-container build details
+- [Scaling](/deploy/scaling) — Kubernetes deployment for multi-host production

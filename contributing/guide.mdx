@@ -1,0 +1,119 @@
+---
+title: "Contributing Guide"
+description: "How to contribute to Voxray: dev setup, code style, commits, and PR process"
+---
+
+Thank you for contributing to Voxray.
+
+## Prerequisites
+
+| Tool | Version | Notes |
+| --- | --- | --- |
+| **Go** | 1.25\+ | Required. |
+| **Git** | Any | Required. |
+| **make** | Any | Optional but recommended. |
+| **C compiler** | Any | Required only for CGO builds (Silero VAD, Opus/WebRTC). |
+
+## Dev Setup
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/voxray-ai/voxray-ai.git
+    cd voxray-ai
+    ```
+  </Step>
+  <Step title="Install Go dependencies">
+    ```bash
+    go mod tidy
+    ```
+  </Step>
+  <Step title="Set up a config file">
+    ```bash
+    cp config.example.json configs/local.json
+    export VOXRAY_CONFIG=./configs/local.json
+    ```
+  </Step>
+  <Step title="Run the server">
+    ```bash
+    go run ./cmd/voxray
+    ```
+  </Step>
+</Steps>
+
+## Running Tests
+
+```bash
+# All tests
+go test ./...
+
+# With race detection (required before PR)
+go test -race -timeout 5m ./...
+```
+
+<Warning>
+  A PR that introduces a data race will be rejected. The `-race` flag is non-negotiable.
+</Warning>
+
+## Code Style
+
+```bash
+# Format code
+gofmt -w ./cmd ./pkg ./tests
+
+# Static analysis
+go vet ./...
+golangci-lint run ./...
+```
+
+### Key principles
+
+- **Context propagation**: Every request-handling entrypoint must accept `context.Context`
+- **Error handling**: Return errors; do not `panic` in normal control flow
+- **Concurrency**: Protect shared state with mutexes; tie goroutines to `context.Context`
+
+## Conventional Commits
+
+```text
+<type>(<optional scope>): <short summary>
+```
+
+| Type | When to use |
+| --- | --- |
+| `feat` | New user-visible feature |
+| `fix` | Bug fix |
+| `docs` | Documentation changes only |
+| `refactor` | Code change that neither fixes nor adds a feature |
+| `test` | Adding or updating tests |
+| `chore` | Maintenance, tooling |
+
+## Pull Request Process
+
+<Steps>
+  <Step title="Create a branch">
+    ```bash
+    git checkout -b feat/webrtc-metrics
+    ```
+  </Step>
+  <Step title="Make focused changes">
+    One feature or bug fix per PR. Update or add tests alongside code changes.
+  </Step>
+  <Step title="Run checks">
+    ```bash
+    go test ./...
+    golangci-lint run ./...
+    ```
+  </Step>
+  <Step title="Update documentation">
+    Update `docs/` if your change affects behavior, configuration, or public API.
+  </Step>
+  <Step title="Open the PR">
+    Open against `main`. Include what changed, why, and any design decisions.
+  </Step>
+</Steps>
+
+## Links
+
+- **GitHub**: [github.com/Voxray-AI/Voxray](https://github.com/Voxray-AI/Voxray)
+- **Issues**: [github.com/Voxray-AI/Voxray/issues](https://github.com/Voxray-AI/Voxray/issues)
+- **Discord**: See the invite link in `README.md`

@@ -1,0 +1,127 @@
+---
+title: "Scaling"
+description: "Run Voxray from a single instance to a horizontally-scaled cluster."
+---
+
+## Single-instance vs multi-instance
+
+Voxray follows a **one goroutine per active connection** model.
+
+<Tabs>
+  <Tab title="Single instance (default)">
+    ```json
+    {
+      "session_store": "memory"
+    }
+    ```
+
+    All session state lives in the process. Appropriate for development and single-region deployments.
+  </Tab>
+  <Tab title="Multiple instances (Redis)">
+    ```json
+    {
+      "session_store": "redis",
+      "redis_url": "redis://redis:6379/0",
+      "session_ttl_secs": 3600
+    }
+    ```
+
+    All instances share session state through Redis.
+
+    <Warning>
+      When `session_store=redis` is active, `/ready` returns **503** if Redis is unreachable.
+    </Warning>
+  </Tab>
+</Tabs>
+
+---
+
+## Load balancer requirements
+
+### WebSocket upgrade passthrough
+
+All load balancers must pass `Upgrade: websocket` and `Connection: Upgrade` headers through. Increase idle-connection timeout to match the longest expected call duration.
+
+### Telephony WebSocket
+
+Telephony providers open a persistent WebSocket to `/telephony/ws`. Use cookie-based or IP-based session affinity for telephony traffic.
+
+---
+
+## Performance tuning
+
+| Config Key | Default | Description |
+| --- | --- | --- |
+| `pipeline_input_queue_cap` | `256` | Buffer between transport read and pipeline push. |
+| `ws_write_coalesce_ms` | `0` (disabled) | WebSocket write coalescing window. |
+| `ws_write_coalesce_max_frames` | — | Maximum frames per coalesce batch. |
+
+---
+
+## Kubernetes deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voxray
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: voxray
+  template:
+    spec:
+      containers:
+        - name: voxray
+          image: your-registry/voxray-go:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: VOXRAY_SESSION_STORE
+              value: "redis"
+            - name: VOXRAY_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: voxray-secrets
+                  key: redis-url
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "2"
+              memory: "1Gi"
+```
+
+### Horizontal Pod Autoscaler
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: voxray-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: voxray
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Pods
+      pods:
+        metric:
+          name: http_active_connections
+        target:
+          type: AverageValue
+          averageValue: "50"
+```

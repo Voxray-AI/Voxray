@@ -1,0 +1,65 @@
+---
+title: "MCP Tools"
+description: "Connect Voxray voice agents to external tools and services via the Model Context Protocol (MCP)."
+---
+
+## What is MCP?
+
+The **Model Context Protocol (MCP)** is an open standard for connecting LLMs to external tools, APIs, and data sources. MCP servers run as stdio subprocesses.
+
+## How Voxray uses MCP
+
+At pipeline startup, Voxray connects to the configured MCP server, calls `ListTools`, converts each tool schema to a `FunctionSchema`, and registers them with the LLM provider.
+
+## Configuration
+
+```json
+{
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/path"],
+    "tools_filter": ["read_file", "list_directory"]
+  }
+}
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `command` | yes | Executable to launch as the MCP server |
+| `args` | no | Arguments forwarded to the server |
+| `tools_filter` | no | Whitelist of tool names to register |
+
+## LLM provider compatibility
+
+| Provider | Tools Supported |
+| --- | --- |
+| OpenAI (GPT-4o, etc.) | Yes |
+| Google (Gemini) | Yes |
+| Anthropic (Claude) | Not yet |
+| Groq | Not yet |
+
+<Warning>
+  If your `llm_provider` doesn't implement `LLMServiceWithTools`, tool registration is silently skipped. Check startup logs for `mcp:` entries to confirm tools were registered.
+</Warning>
+
+## Common MCP servers
+
+```json
+// Filesystem
+{
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/var/data"],
+    "tools_filter": ["read_file", "list_directory"]
+  }
+}
+
+// Brave Search
+{
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+    "tools_filter": ["brave_web_search"]
+  }
+}
+```

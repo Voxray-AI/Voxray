@@ -1,0 +1,121 @@
+---
+title: "FAQ"
+description: "Frequently asked questions about Voxray"
+---
+
+<AccordionGroup>
+  <Accordion title="Do I need CGO to run Voxray?">
+    It depends on which transports you need.
+
+    **No CGO required — WebSocket only:**
+
+    ```bash
+    make build
+    # or: go build -o voxray-go ./cmd/...
+    ```
+
+    **CGO required — WebRTC with Opus audio:**
+
+    ```bash
+    make build-voice
+    # or: CGO_ENABLED=1 go build -o voxray-go ./cmd/...
+    ```
+
+    WebRTC TTS output requires the Opus encoder. You need `gcc` in `PATH`.
+  </Accordion>
+
+  <Accordion title="Can I use different providers for STT, LLM, and TTS?">
+    Yes. STT, LLM, and TTS providers are resolved independently.
+
+    ```json
+    {
+      "stt_provider": "groq",
+      "llm_provider": "anthropic",
+      "tts_provider": "elevenlabs",
+      "model": "claude-3-5-sonnet-20241022"
+    }
+    ```
+
+    See the [Provider Matrix](/reference/provider-matrix) for the full list.
+  </Accordion>
+
+  <Accordion title="My voice agent isn't responding — troubleshooting checklist">
+    1. **VAD thresholds** — Lower `vad_threshold` to `0.01` or try `vad_type: "silero"`
+    2. **Microphone permissions** — Ensure the browser/app has microphone access
+    3. **PCM audio format** — Voxray expects 16-bit signed PCM, mono, 16 kHz
+    4. **API key validity** — Check server logs for authentication errors
+    5. **Network connectivity** — Ensure the server can reach provider API endpoints
+
+    <Warning>
+      For WebRTC sessions, ICE connectivity failures (no audio reaching the server) are a common cause. Check browser console for ICE errors and ensure STUN/TURN servers are reachable.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="How do I scale Voxray horizontally?">
+    ```json
+    {
+      "session_store": "redis",
+      "redis_url": "redis://redis:6379/0",
+      "session_ttl_secs": 3600
+    }
+    ```
+
+    When using Redis, `/ready` returns `503` if Redis is unreachable — use this as your load balancer readiness probe.
+  </Accordion>
+
+  <Accordion title="Can I run Voxray fully locally without any cloud services?">
+    Yes. Use Ollama for LLM, a local Whisper server for STT, and XTTS for TTS:
+
+    ```json
+    {
+      "llm_provider": "ollama",
+      "stt_provider": "whisper",
+      "tts_provider": "xtts",
+      "model": "llama3.2"
+    }
+    ```
+
+    ```bash
+    export WHISPER_BASE_URL=http://localhost:9000
+    export XTTS_BASE_URL=http://localhost:8020
+    ```
+  </Accordion>
+
+  <Accordion title="What audio format does Voxray expect from the client?">
+    | Property | Value |
+    | --- | --- |
+    | Encoding | 16-bit signed PCM (little-endian) |
+    | Channels | Mono (1 channel) |
+    | Sample rate | 16,000 Hz |
+    | Container | None — raw bytes, no WAV/MP3 header |
+  </Accordion>
+
+  <Accordion title="How do I reduce latency?">
+    - **STT**: Use `groq` with `whisper-large-v3` (≤300ms)
+    - **LLM**: Use `groq` with `llama-3.1-8b-instant` (~50–150ms TTFT)
+    - **TTS**: Use `elevenlabs` with `eleven_turbo_v2`
+    - **Infrastructure**: Co-locate your server in the same cloud region as your provider APIs
+    - For lowest latency: use OpenAI Realtime API (`realtime` provider)
+  </Accordion>
+
+  <Accordion title="Does Voxray support recording calls?">
+    Yes:
+
+    ```json
+    {
+      "recording": {
+        "enable": true,
+        "bucket": "my-recordings-bucket",
+        "base_path": "recordings/",
+        "format": "wav",
+        "worker_count": 4
+      },
+      "transcripts": {
+        "enable": true,
+        "driver": "postgres",
+        "dsn": "postgresql://user:pass@localhost/voxray"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>

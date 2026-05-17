@@ -1,0 +1,43 @@
+---
+title: "Echo Bot"
+description: "Test your Voxray setup with zero API keys required."
+---
+
+The echo bot requires no STT, LLM, or TTS API keys — only the Go binary and a four-line config.
+
+## Config
+
+```json echo-config.json
+{
+  "host": "0.0.0.0",
+  "port": 3042,
+  "transport": "websocket",
+  "plugins": ["echo"]
+}
+```
+
+## Steps
+
+<Steps>
+  <Step title="Start the server">
+    ```bash
+    ./voxray -config echo-config.json
+    ```
+  </Step>
+  <Step title="Connect a client">
+    ```bash
+    websocat ws://localhost:3042/ws
+    ```
+  </Step>
+  <Step title="Send a text frame">
+    Type any message. The echo processor reflects it back as an `LLMTextFrame`.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `bind: address already in use` | Change `port` in config |
+| No echo response | Send a `TextFrame`; echo ignores other types |
+| `plugin not found: echo` | Rebuild with `go build ./cmd/voxray` |

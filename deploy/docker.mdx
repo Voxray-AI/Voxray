@@ -1,0 +1,117 @@
+---
+title: "Docker"
+description: "Build and run Voxray as a Docker container — single binary, minimal Alpine runtime, two build variants."
+---
+
+Voxray ships as a statically linked Go binary that fits cleanly into a minimal Alpine image.
+
+## Dockerfile walkthrough
+
+```dockerfile title="Dockerfile"
+# Multi-stage build for Voxray-Go server
+FROM golang:1.25-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /voxray ./cmd/voxray
+
+FROM alpine:3.20
+RUN adduser -D -g "" voxray
+USER voxray
+WORKDIR /app
+ENV VOXRAY_CONFIG=/app/config.json
+COPY --from=builder /voxray /voxray
+EXPOSE 8080
+ENTRYPOINT ["/voxray"]
+CMD ["-config", "/app/config.json"]
+```
+
+## Build variants
+
+| Variant | CGO | Transport | Build command |
+| --- | --- | --- | --- |
+| Default | Disabled | WebSocket only | `docker build -t voxray .` |
+| WebRTC \+ Opus | Enabled | WebSocket \+ WebRTC | Use `Dockerfile.webrtc` |
+
+<Warning>
+  The default Dockerfile sets `CGO_ENABLED=0`. If your pipeline uses WebRTC with Opus audio, use the WebRTC variant.
+</Warning>
+
+### WebRTC \+ Opus Dockerfile
+
+```dockerfile title="Dockerfile.webrtc"
+FROM golang:1.25-alpine AS builder
+RUN apk add --no-cache gcc musl-dev opus-dev pkgconfig
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-w -s" -o /voxray ./cmd/voxray
+
+FROM alpine:3.20
+RUN apk add --no-cache opus && adduser -D -g "" voxray
+USER voxray
+WORKDIR /app
+ENV VOXRAY_CONFIG=/app/config.json
+COPY --from=builder /voxray /voxray
+EXPOSE 8080
+ENTRYPOINT ["/voxray"]
+CMD ["-config", "/app/config.json"]
+```
+
+## Running the container
+
+```bash
+# Basic run
+docker run -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  voxray
+
+# With environment variable overrides
+docker run -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -e GROQ_API_KEY=gsk_... \
+  -e OPENAI_API_KEY=sk-... \
+  -e VOXRAY_LOG_LEVEL=debug \
+  voxray
+
+# Detached with restart
+docker run -d --restart unless-stopped \
+  -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -e GROQ_API_KEY=gsk_... \
+  --name voxray \
+  voxray
+```
+
+## Health check
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost:8080/health || exit 1
+```
+
+| Endpoint | Purpose | Returns |
+| --- | --- | --- |
+| `GET /health` | Liveness | `200 OK` always |
+| `GET /ready` | Readiness | `200 OK` or `503` if Redis unreachable |
+
+## Useful environment variables
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `VOXRAY_CONFIG` | `/app/config.json` | Path to the config file |
+| `PORT` or `VOXRAY_PORT` | `8080` | Listening port |
+| `VOXRAY_LOG_LEVEL` | `info` | Log verbosity |
+| `VOXRAY_JSON_LOGS` | `false` | Structured JSON log output |
+| `VOXRAY_SERVER_API_KEY` | unset | Require Bearer auth on protected endpoints |
+
+<Tip>
+  In containerized environments, prefer JSON logs (`VOXRAY_JSON_LOGS=true`) so your log aggregator can parse fields without regex extraction.
+</Tip>
+
+## Next steps
+
+- [Docker Compose](/deploy/docker-compose) — multi-service local setup with optional Redis
+- [Production Deployment](/deploy/production) — environment variables, TLS, and security checklist

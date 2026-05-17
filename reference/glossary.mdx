@@ -1,0 +1,77 @@
+---
+title: "Glossary"
+description: "Definitions of key terms used throughout the Voxray documentation"
+---
+
+This page defines the key terms used across the Voxray documentation.
+
+---
+
+## Core Concepts
+
+| Term | Definition |
+| --- | --- |
+| **Frame** | The fundamental unit of data that flows through a Voxray pipeline. Every object — raw audio bytes, transcribed text, LLM tokens, lifecycle signals — is a typed `Frame` value. |
+| **Processor** | A single stage in the pipeline. Receives a `Frame`, optionally transforms it, and forwards frames to its downstream or upstream neighbour. |
+| **Pipeline** | A linear, doubly-linked chain of `Processor` values. `Pipeline.Push` sends a frame downstream; frames can also travel upstream. |
+| **Runner** | The goroutine manager for a single session. Owns a reader goroutine and a worker goroutine. |
+| **Transport** | The network boundary of a session. Exposes `Input()` and `Output()` frame channels. |
+| **Session** | One complete lifecycle from connection to close. Each session has exactly one Transport, Runner, and Pipeline. |
+| **BaseProcessor** | A concrete struct every custom processor embeds. Provides chain linking and `PushDownstream`/`PushUpstream` helpers. |
+| **Direction** | `Downstream` (first processor → Sink) or `Upstream` (Sink → source). |
+
+---
+
+## Audio & Voice
+
+| Term | Definition |
+| --- | --- |
+| **VAD** | Voice Activity Detection — per-frame classifier deciding if a 10ms audio window contains speech. |
+| **Turn Detection** | Higher-level mechanism determining when the user finished speaking and STT should be triggered. |
+| **STT** | Speech-to-Text — converting raw audio into a text transcript. |
+| **LLM** | Large Language Model — generates text responses given conversation history. |
+| **TTS** | Text-to-Speech — synthesizing spoken audio from text. |
+| **Realtime** | A bidirectional provider session merging STT, LLM, and TTS into a single persistent connection. |
+| **Opus** | Lossy audio codec for WebRTC. Requires CGO and `gopus`. |
+| **G.711** | ITU standard codec for telephone-quality audio (8-bit, 8kHz). Used by Twilio, Telnyx, Plivo, Exotel. |
+| **PCM** | Pulse-Code Modulation — raw, uncompressed audio format used internally throughout the pipeline. |
+
+---
+
+## Network & WebRTC
+
+| Term | Definition |
+| --- | --- |
+| **ICE** | Interactive Connectivity Establishment — IETF protocol for WebRTC path discovery and negotiation. |
+| **STUN** | Session Traversal Utilities for NAT — lets clients discover their public IP for peer-to-peer connectivity. |
+| **TURN** | Traversal Using Relays around NAT — relay protocol for WebRTC when direct P2P fails. |
+| **SDP** | Session Description Protocol — text format describing WebRTC endpoint capabilities. |
+| **WebRTC** | Browser/native API standard for real-time peer-to-peer audio, video, and data. |
+| **WebSocket** | Full-duplex, low-latency protocol over TCP. Voxray's primary transport for browser clients. |
+
+---
+
+## Infrastructure
+
+| Term | Definition |
+| --- | --- |
+| **SessionStore** | Key-value store mapping session IDs to WebRTC session state. Default: in-memory. |
+| **DTMF** | Dual-Tone Multi-Frequency — telephone keypad tones. |
+| **RTVI** | Real-Time Voice Interaction — open protocol for real-time voice AI clients (Pipecat-based). |
+| **MCP** | Model Context Protocol — open standard for exposing tools to LLMs. |
+| **Plugin** | Config-driven extension point for assembling the pipeline without writing Go code. |
+| **Aggregator** | Processor that accumulates frames across multiple turns before emitting a single richer frame. |
+
+---
+
+## Voxray-Specific
+
+| Term | Definition |
+| --- | --- |
+| **IVR** | Interactive Voice Response — guides callers through menus using speech and DTMF. |
+| **TurnProcessor** | Built-in processor combining VAD and turn detection. |
+| **InterruptionController** | Processor detecting barge-in and canceling in-progress TTS synthesis. |
+| **CGO** | Go mechanism for calling C libraries. Required for Silero VAD and WebRTC Opus audio. |
+| **ServiceSwitcher** | Processor wrapper allowing active STT/LLM/TTS service to be swapped at runtime. |
+| **ParallelPipeline** | Pipeline variant delivering frames to multiple child pipelines simultaneously. |
+| **ExternalChain** | Framework processor forwarding frames to an external HTTP sidecar and receiving transformed frames. |

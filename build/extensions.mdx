@@ -1,0 +1,74 @@
+---
+title: "Extensions"
+description: "Drop-in pipeline extensions for IVR navigation and voicemail detection in outbound Voxray agents."
+---
+
+Extensions are optional pipeline components for outbound call scenarios.
+
+## IVR Extension
+
+Automates navigation of IVR phone menus. When an outbound call encounters an IVR, the extension:
+
+1. **Classifies** the audio: IVR system or human
+2. **Navigates** the IVR using LLM-generated DTMF tones
+3. **Hands off** to normal conversation mode when a human is reached
+
+### Setup
+
+```go
+import "voxray-go/pkg/extensions/ivr"
+
+llm := services.NewLLMService(cfg)
+navigator := ivr.NewIVRNavigator(llm, "Reach the billing department", 2.0)
+
+navigator.OnConversationDetected(func(history []map[string]any) {
+    log.Println("Human detected, starting conversation")
+})
+
+navigator.OnIVRStatusChanged(func(status ivr.IVRStatus) {
+    // IVRStatusDetected, IVRStatusCompleted, IVRStatusStuck, IVRStatusWait
+})
+
+// Add to pipeline after STT
+pl.Add(navigator.Processor)
+```
+
+### LLM command tags
+
+| Tag | Example | Effect |
+| --- | --- | --- |
+| `<dtmf>` | `<dtmf>1</dtmf>` | Emits DTMF tone |
+| `<status>` | `<status>completed</status>` | Fires `OnIVRStatusChanged` |
+| `<mode>` | `<mode>conversation</mode>` | Exits IVR mode |
+
+## Voicemail Detection Extension
+
+Classifies whether a human or answering machine picked up before the agent starts speaking.
+
+- **Human detected** → TTS gate opens and releases buffered speech
+- **Voicemail detected** → TTS gate discards buffer; `OnVoicemailDetected` fires
+
+### Setup
+
+```go
+import "voxray-go/pkg/extensions/voicemail"
+
+det := voicemail.NewVoicemailDetector(classifierLLM, 2.0)
+
+det.OnConversationDetected(func() {
+    log.Println("Human answered")
+})
+
+det.OnVoicemailDetected(func() {
+    // Push a voicemail message
+    pipeline.Push(frames.NewTTSSpeakFrame("Please call us back at 555-0100."))
+})
+
+// Add to pipeline
+pl.Add(det.Detector())  // After STT
+pl.Add(det.Gate())      // After TTS
+```
+
+<Warning>
+  The classifier LLM must respond with exactly `CONVERSATION` or `VOICEMAIL`. Append `voicemail.ClassifierResponseInstruction` to any custom prompt.
+</Warning>

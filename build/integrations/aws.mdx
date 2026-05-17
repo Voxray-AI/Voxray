@@ -1,0 +1,66 @@
+---
+title: "AWS"
+description: "Use Amazon Transcribe (STT), Amazon Bedrock (LLM), and Amazon Polly (TTS) with Voxray."
+---
+
+## Overview
+
+AWS uses the **AWS SDK v2 credential chain** rather than a single bearer token. All three pipeline stages share a single region setting.
+
+## Authentication
+
+<Tabs>
+  <Tab title="Environment Variables">
+    ```bash
+    export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+    export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+    ```
+  </Tab>
+  <Tab title="IAM Role (Production)">
+    Attach an IAM role to your EC2/ECS/Lambda resource. The SDK fetches credentials from IMDS automatically.
+  </Tab>
+</Tabs>
+
+## Quick Config
+
+```json
+{
+  "stt_provider": "aws",
+  "llm_provider": "aws",
+  "tts_provider": "aws",
+  "model": "anthropic.claude-3-haiku-20240307-v1:0",
+  "api_keys": { "aws_region": "us-east-1" }
+}
+```
+
+## Bedrock Models
+
+| Model ID | Notes |
+| --- | --- |
+| `anthropic.claude-3-haiku-20240307-v1:0` | Fastest Claude 3 |
+| `anthropic.claude-3-sonnet-20240229-v1:0` | Balanced |
+| `meta.llama3-8b-instruct-v1:0` | Open-weight 8B |
+
+<Note>
+  Model availability varies by region. Enable model access in the Bedrock console before deploying.
+</Note>
+
+## Polly Voice Selection
+
+```json
+{ "tts_voice": "Joanna" }
+```
+
+Common voices: `Joanna` (en-US Female), `Matthew` (en-US Male), `Amy` (en-GB Female), `Brian` (en-GB Male).
+
+## Required IAM Permissions
+
+```json
+{
+  "Statement": [
+    {"Action": ["transcribe:StartStreamTranscription"], "Effect": "Allow", "Resource": "*"},
+    {"Action": ["bedrock:InvokeModelWithResponseStream"], "Effect": "Allow", "Resource": "arn:aws:bedrock:*::foundation-model/*"},
+    {"Action": ["polly:SynthesizeSpeech"], "Effect": "Allow", "Resource": "*"}
+  ]
+}
+```

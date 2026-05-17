@@ -1,0 +1,56 @@
+---
+title: "Full Cloud Voice Agent with OpenAI"
+description: "Run a complete voice pipeline using OpenAI for STT, LLM, and TTS from a single API key."
+---
+
+## What you'll build
+
+- **STT:** `gpt-4o-mini-transcribe`
+- **LLM:** `gpt-4o-mini`
+- **TTS:** `nova` voice
+
+Expected latency: **~1.1 seconds** end-to-end.
+
+## Config
+
+```json config.json
+{
+  "host": "localhost",
+  "port": 8080,
+  "transport": "websocket",
+  "stt_provider": "openai",
+  "llm_provider": "openai",
+  "tts_provider": "openai",
+  "model": "gpt-4o-mini",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "tts_voice": "nova",
+  "api_keys": { "openai": "sk-..." }
+}
+```
+
+## Steps
+
+```bash
+export OPENAI_API_KEY="sk-..."
+./voxray -config config.json
+```
+
+Connect to `ws://localhost:8080/ws` and speak.
+
+## TTS voices
+
+| Voice | Character |
+| --- | --- |
+| `nova` | Warm, conversational |
+| `alloy` | Neutral, balanced |
+| `echo` | Authoritative |
+| `onyx` | Confident |
+| `shimmer` | Calm |
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `401 Unauthorized` | Verify `OPENAI_API_KEY` |
+| Long pauses | Lower `turn_stop_secs` to `1.5` |
+| `insufficient_quota` | Add billing at platform.openai.com |

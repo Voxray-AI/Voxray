@@ -1,0 +1,81 @@
+---
+title: "Provider Matrix"
+description: "Complete matrix of all supported providers and their capabilities"
+---
+
+## Overview
+
+Voxray supports a large and growing set of AI providers for STT, LLM, TTS, and real-time pipeline tasks. Each task is configured independently — you can mix and match providers freely.
+
+## Capability Matrix
+
+| Provider | Provider Key | STT | LLM | TTS | Realtime | API Key Env Var |
+| --- | --- | :-: | :-: | :-: | :-: | --- |
+| OpenAI | `openai` | ✓ | ✓ | ✓ | ✓ | `OPENAI_API_KEY` |
+| Groq | `groq` | ✓ | ✓ | ✓ | — | `GROQ_API_KEY` |
+| Sarvam | `sarvam` | ✓ | — | ✓ | — | `SARVAM_API_KEY` |
+| ElevenLabs | `elevenlabs` | ✓ | — | ✓ | — | `ELEVENLABS_API_KEY` |
+| AWS | `aws` | ✓ | ✓ | ✓ | — | `AWS_SECRET_ACCESS_KEY` |
+| Google | `google` | ✓ | ✓ | ✓ | — | `GOOGLE_API_KEY` |
+| Google Vertex AI | `google_vertex` | — | ✓ | — | — | ADC (no key) |
+| Anthropic | `anthropic` | — | ✓ | — | — | `ANTHROPIC_API_KEY` |
+| Grok (xAI) | `grok` | — | ✓ | — | — | `XAI_API_KEY` |
+| Cerebras | `cerebras` | — | ✓ | — | — | `CEREBRAS_API_KEY` |
+| Mistral | `mistral` | — | ✓ | — | — | `MISTRAL_API_KEY` |
+| DeepSeek | `deepseek` | — | ✓ | — | — | `DEEPSEEK_API_KEY` |
+| Ollama | `ollama` | — | ✓ | — | — | `OLLAMA_API_KEY` (optional) |
+| Qwen | `qwen` | — | ✓ | — | — | `DASHSCOPE_API_KEY` |
+| Whisper (self-hosted) | `whisper` | ✓ | — | — | — | `WHISPER_API_KEY` |
+| Hume | `hume` | — | — | ✓ | ✓ | `HUME_API_KEY` |
+| Inworld | `inworld` | — | ✓ | ✓ | ✓ | `INWORLD_API_KEY` |
+| Minimax | `minimax` | — | ✓ | ✓ | — | `MINIMAX_API_KEY` |
+| Neuphonic | `neuphonic` | — | — | ✓ | — | `NEUPHONIC_API_KEY` |
+| XTTS (self-hosted) | `xtts` | — | — | ✓ | — | `XTTS_API_KEY` (optional) |
+| Soniox | `soniox` | ✓ | — | — | — | `SONIOX_API_KEY` |
+
+## LLM Providers
+
+| Provider | Provider Key | Default Model |
+| --- | --- | --- |
+| OpenAI | `openai` | `gpt-3.5-turbo` |
+| Groq | `groq` | `llama-3.1-8b-instant` |
+| Anthropic | `anthropic` | `claude-3-sonnet-20240229` |
+| Google | `google` | `gemini-2.5-flash` |
+| Ollama | `ollama` | `llama3.2` |
+| AWS Bedrock | `aws` | `anthropic.claude-3-haiku-20240307-v1:0` |
+
+## STT Providers
+
+| Provider | Provider Key | Streaming |
+| --- | --- | :-: |
+| OpenAI | `openai` | — |
+| Groq | `groq` | — |
+| Sarvam | `sarvam` | ✓ |
+| ElevenLabs | `elevenlabs` | — |
+| AWS Transcribe | `aws` | — |
+| Soniox | `soniox` | ✓ |
+
+## TTS Providers
+
+| Provider | Provider Key | Default Voice |
+| --- | --- | --- |
+| OpenAI | `openai` | (API default) |
+| Groq | `groq` | `alloy` |
+| Sarvam | `sarvam` | `anushka` |
+| ElevenLabs | `elevenlabs` | (required voice ID) |
+| AWS Polly | `aws` | `Joanna` |
+| Google Cloud TTS | `google` | (API default) |
+
+## Realtime Providers
+
+Realtime providers bypass the standard STT → LLM → TTS pipeline.
+
+| Provider | Notes |
+| --- | --- |
+| **OpenAI Realtime** | Low-latency bidirectional audio via `gpt-4o-realtime-preview` |
+| **Hume** | Emotion-aware voice |
+| **Inworld** | Game/character-oriented |
+
+<Note>
+  Daily.co and LiveKit are supported as **transport** providers via `runner_transport`, not as realtime AI providers.
+</Note>

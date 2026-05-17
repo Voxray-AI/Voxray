@@ -1,0 +1,114 @@
+---
+title: "Security"
+description: "API key authentication, CORS, request body limits, secrets management, and container hardening for Voxray."
+---
+
+## API key authentication
+
+When `server_api_key` is set, Voxray enforces bearer token authentication on all sensitive endpoints.
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "server_api_key": "your-secret-key-here"
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    VOXRAY_SERVER_API_KEY=your-secret-key-here
+    ```
+  </Tab>
+</Tabs>
+
+### Protected endpoints
+
+| Endpoint | Protected |
+| --- | --- |
+| `POST /start` | Yes |
+| `POST /webrtc/offer` | Yes |
+| `GET /ws` | Yes |
+| `GET /health` | No |
+| `GET /ready` | No |
+| `GET /metrics` | No (firewall separately) |
+
+### Sending the API key
+
+```bash
+# Authorization: Bearer
+curl -X POST https://voxray.example.com/start \
+  -H "Authorization: Bearer your-secret-key-here"
+
+# X-API-Key
+curl -X POST https://voxray.example.com/start \
+  -H "X-API-Key: your-secret-key-here"
+```
+
+---
+
+## CORS configuration
+
+<Warning>
+  If `cors_allowed_origins` is omitted or empty and you are serving browser clients, your front-end JavaScript will fail with a CORS error.
+</Warning>
+
+```json
+{
+  "cors_allowed_origins": [
+    "https://yourapp.com",
+    "https://www.yourapp.com"
+  ]
+}
+```
+
+Or via environment variable (comma-separated):
+
+```bash
+VOXRAY_CORS_ORIGINS=https://yourapp.com,https://www.yourapp.com
+```
+
+---
+
+## Request body limits
+
+| Setting | Default | Recommended |
+| --- | --- | --- |
+| `max_request_body_bytes` | `262144` (256 KB) | `1048576` (1 MiB) |
+
+---
+
+## Secrets management
+
+**Never commit API keys to git.** Use environment variables:
+
+```bash
+# Docker
+docker run -p 8080:8080 \
+  -e OPENAI_API_KEY=sk-proj-... \
+  -e VOXRAY_SERVER_API_KEY=... \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  voxray:latest
+
+# Kubernetes
+env:
+  - name: OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: voxray-secrets
+        key: openai-api-key
+```
+
+---
+
+## Production security checklist
+
+- TLS enabled
+- `server_api_key` set to a long random string
+- CORS origins explicitly set — no wildcards
+- `max_request_body_bytes` configured
+- `/metrics` not publicly accessible
+- API keys in environment variables
+- Config file not committed to git
+- Running as non-root (default Docker image user is `voxray`)
+- Network policies restrict outbound to required provider APIs
