@@ -1,6 +1,6 @@
-# github.com/Voxray-AI/Voxray Architecture
+# Voxray-Go Architecture
 
-High-level architecture of the **github.com/Voxray-AI/Voxray** real-time voice pipeline server.
+High-level architecture of the **voxray-go** real-time voice pipeline server.
 
 ---
 
@@ -198,7 +198,7 @@ sequenceDiagram
 
 Binary **Frame** wire format (Text, Audio, Transcription, Message) follows a common frame proto: same message names, field numbers, and types. Use `ProtobufSerializer` on WebSocket binary messages for interoperability with external clients or servers.
 
-**github.com/Voxray-AI/Voxray–specific:** JSON envelope (type + data) and system frames (StartFrame, CancelFrame, ErrorFrame) are not in the shared proto; they are used for JSON transport or skipped when using binary protobuf.
+**Voxray-go–specific:** JSON envelope (type + data) and system frames (StartFrame, CancelFrame, ErrorFrame) are not in the shared proto; they are used for JSON transport or skipped when using binary protobuf.
 
 ---
 
@@ -256,7 +256,7 @@ See [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md) for the full system view 
 ## 6. File Layout (Key Paths)
 
 ```
-github.com/Voxray-AI/Voxray/
+voxray-go/
 ├── cmd/voxray/          # Entry: main, init
 ├── pkg/
 │   ├── server/          # StartServers; /ws, /webrtc/offer, /start, /sessions, telephony, Daily routes

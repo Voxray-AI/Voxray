@@ -1,0 +1,154 @@
+---
+title: "Provider Matrix"
+description: "Complete matrix of all supported providers and their capabilities"
+---
+
+## Overview
+
+Voxray supports a large and growing set of AI providers for speech-to-text (STT), large language model (LLM), text-to-speech (TTS), and real-time pipeline tasks. Each task is configured independently — you can mix and match providers freely (e.g. Groq for STT, Anthropic for LLM, ElevenLabs for TTS).
+
+Provider keys are set via `provider`, `stt_provider`, `llm_provider`, or `tts_provider` in your `config.json`, or via the `api_keys` map or the corresponding environment variable listed below.
+
+---
+
+## Capability Matrix
+
+| Provider | Provider Key | STT | LLM | TTS | Realtime | API Key Env Var |
+|---|---|:---:|:---:|:---:|:---:|---|
+| OpenAI | `openai` | ✓ | ✓ | ✓ | ✓ | `OPENAI_API_KEY` |
+| Groq | `groq` | ✓ | ✓ | ✓ | — | `GROQ_API_KEY` |
+| Sarvam | `sarvam` | ✓ | — | ✓ | — | `SARVAM_API_KEY` |
+| ElevenLabs | `elevenlabs` | ✓ | — | ✓ | — | `ELEVENLABS_API_KEY` |
+| AWS (Bedrock + Transcribe + Polly) | `aws` | ✓ | ✓ | ✓ | — | `AWS_SECRET_ACCESS_KEY` |
+| Google (Gemini + Cloud Speech + Cloud TTS) | `google` | ✓ | ✓ | ✓ | — | `GOOGLE_API_KEY` |
+| Google Vertex AI | `google_vertex` | — | ✓ | — | — | ADC (no key) |
+| Anthropic | `anthropic` | — | ✓ | — | — | `ANTHROPIC_API_KEY` |
+| Grok (xAI) | `grok` | — | ✓ | — | — | `XAI_API_KEY` |
+| Cerebras | `cerebras` | — | ✓ | — | — | `CEREBRAS_API_KEY` |
+| Mistral | `mistral` | — | ✓ | — | — | `MISTRAL_API_KEY` |
+| DeepSeek | `deepseek` | — | ✓ | — | — | `DEEPSEEK_API_KEY` |
+| Ollama | `ollama` | — | ✓ | — | — | `OLLAMA_API_KEY` (optional) |
+| Qwen (Alibaba) | `qwen` | — | ✓ | — | — | `DASHSCOPE_API_KEY` / `QWEN_API_KEY` |
+| Whisper (self-hosted) | `whisper` | ✓ | — | — | — | `WHISPER_API_KEY` / `OPENAI_API_KEY` |
+| Hume | `hume` | — | — | ✓ | ✓ | `HUME_API_KEY` |
+| Inworld | `inworld` | — | ✓ | ✓ | ✓ | `INWORLD_API_KEY` |
+| Minimax | `minimax` | — | ✓ | ✓ | — | `MINIMAX_API_KEY` |
+| Neuphonic | `neuphonic` | — | — | ✓ | — | `NEUPHONIC_API_KEY` |
+| XTTS (self-hosted) | `xtts` | — | — | ✓ | — | `XTTS_API_KEY` (optional) |
+| AsyncAI | `asyncai` | — | ✓ | — | — | `ASYNC_AI_API_KEY` |
+| Camb | `camb` | ✓ | — | — | — | `CAMB_API_KEY` |
+| Fish | `fish` | — | ✓ | — | — | `FISH_API_KEY` |
+| Gradium | `gradium` | ✓ | — | — | — | `GRADIUM_API_KEY` |
+| Moondream | `moondream` | — | ✓ | — | — | `MOONDREAM_API_KEY` |
+| OpenPipe | `openpipe` | — | ✓ | — | — | `OPENPIPE_API_KEY` |
+| Soniox | `soniox` | ✓ | — | — | — | `SONIOX_API_KEY` |
+
+<Note>
+Google Vertex AI uses [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials) — no API key field is required. Set `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` instead.
+</Note>
+
+---
+
+## LLM Providers
+
+All LLM providers are configured via `llm_provider` (or the global `provider` field). The `model` field selects the specific chat model. When `model` is empty, the default shown below is used.
+
+| Provider | Provider Key | Default Model | Notes |
+|---|---|---|---|
+| OpenAI | `openai` | `gpt-3.5-turbo` | Supports any OpenAI chat model (GPT-4o, GPT-4 Turbo, etc.) |
+| Groq | `groq` | `llama-3.1-8b-instant` | Groq-hosted Llama and Mixtral models; very low latency |
+| Anthropic | `anthropic` | `claude-3-sonnet-20240229` | All Claude 3/3.5 models supported |
+| Google | `google` | `gemini-2.5-flash` | Gemini Flash and Pro families |
+| Google Vertex AI | `google_vertex` | `gemini-2.5-flash` | Same Gemini models via Vertex; requires `GOOGLE_CLOUD_PROJECT` |
+| Grok (xAI) | `grok` | `grok-2` | xAI Grok models |
+| Cerebras | `cerebras` | `llama3.1-8b` | Cerebras Wafer-Scale Engine; Llama-based models |
+| Mistral | `mistral` | `mistral-small-latest` | Mistral Small, Medium, Large, Codestral |
+| DeepSeek | `deepseek` | `deepseek-chat` | DeepSeek Chat and Reasoner models |
+| AWS Bedrock | `aws` | `anthropic.claude-3-haiku-20240307-v1:0` | Any Bedrock-supported model ID; uses Converse API |
+| Ollama | `ollama` | `llama3.2` | Local inference; any model pulled via `ollama pull` |
+| Qwen | `qwen` | `qwen-plus` | Alibaba Cloud DashScope; Qwen-Plus, Turbo, Max families |
+| AsyncAI | `asyncai` | (provider default) | Async AI platform |
+| Fish | `fish` | (provider default) | Fish Audio models |
+| Inworld | `inworld` | (provider default) | Inworld character AI |
+| Minimax | `minimax` | (provider default) | Minimax conversation models |
+| Moondream | `moondream` | (provider default) | Moondream vision-language model |
+| OpenPipe | `openpipe` | (provider default) | OpenPipe fine-tuned model routing |
+
+<Tip>
+For the lowest LLM latency in production, use `groq` with `llama-3.1-8b-instant` or `cerebras` with `llama3.1-8b`. For highest quality, use `anthropic` with Claude 3.5 Sonnet or `openai` with GPT-4o.
+</Tip>
+
+---
+
+## STT Providers
+
+All STT providers are configured via `stt_provider` (or the global `provider` field). Use `stt_model` to select a specific transcription model and `stt_language` to pin a language code.
+
+| Provider | Provider Key | Default Model | Streaming | Notes |
+|---|---|---|:---:|---|
+| OpenAI | `openai` | Whisper-1 | — | File-based upload; returns full transcript |
+| Groq | `groq` | `whisper-large-v3` | — | Groq-accelerated Whisper; very fast batch |
+| Sarvam | `sarvam` | `saarika:v2.5` | ✓ | Streaming STT (`stt_streaming.go`); Indian language support; `saaras:v3` also available |
+| ElevenLabs | `elevenlabs` | (provider default) | — | ElevenLabs speech recognition endpoint |
+| AWS | `aws` | (region default) | — | AWS Transcribe Streaming; region from `AWS_REGION` or `aws_region` config |
+| Google | `google` | (project default) | — | Google Cloud Speech-to-Text v2; requires `GOOGLE_CLOUD_PROJECT` |
+| Whisper (self-hosted) | `whisper` | (server default) | — | Compatible with OpenAI Whisper server; set `WHISPER_BASE_URL` |
+| Camb | `camb` | (model config) | — | Camb.ai STT; set `CAMB_BASE_URL` |
+| Gradium | `gradium` | (model config) | — | Gradium STT; set `GRADIUM_BASE_URL` |
+| Soniox | `soniox` | `stt-rt-v4` | ✓ | WebSocket-based real-time transcription via `wss://stt-rt.soniox.com`; set `SONIOX_WS_URL` to override |
+
+<Note>
+Sarvam and Soniox use WebSocket-based streaming internally to reduce first-word latency. All other STT providers use a single-call batch transcription approach where audio is buffered per turn before sending.
+</Note>
+
+---
+
+## TTS Providers
+
+All TTS providers are configured via `tts_provider` (or the global `provider` field). Use `tts_model` to select a TTS model and `tts_voice` to select a voice/speaker ID.
+
+| Provider | Provider Key | Default Model | Default Voice | Notes |
+|---|---|---|---|---|
+| OpenAI | `openai` | `tts-1` | (API default) | Voices: `alloy`, `echo`, `fable`, `nova`, `onyx`, `shimmer`; `tts-1-hd` for higher quality |
+| Groq | `groq` | `canopylabs/orpheus-v1-english` | `alloy` | Groq TTS returns WAV at 48 kHz; decoded to raw PCM |
+| Sarvam | `sarvam` | `bulbul:v2` | `anushka` | Supports streaming (`tts_streaming.go`); Indian language voices; set `stt_language` for locale |
+| ElevenLabs | `elevenlabs` | `eleven_multilingual_v2` | (required voice ID) | `tts_voice` must be a valid ElevenLabs voice ID; multilingual v2 recommended |
+| AWS Polly | `aws` | (region default) | `Joanna` | Any Polly voice ID; region from `AWS_REGION` |
+| Google Cloud TTS | `google` | (project default) | (API default) | Language set via `stt_language` (default `en-US`) |
+| Hume | `hume` | — | (voice config) | Hume AI expressive TTS |
+| Inworld | `inworld` | — | (voice config) | Inworld character voices |
+| Minimax | `minimax` | `speech-01` | (voice config) | Set `MINIMAX_BASE_URL` for custom endpoint |
+| Neuphonic | `neuphonic` | — | (voice config) | Multilingual; `stt_language` sets locale (default `en`); set `NEUPHONIC_BASE_URL` |
+| XTTS (self-hosted) | `xtts` | — | (voice config) | Coqui XTTS self-hosted; set `XTTS_BASE_URL`; `stt_language` sets language (default `en`) |
+
+---
+
+## Realtime Providers
+
+Realtime providers bypass the standard STT → LLM → TTS pipeline and handle the full voice session end-to-end, including VAD, turn detection, and audio I/O. Use `realtime.NewFromConfig(cfg, provider)` to construct (not `NewServicesFromConfig`).
+
+### OpenAI Realtime
+
+- **Provider key:** `openai`
+- **API key env var:** `OPENAI_API_KEY`
+- Full duplex real-time audio via the OpenAI Realtime API (WebSocket).
+- Handles VAD, interruptions, and function calling natively.
+- Recommended for the lowest end-to-end latency when using OpenAI models.
+
+### Hume
+
+- **Provider key:** `hume`
+- **API key env var:** `HUME_API_KEY`
+- Hume AI empathic voice interface; real-time emotional intelligence in the voice pipeline.
+- Also available as a TTS-only provider in the standard pipeline.
+
+### Inworld
+
+- **Provider key:** `inworld`
+- **API key env var:** `INWORLD_API_KEY`
+- Inworld AI character engine; real-time character dialogue with LLM and TTS bundled.
+- Also available as LLM and TTS providers in the standard pipeline.
+
+<Note>
+Daily.co and LiveKit are supported as **transport** providers via `runner_transport` (`"daily"`, `"livekit"`) rather than as realtime AI providers. They handle WebRTC room management and media routing, while the STT/LLM/TTS pipeline still runs inside Voxray.
+</Note>

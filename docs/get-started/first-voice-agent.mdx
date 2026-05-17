@@ -1,0 +1,336 @@
+---
+title: "Your First Voice Agent"
+description: "Build a working voice agent that greets users and answers questions — from a blank config to a live conversation in under 10 minutes."
+---
+
+By the end of this page you will have a Voxray server running locally, connected to real STT, LLM, and TTS providers, and able to hold a spoken conversation in your browser. We use OpenAI for all three pipeline stages because it requires only one API key, but every field documented here maps directly to a provider-agnostic config key you can swap later.
+
+## Minimal working config
+
+Copy `config.example.json` to `config.json`, then replace its contents with the minimal config below. The example file contains every available option — useful as a reference, but noisy when learning. Start here instead.
+
+```json config.json
+{
+  "host": "localhost",
+  "port": 3042,
+
+  "transport": "websocket",
+
+  "provider": "openai",
+  "stt_provider": "openai",
+  "llm_provider": "openai",
+  "tts_provider": "openai",
+
+  "model": "gpt-4o-mini",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "tts_voice": "alloy",
+
+  "api_keys": {
+    "openai": "YOUR_OPENAI_API_KEY"
+  },
+
+  "turn_detection": "silence",
+  "turn_stop_secs": 3.0,
+
+  "vad_min_volume": 0.2,
+
+  "plugins": []
+}
+```
+
+<Note>
+  Replace `YOUR_OPENAI_API_KEY` with a real key before starting the server. Alternatively, set the `OPENAI_API_KEY` environment variable and omit the `api_keys` block entirely — Voxray falls back to environment variables automatically.
+</Note>
+
+## Config field walkthrough
+
+### Server: `host` and `port`
+
+```json
+"host": "localhost",
+"port": 3042
+```
+
+`host` controls which network interface Voxray binds to. `localhost` means only processes on the same machine can connect — correct for local development. Change to `0.0.0.0` when you deploy to a server and need external traffic.
+
+`port` defaults to `8080` in Voxray's built-in defaults, but `3042` is the value in `config.example.json` and is used throughout this documentation. The browser client at `web/index.html` points to this port by default; if you change it, update the client's server URL to match.
+
+### Transport: `websocket` to start simple
+
+```json
+"transport": "websocket"
+```
+
+Voxray supports three transport values:
+
+| Value | What it enables |
+|-------|----------------|
+| `"websocket"` | WebSocket only (`/ws`) — no CGO, no C compiler needed |
+| `"smallwebrtc"` | WebRTC only (`/webrtc/offer`) — requires CGO + gcc for Opus |
+| `"both"` | Both transports on the same HTTP server |
+
+Start with `"websocket"`. It has no build dependencies, works in every browser, and makes debugging straightforward: you can inspect WebSocket frames directly in Chrome DevTools. Switch to `"both"` or `"smallwebrtc"` once your pipeline logic is correct and you want lower-latency audio delivery.
+
+### Provider selection: `provider`, `stt_provider`, `llm_provider`, `tts_provider`
+
+```json
+"provider": "openai",
+"stt_provider": "openai",
+"llm_provider": "openai",
+"tts_provider": "openai"
+```
+
+`provider` is a **fallback default**. When Voxray resolves which provider to use for each pipeline stage, it checks the task-specific key first (`stt_provider`, `llm_provider`, `tts_provider`) and falls back to `provider` only if the task-specific key is absent or empty. This means you can set `"provider": "openai"` as a catch-all and then override individual stages selectively.
+
+For example, to use Groq for STT (faster Whisper) but keep OpenAI for LLM and TTS:
+
+```json
+"provider": "openai",
+"stt_provider": "groq"
+```
+
+The priority chain per stage is: task-specific key → `provider` → error.
+
+### Model selection: `model`, `stt_model`, `tts_voice`
+
+```json
+"model": "gpt-4o-mini",
+"stt_model": "gpt-4o-mini-transcribe",
+"tts_voice": "alloy"
+```
+
+`model` sets the LLM model. `stt_model` sets the transcription model; when omitted, Voxray uses the provider's default. `tts_voice` selects the speaker voice — valid values depend on your TTS provider:
+
+| Provider | Example voices |
+|----------|---------------|
+| OpenAI | `alloy`, `nova`, `echo`, `fable`, `onyx`, `shimmer` |
+| ElevenLabs | Use the voice ID from ElevenLabs dashboard |
+| Sarvam | `anushka`, `arvind`, and other Sarvam voice names |
+| Google | Voice names from Cloud TTS (e.g. `en-US-Neural2-A`) |
+
+There is no `tts_model` in this minimal config because OpenAI's TTS API selects the model based on the voice. For providers that distinguish model from voice (Sarvam, ElevenLabs), add `"tts_model": "..."` alongside `tts_voice`.
+
+### API keys: `api_keys`
+
+```json
+"api_keys": {
+  "openai": "sk-..."
+}
+```
+
+`api_keys` is a flat map from provider name to key. Voxray checks this map first, then falls back to environment variables using standard names (`OPENAI_API_KEY`, `GROQ_API_KEY`, etc.). You never need both; the map is convenient for local dev and environment variables are better for CI and production.
+
+For multi-provider configs, list each provider's key under its name:
+
+```json
+"api_keys": {
+  "groq": "gsk_...",
+  "openai": "sk-...",
+  "elevenlabs": "el_..."
+}
+```
+
+<Warning>
+  Never commit `config.json` with real API keys to version control. Add `config.json` to `.gitignore` and use environment variables in CI/CD pipelines.
+</Warning>
+
+### Turn detection: `turn_detection` and `turn_stop_secs`
+
+```json
+"turn_detection": "silence",
+"turn_stop_secs": 3.0
+```
+
+`turn_detection` controls when Voxray decides the user has finished speaking and sends the accumulated audio to STT. There are two values:
+
+- `"none"` — no automatic turn detection; the client signals turn end explicitly. Useful when building custom UI.
+- `"silence"` — **silence gate**: Voxray listens for `turn_stop_secs` seconds of continuous silence after speech activity, then closes the turn and flushes to STT.
+
+`turn_stop_secs: 3.0` means the agent waits for 3 seconds of silence before it considers the user done speaking. This is the most important tuning knob for conversational feel. Lower values (1.0–1.5s) feel snappier but cut off users who pause mid-sentence. Higher values (4–5s) feel more patient but add latency. Start at 3.0 and adjust based on your use case and user feedback.
+
+### VAD: `vad_min_volume`
+
+```json
+"vad_min_volume": 0.2
+```
+
+Voice activity detection (VAD) runs continuously on incoming audio and decides whether a given audio chunk contains speech. `vad_min_volume` sets the minimum RMS amplitude a chunk must exceed before VAD considers it "speech" — chunks below this threshold are treated as silence regardless of content.
+
+The practical effect: **`vad_min_volume` is your noise floor gate.** If the agent is triggering on air conditioning, keyboard clicks, or ambient room noise, raise `vad_min_volume` (try 0.3–0.4). If the agent is missing quiet speech or the user's microphone has low gain, lower it (try 0.1–0.15).
+
+The default in `config.example.json` is `0.25`; `0.2` in this minimal config is slightly more sensitive, which works well for most laptop microphones in a quiet room.
+
+### Plugins: `plugins`
+
+```json
+"plugins": []
+```
+
+Plugins extend the pipeline with additional processors — echo cancellation, wake-word detection, frame filtering, audio gain, and more. Start with an empty list: your agent will work without any plugins and the config stays readable. Once the core pipeline is working, add plugins one at a time so you can isolate their effect.
+
+Available built-in plugins include `echo`, `frame_filter`, `wake_check_filter`, `stt_mute_filter`, `audio_filter`, `interruption_controller`, `external_chain`, and `rtvi`. Each has its own options block under `plugin_options`. See the Extensions documentation for details.
+
+## Adding a system prompt
+
+Voxray's config file controls pipeline behavior — provider selection, transport, VAD parameters — but **the system prompt lives in the LLM context**, not in `config.json`. The LLM context is assembled per-session from the first message in the conversation context passed by the client.
+
+When a client connects over WebSocket, it sends an initial context payload before audio begins. That payload includes a `messages` array. The first message in that array with `role: "system"` becomes the system prompt the LLM sees on every turn.
+
+A minimal context payload sent by the client looks like:
+
+```json
+{
+  "type": "context",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a friendly voice assistant named Aria. Keep your responses concise — one to three sentences — because the user is listening rather than reading. Always greet new users with 'Hello! How can I help you today?'"
+    }
+  ]
+}
+```
+
+<Tip>
+  Keep system prompts short and speech-aware. Unlike chat interfaces, voice agents read responses aloud, so avoid bullet points, markdown formatting, code blocks, or long enumerations. Write in complete spoken sentences and instruct the LLM to do the same.
+</Tip>
+
+The reference browser client at `web/index.html` (or `tests/frontend/webrtc-voice.html` for WebRTC) sends this context automatically when you configure it. For custom clients, send the context message immediately after the WebSocket connection is established, before sending any audio frames.
+
+## Starting and testing your agent
+
+<Steps>
+  <Step title="Build the binary">
+    From the repository root, build Voxray for WebSocket-only use (no CGO required):
+
+    ```bash
+    go build -o voxray ./cmd/voxray
+    ```
+
+    On Windows:
+
+    ```powershell
+    go build -o voxray.exe ./cmd/voxray
+    ```
+
+    If you have `make` available, `make build` does the same thing.
+  </Step>
+
+  <Step title="Start the server">
+    ```bash
+    ./voxray -config config.json
+    ```
+
+    You should see output similar to:
+
+    ```
+    INFO  voxray starting  transport=websocket host=localhost port=3042
+    INFO  listening on :3042
+    ```
+
+    The server is ready when you see `listening on :3042`. If the port is already in use, change `port` in `config.json` to another value (e.g. `3043`) and restart.
+  </Step>
+
+  <Step title="Open the browser client">
+    Open `web/index.html` directly in your browser (drag the file into a browser tab, or use a local file server):
+
+    ```bash
+    # macOS
+    open web/index.html
+
+    # Linux
+    xdg-open web/index.html
+
+    # Or serve it with Python to avoid any file:// restrictions
+    python -m http.server 8000 --directory web
+    # then open http://localhost:8000/index.html
+    ```
+
+    Alternatively, use the WebRTC test client (requires a voice build):
+
+    ```bash
+    cd tests/frontend && python -m http.server 3000
+    # Open http://localhost:3000/webrtc-voice.html
+    ```
+
+    Set the server URL field in the client to `ws://localhost:3042/ws`.
+  </Step>
+
+  <Step title="Say hello">
+    Click the microphone button to begin a session. Wait for the connection indicator to turn green, then say **"Hello"** clearly.
+
+    Pause for at least `turn_stop_secs` (3 seconds) after speaking. Voxray's silence gate needs that pause to detect end of turn and dispatch your audio to STT.
+
+    The agent should respond with audio within 2–3 seconds of the silence gate triggering.
+  </Step>
+
+  <Step title="Verify the full round-trip">
+    Confirm each stage completed by checking the server logs. A successful round-trip looks like:
+
+    ```
+    INFO  vad speech_detected
+    INFO  stt transcript="Hello"
+    INFO  llm response_started
+    INFO  tts audio_chunk_sent
+    INFO  turn complete
+    ```
+
+    If any stage is missing, that log line points to where the pipeline stopped.
+  </Step>
+</Steps>
+
+## Verification checklist
+
+<Tip>
+  Run through this checklist after your first start. Every item corresponds to a distinct system layer — checking all five rules out entire categories of problems.
+
+  - [ ] Server log shows `listening on :3042` within 2 seconds of startup
+  - [ ] Browser connects without 4xx or 5xx errors (open DevTools → Network tab → filter by WS)
+  - [ ] VAD indicator in the browser client shows activity when you speak (confirms audio is reaching the server)
+  - [ ] Server log shows `stt transcript=` after you stop speaking and the silence gate fires
+  - [ ] Agent responds with audio within 2–3 seconds of the transcript appearing in logs
+</Tip>
+
+## Common first-time issues
+
+**Agent responds with a robotic or wrong voice**
+
+Your `tts_voice` value does not match a valid voice ID for your TTS provider. Each provider has its own voice name format — OpenAI uses short names like `alloy` and `nova`, ElevenLabs uses UUIDs or slug names from your dashboard, and Sarvam uses names like `anushka`. Check the provider's documentation for the exact list of valid voice identifiers and update `tts_voice` to match.
+
+**Agent does not respond after you speak**
+
+The most common cause is the silence gate not firing. Make sure `turn_detection` is set to `"silence"` and that you paused speaking for the full `turn_stop_secs` duration (3 seconds by default). The gate requires a continuous unbroken silence — if your environment has frequent ambient noise bursts (fans, typing), the gate keeps resetting. Try raising `vad_min_volume` to 0.3 or 0.4 so low-amplitude background noise does not count as speech.
+
+If you are certain you paused long enough, check that the WebSocket connection is established (green indicator in the client) and that the server is receiving audio frames (look for `vad` lines in server logs).
+
+**No audio from the agent**
+
+Two possible causes:
+
+1. **Browser speaker permission denied** — open browser Settings and verify microphone and speaker permissions are granted for the page. Some browsers also require a user gesture (a click) before playing audio; the microphone button in the client satisfies this.
+
+2. **TTS provider API key is invalid or missing** — check the server log for a TTS error line. If the API key in `api_keys.openai` is wrong, the TTS call will return a 401 and Voxray logs the error. Fix the key and restart the server.
+
+**Server exits immediately with "invalid config format"**
+
+Your `config.json` has a JSON syntax error. Run `cat config.json | python3 -m json.tool` or paste it into [jsonlint.com](https://jsonlint.com) to find the offending line.
+
+**Port 3042 already in use**
+
+Another process is bound to that port. Either stop it (`lsof -i :3042` on macOS/Linux) or change `port` in your config to a free port.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book-open" href="/core-concepts/pipeline">
+    Understand how the STT → LLM → TTS pipeline works, what frames are, and how turn detection and VAD fit together.
+  </Card>
+  <Card title="Tutorials" icon="graduation-cap" href="/build/tutorials/overview">
+    Step-by-step tutorials from a zero-dependency echo bot to a production multi-provider pipeline with telephony.
+  </Card>
+  <Card title="Deployment" icon="server" href="/deploy/overview">
+    Run Voxray in production: Docker, environment variables, TLS termination, Prometheus metrics, and horizontal scaling.
+  </Card>
+  <Card title="Integrations" icon="plug" href="/build/integrations/overview">
+    Connect Voxray to telephony (Twilio, Telnyx, Plivo), WebRTC, Daily.co, and external LLM chains.
+  </Card>
+</CardGroup>

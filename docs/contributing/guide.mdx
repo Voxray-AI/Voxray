@@ -1,0 +1,340 @@
+---
+title: "Contributing Guide"
+description: "How to contribute to Voxray: dev setup, code style, commits, and PR process"
+---
+
+Thank you for contributing to Voxray. This guide covers everything you need to get a local environment running, write code that passes review, and open a pull request.
+
+---
+
+## Prerequisites
+
+Before you begin, make sure you have the following installed:
+
+| Tool | Version | Notes |
+|------|---------|-------|
+| **Go** | 1.25+ | Required. Check with `go version`. |
+| **Git** | Any recent | Required for cloning and branching. |
+| **make** | Any | Optional but recommended for convenience targets. |
+| **C compiler** (`gcc` or `clang`) | Any | Required only for CGO builds (Silero VAD, Opus/WebRTC). On macOS, install Xcode Command Line Tools. On Linux, install `build-essential`. |
+| **Docker / Docker Compose** | Any | Optional. Used to run local dependencies (Redis, databases) and integration tests. |
+
+<Note>
+CGO is only required if you want to build with Silero VAD (`vad_type: "silero"`) or with WebRTC audio output (Opus encoding). For most development work, `CGO_ENABLED=0` produces a smaller binary that still supports energy-based VAD and all WebSocket/telephony transports.
+</Note>
+
+---
+
+## Dev Setup
+
+<Steps>
+  <Step title="Clone the repository">
+    Fork the repository on GitHub, then clone your fork:
+
+    ```bash
+    git clone https://github.com/voxray-ai/voxray-ai.git
+    cd voxray-ai
+    ```
+  </Step>
+
+  <Step title="Install Go dependencies">
+    Voxray uses Go modules. Fetch and tidy all dependencies:
+
+    ```bash
+    go mod tidy
+    ```
+  </Step>
+
+  <Step title="Set up a config file">
+    Copy the example config and adjust it for your local environment:
+
+    ```bash
+    cp config.example.json configs/local.json
+    # Edit configs/local.json: set provider credentials, transport, and optional Redis/S3 settings
+    ```
+
+    Point Voxray at the config at runtime:
+
+    ```bash
+    export VOXRAY_CONFIG=./configs/local.json
+    ```
+
+    Key config areas to review:
+
+    - `transport` — set to `"websocket"`, `"smallwebrtc"`, or `"both"`
+    - `provider`, `stt_provider`, `tts_provider` — select AI provider and set API keys
+    - `session_store` — `"memory"` (default) or `"redis"` with `redis_url`
+    - `s3_*` keys — for optional call recording
+  </Step>
+
+  <Step title="Run the server">
+    ```bash
+    go run ./cmd/voxray
+    ```
+
+    With the default local config:
+
+    - WebSocket endpoint: `ws://localhost:8080/ws`
+    - WebRTC offer endpoint: `http://localhost:8080/webrtc/offer`
+
+    Use `VOXRAY_LOG_LEVEL=debug` for verbose output during development.
+  </Step>
+
+  <Step title="(Optional) Start dependencies with Docker">
+    If your config requires Redis, a database, or other services:
+
+    ```bash
+    docker-compose up -d
+    VOXRAY_CONFIG=./configs/docker-local.json go run ./cmd/voxray
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Running Tests
+
+### Unit tests (fast, no external services)
+
+Run the full test suite before every commit:
+
+```bash
+go test ./...
+# or
+make test
+```
+
+Run tests for a specific package:
+
+```bash
+go test ./pkg/transport/...
+go test ./pkg/services/...
+go test ./tests/pkg/...
+```
+
+### Integration and end-to-end tests
+
+Heavier tests live under `tests/integration/` and `tests/e2e/` and may require external services:
+
+```bash
+docker-compose up -d   # start Postgres/MySQL, Redis, etc.
+
+VOXRAY_CONFIG=./configs/test.json \
+  go test ./tests/... -run TestE2E
+```
+
+<Tip>
+Provider-specific integration tests (e.g. Sarvam) are skipped automatically unless the relevant API key is set in the environment (e.g. `SARVAM_API_KEY`). This means `go test ./...` is always safe to run locally without external credentials.
+</Tip>
+
+### Test layout
+
+| Directory | What lives here |
+|-----------|-----------------|
+| `tests/pkg/` | Unit tests mirroring `pkg/`, e.g. `tests/pkg/pipeline/pipeline_test.go` |
+| `tests/integration/` | Integration tests for provider combinations and transport paths |
+| `tests/e2e/` | Full end-to-end pipeline tests |
+| `tests/testdata/` | Shared fixtures (audio files, JSON payloads, etc.) |
+
+When adding tests:
+
+- Prefer fast, deterministic unit tests under `tests/pkg/...`.
+- For provider integrations, add coverage under `tests/pkg/services/<provider>/`.
+- For full pipeline scenarios (WebSocket/WebRTC/telephony), add tests under `tests/e2e/` or `tests/integration/`.
+
+---
+
+## Code Style & Quality
+
+Voxray follows standard Go best practices with a focus on correctness, observability, and safe concurrency.
+
+### Formatting and linting
+
+All Go code must be formatted before committing:
+
+```bash
+gofmt -w ./cmd ./pkg ./tests
+# or
+goimports -w ./cmd ./pkg ./tests
+```
+
+Run static analysis:
+
+```bash
+go vet ./...
+```
+
+Run the full aggregated linter (strongly recommended before pushing):
+
+```bash
+golangci-lint run ./...
+```
+
+<Note>
+CI runs a subset of these checks on every push and pull request. Fixing lint failures locally is faster than iterating through CI. Install `golangci-lint` from [golangci-lint.run](https://golangci-lint.run/usage/install/).
+</Note>
+
+### Context propagation
+
+- Every request-handling entrypoint must accept a `context.Context`.
+- Pass the context through to all downstream calls (providers, database, Redis, etc.) — never substitute `context.Background()` inside a request path.
+- Respect context cancellation and deadlines in all I/O and long-running operations.
+
+### Error handling
+
+- Return errors; do not `panic` in normal control flow.
+- Wrap errors with additional context when crossing package boundaries.
+- Use typed or sentinel errors where the distinction matters for callers.
+- Log errors once at the pipeline boundary; avoid logging the same error at multiple layers.
+
+### Concurrency
+
+- Avoid shared mutable state; prefer passing data through channels or pipeline frames.
+- Protect shared state with mutexes and document the invariants. See `LLMProcessor.msgs` (guarded by `sync.Mutex`) as the canonical pattern.
+- Tie all goroutine lifecycles to a `context.Context` so they exit cleanly on shutdown or cancellation.
+
+### Panics
+
+Panics are reserved for truly unrecoverable programmer errors (impossible states, violated invariants). Public APIs and the frame hot path must never panic on invalid user input or transient provider errors.
+
+---
+
+## Conventional Commits
+
+Voxray uses the [Conventional Commits](https://www.conventionalcommits.org/) format to keep history clear and automation-friendly.
+
+### Format
+
+```text
+<type>(<optional scope>): <short summary>
+```
+
+The summary should be in lowercase and must not end with a period. Keep it under 72 characters.
+
+### Common types
+
+| Type | When to use |
+|------|-------------|
+| `feat` | A new user-visible feature |
+| `fix` | A bug fix |
+| `docs` | Documentation changes only |
+| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| `test` | Adding or updating tests |
+| `chore` | Maintenance, tooling, or non-production code |
+| `ci` | CI workflow changes |
+| `build` | Build system or dependency changes |
+| `perf` | Performance improvements |
+
+### Examples
+
+```text
+feat(pipeline): add silero vad-based auto-mute
+fix(transport): handle websocket close frames correctly
+docs(providers): document groq tts configuration
+refactor(services): unify stt/tts provider registry
+test(e2e): cover webrtc offer path with groq + sarvam
+chore(ci): enable golangci-lint in main workflow
+perf(audio): reuse resample buffer across frames to reduce GC pressure
+```
+
+---
+
+## Pull Request Process
+
+<Steps>
+  <Step title="Fork and create a branch">
+    External contributors: fork the repository on GitHub first. All contributors: create a descriptive branch name.
+
+    ```bash
+    git checkout -b feat/webrtc-metrics
+    ```
+
+    Use the commit type as the branch prefix (`feat/`, `fix/`, `docs/`, etc.) for consistency.
+  </Step>
+
+  <Step title="Make focused changes">
+    Keep each PR logically focused — one feature or bug fix at a time. If you find unrelated issues while working, open separate PRs for them.
+
+    Update or add tests alongside every code change.
+  </Step>
+
+  <Step title="Run checks locally">
+    Before pushing, verify the full suite passes:
+
+    ```bash
+    go test ./...
+    golangci-lint run ./...
+    ```
+
+    Run any integration or e2e tests relevant to your change area if external services are available.
+  </Step>
+
+  <Step title="Update documentation">
+    If your change affects behavior, configuration, or public API surface, update the relevant docs:
+
+    - `README.md` for overview-level changes
+    - Files under `docs/` for in-depth documentation
+    - Config examples in `configs/` or `config.example.json`
+    - Provider-specific docs if adding or changing a provider
+  </Step>
+
+  <Step title="Push and open the PR">
+    ```bash
+    git push origin feat/webrtc-metrics
+    ```
+
+    Open a Pull Request on GitHub against the `main` branch. In the PR description, include:
+
+    - **What** changed and **why**
+    - Links to related Issues or Discussions
+    - Any noteworthy design decisions or trade-offs
+
+    Use a title that matches the main commit message (e.g. `feat(transport): add WebRTC metrics`).
+  </Step>
+
+  <Step title="Respond to review feedback">
+    Push follow-up commits to address reviewer comments. Keep the branch up to date by rebasing or merging `main` as needed. Respond to every comment — either implement the suggestion or explain why you disagree.
+  </Step>
+
+  <Step title="Merge">
+    A maintainer will merge the PR once CI is green and the review is approved. Squash vs. merge strategy follows the repository's default.
+  </Step>
+</Steps>
+
+---
+
+## What Makes a Good PR
+
+A pull request is easier to review and more likely to be accepted when it:
+
+- **Has focused scope.** One logical change per PR. Large refactors are better split across multiple incremental PRs.
+- **Includes tests.** Every new behaviour and every bug fix should have a corresponding test that would have caught the issue.
+- **Updates docs.** If the change affects configuration keys, environment variables, API behaviour, or provider support, the documentation is updated in the same PR.
+- **Passes all checks.** `go test ./...`, `go vet ./...`, and `golangci-lint run ./...` all pass with no new warnings.
+- **Has a clear description.** The PR description explains what changed, why, and any relevant context. Reviewers should not need to read the entire diff to understand the intent.
+- **Does not hardcode secrets.** API keys, tokens, and credentials must always come from config or environment variables — never committed to source.
+
+---
+
+## Bug Reports
+
+High-quality bug reports make it much easier to diagnose issues in a real-time voice system. Before opening an issue, check existing [Issues](https://github.com/voxray-ai/voxray-ai/issues) and [Discussions](https://github.com/voxray-ai/voxray-ai/discussions) to see if the problem is already known.
+
+A good bug report includes:
+
+1. **Summary** — one or two sentences describing the problem.
+2. **Environment** — Voxray version or commit SHA, Go version, OS/architecture, deployment mode (local, Docker, Kubernetes).
+3. **Configuration** — relevant portions of your config (redact API keys and credentials).
+4. **Steps to reproduce** — a minimal, reliable sequence that reproduces the issue.
+5. **Expected behavior** — what you expected Voxray to do.
+6. **Actual behavior** — what actually happened, including error messages or incorrect output.
+7. **Logs and metrics** — relevant log excerpts (sanitized) and any Prometheus metrics that help illustrate the problem.
+
+---
+
+## Links
+
+- **GitHub Repository**: [github.com/voxray-ai/voxray-ai](https://github.com/voxray-ai/voxray-ai)
+- **Issues**: [github.com/voxray-ai/voxray-ai/issues](https://github.com/voxray-ai/voxray-ai/issues)
+- **Discussions**: [github.com/voxray-ai/voxray-ai/discussions](https://github.com/voxray-ai/voxray-ai/discussions)
+- **Discord**: See the invite link in `README.md` or the project badges.

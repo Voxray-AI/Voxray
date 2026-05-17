@@ -1,0 +1,596 @@
+---
+title: "Configuration"
+description: "Complete reference for Voxray's JSON configuration file and environment variable overrides, following 12-factor app principles."
+---
+
+## Loading configuration
+
+Voxray reads a single JSON file at startup. Pass the path with the `-config` flag or the `VOXRAY_CONFIG` environment variable:
+
+```bash
+./voxray -config config.json
+# or
+VOXRAY_CONFIG=/etc/voxray/config.json ./voxray
+```
+
+After parsing the JSON, `ApplyEnvOverrides` runs automatically and applies any `VOXRAY_*` environment variables on top of the file values. The result is a single resolved `Config` struct used for the lifetime of the process.
+
+**Loading precedence (highest to lowest):**
+
+1. Environment variable (e.g. `VOXRAY_PORT`)
+2. `config.json` field value
+3. Internal Go default (zero value or documented default)
+
+To start, copy the example file:
+
+```bash
+cp config.example.json config.json
+```
+
+<Warning>
+Never commit `config.json` with real API keys to a git repository. In production, leave all `api_keys` values as empty strings and set the actual secrets via environment variables or a secrets manager. The `VOXRAY_SERVER_API_KEY`, `OPENAI_API_KEY`, and similar variables are the 12-factor-compliant approach.
+</Warning>
+
+---
+
+## Server settings
+
+These control what address and port the HTTP server binds to, and which network transports are enabled.
+
+```json
+{
+  "host": "localhost",
+  "port": 3042,
+  "transport": "both"
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `host` | string | `"0.0.0.0"` | Bind address. Use `"0.0.0.0"` to accept connections on all interfaces in production; `"localhost"` for local-only. |
+| `port` | int | `8080` | TCP port for the HTTP server. Overridden by `VOXRAY_PORT` or `PORT`. |
+| `transport` | string | `"websocket"` | Enabled transports. `"websocket"` serves `/ws` only. `"smallwebrtc"` serves `/webrtc/offer` only. `"both"` enables both on the same server. |
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "host": "0.0.0.0",
+      "port": 8080,
+      "transport": "both"
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variables">
+    ```bash
+    VOXRAY_HOST=0.0.0.0
+    VOXRAY_PORT=8080
+    # transport has no env override; set it in config.json
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Provider selection
+
+Voxray resolves providers per pipeline stage. Set `provider` as a global default; override per-task with `stt_provider`, `llm_provider`, or `tts_provider`.
+
+```json
+{
+  "provider": "groq",
+  "stt_provider": "sarvam",
+  "llm_provider": "groq",
+  "tts_provider": "sarvam",
+  "model": "llama-3.1-8b-instant",
+  "stt_model": "saarika:v2.5",
+  "stt_language": "hi-IN",
+  "tts_model": "bulbul:v2",
+  "tts_voice": "anushka"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `provider` | string | Global fallback when a task-specific provider is not set. |
+| `stt_provider` | string | Provider for speech-to-text. Overrides `provider` for STT only. |
+| `llm_provider` | string | Provider for chat/completion. Overrides `provider` for LLM only. |
+| `tts_provider` | string | Provider for text-to-speech. Overrides `provider` for TTS only. |
+| `model` | string | Chat model name passed to the LLM provider (e.g. `"gpt-4.1-mini"`, `"claude-opus-4-5"`). |
+| `stt_model` | string | Model for the STT provider where supported (e.g. `"gpt-4o-mini-transcribe"` for OpenAI STT, `"saarika:v2.5"` for Sarvam). |
+| `stt_language` | string | BCP-47 language tag for the STT provider (e.g. `"hi-IN"`, `"en-US"`). Empty = provider auto-detect where supported. Also used as the language hint for Google TTS, Neuphonic, and XTTS. |
+| `tts_model` | string | TTS model name where supported (e.g. `"bulbul:v2"` for Sarvam, `"speech-01"` for Minimax). |
+| `tts_voice` | string | Voice identifier for TTS (e.g. `"alloy"` for OpenAI, `"anushka"` for Sarvam, `"Joanna"` for AWS Polly). |
+
+See [Providers & Services](/core-concepts/providers-services) for the full capability matrix and supported config key values.
+
+---
+
+## API keys
+
+API keys are stored in the `api_keys` map. Each key is the provider's short name; each value is the secret.
+
+```json
+{
+  "api_keys": {
+    "openai": "sk-...",
+    "groq": "",
+    "anthropic": "",
+    "sarvam": "",
+    "elevenlabs": "",
+    "aws": "",
+    "aws_region": "us-east-1",
+    "google_cloud_project": "my-gcp-project",
+    "google_cloud_location": "us-central1"
+  }
+}
+```
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "api_keys": {
+        "openai": "sk-your-openai-key"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    # Set OPENAI_API_KEY in the environment; leave api_keys.openai empty or absent
+    export OPENAI_API_KEY="sk-your-openai-key"
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+The `api_keys` object is the only section of `config.json` that should never be committed with real values. Use the environment variable approach in any environment beyond your local machine.
+</Warning>
+
+Resolution order for each key: `api_keys[name]` in config → environment variable → empty string (authentication will fail at the first API call). See [Providers & Services](/core-concepts/providers-services) for the env var name for each provider.
+
+---
+
+## Transport
+
+Controls how clients connect to the server: WebSocket, WebRTC, or both. The WebRTC transport uses the SmallWebRTC signaling protocol.
+
+```json
+{
+  "transport": "both",
+  "webrtc_ice_servers": [
+    "stun:stun.l.google.com:19302",
+    "stun:openrelay.metered.ca:80"
+  ],
+  "rtc_max_duration_secs": 0
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `transport` | string | `"websocket"` | `"websocket"` (serves `/ws`), `"smallwebrtc"` (serves `/webrtc/offer`), or `"both"`. |
+| `webrtc_ice_servers` | array | Google STUN | ICE server URLs used for WebRTC peer connection negotiation. Add TURN servers here for NAT traversal in production. |
+| `rtc_max_duration_secs` | float | `0` | Maximum lifetime in seconds for any RTC or WebSocket voice session after first inbound audio. `0` disables enforcement. Overridden by `VOXRAY_RTC_MAX_DURATION_SECS`. |
+
+<Note>
+For WebRTC TTS audio (Opus), Voxray must be built with CGO enabled (`CGO_ENABLED=1 go build ./cmd/voxray`). Without CGO, WebRTC offers succeed for signaling but TTS audio delivery returns `503 opus encoder unavailable`.
+</Note>
+
+---
+
+## VAD and turn detection
+
+Voice Activity Detection (VAD) gates when audio is forwarded to STT. Turn detection decides when the user has finished speaking and the LLM should respond.
+
+```json
+{
+  "vad_type": "energy",
+  "vad_confidence": 0.2,
+  "vad_threshold": 0.01,
+  "vad_min_volume": 0.25,
+  "vad_start_secs_vad": 0.25,
+  "vad_stop_secs": 0.16,
+  "vad_batch_size": 1,
+  "turn_detection": "silence",
+  "turn_stop_secs": 3.0,
+  "turn_pre_speech_ms": 10,
+  "turn_max_duration_secs": 2,
+  "vad_start_secs": 0,
+  "turn_async": false,
+  "user_turn_stop_timeout_secs": 4,
+  "user_idle_timeout_secs": 30
+}
+```
+
+### VAD parameters
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `vad_type` | string | `"energy"` | VAD algorithm. `"energy"` uses RMS-based detection. `"silero"` uses the Silero neural VAD model for higher accuracy at higher CPU cost. |
+| `vad_confidence` | float | `0.7` | Silero VAD confidence threshold (0–1). Lowering this triggers speech detection more readily. Ignored for `energy` VAD. |
+| `vad_threshold` | float | `0.02` | RMS energy threshold for the energy VAD. Lower this if quiet microphones are not being detected (e.g. `0.01`). |
+| `vad_min_volume` | float | `0.6` | Minimum normalised volume level before VAD considers a chunk as containing speech. Lower this for quieter environments. |
+| `vad_start_secs_vad` | float | `0.2` | Minimum duration of detected speech before the VAD declares speech start. |
+| `vad_stop_secs` | float | `0.2` | Silence duration after speech before the VAD declares speech end. |
+| `vad_batch_size` | int | `1` | Batch consecutive VAD chunks before inference. Useful for Silero to amortise model overhead. `1` = no batching. Overridden by `VOXRAY_VAD_BATCH_SIZE`. |
+
+### Turn detection parameters
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `turn_detection` | string | `"none"` | `"none"`: the pipeline waits for the transport to signal end-of-turn (e.g. client sends a marker). `"silence"`: the server detects end of turn from silence after speech. |
+| `turn_stop_secs` | float | `3.0` | Seconds of silence after speech ends before the turn is considered complete and STT is triggered. |
+| `turn_pre_speech_ms` | float | `500` | Milliseconds of audio prepended before detected speech start (avoids clipping leading consonants). |
+| `turn_max_duration_secs` | float | `8.0` | Maximum duration of a single turn segment in seconds. Forces a turn cut if the user keeps speaking. |
+| `vad_start_secs` | float | `0` | Extra delay in seconds between VAD detecting speech start and the turn starting. |
+| `turn_async` | bool | `false` | When `true`, end-of-turn analysis runs in a background goroutine instead of blocking the audio path. Reduces latency under load at the cost of potential out-of-order frames. |
+| `user_turn_stop_timeout_secs` | float | falls back to `turn_stop_secs` | Override timeout for the user-turn state machine specifically. Set to a higher value if users pause mid-sentence frequently. |
+| `user_idle_timeout_secs` | float | `0` | When > 0, emits a `UserIdleFrame` after the bot finishes speaking and the user has been silent for this duration. Useful for triggering idle prompts. |
+
+<Tip>
+If VAD misses the second utterance in a conversation or quiet microphones are silently skipped, lower `vad_min_volume` to `0.2` and `vad_threshold` to `0.01`. These are the two most common tuning levers.
+</Tip>
+
+---
+
+## Interruptions
+
+Controls whether a user can interrupt the bot mid-response (barge-in) and how the interruption is handled.
+
+```json
+{
+  "allow_interruptions": true,
+  "interruption_strategy": "keyword",
+  "min_words": 3
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `allow_interruptions` | bool | `false` | When `true`, detected user speech while the bot is speaking triggers an interruption: TTS output is halted and the new user turn begins. |
+| `interruption_strategy` | string | `""` | Strategy for evaluating whether detected speech counts as an interruption. `"keyword"` requires matching a wake/interruption phrase. `"min_words"` requires the user to say at least `min_words` words. Empty = interrupt on any detected speech. |
+| `min_words` | int | `0` | Minimum word count threshold when `interruption_strategy` is `"min_words"`. |
+
+---
+
+## Plugins
+
+The plugin system lets you insert custom processors into the pipeline. Built-in plugins include `echo`, `frame_filter`, `wake_check_filter`, `stt_mute_filter`, `audio_filter`, `interruption_controller`, `external_chain`, and `rtvi`.
+
+```json
+{
+  "plugins": ["echo"],
+  "plugin_options": {
+    "frame_filter": {
+      "allowed_types": ["TextFrame", "TranscriptionFrame"]
+    },
+    "wake_check_filter": {
+      "wake_phrases": ["hey bot"],
+      "keepalive_secs": 5
+    },
+    "stt_mute_filter": {
+      "strategies": ["first_speech", "always"]
+    },
+    "audio_filter": {
+      "filters": [
+        { "type": "gain", "gain": 0.9 }
+      ]
+    },
+    "interruption_controller": {
+      "strategy": "min_words",
+      "min_words": 3
+    },
+    "external_chain": {
+      "url": "http://localhost:8765/chain",
+      "stream": true,
+      "timeout_sec": 45,
+      "transcript_key": "input"
+    },
+    "rtvi": {
+      "protocol_version": "1.2.0"
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `plugins` | array of strings | Names of plugins to activate, in order. Each name must match a registered plugin factory. |
+| `plugin_options` | object | Per-plugin configuration. Keys are plugin names; values are plugin-specific JSON objects. |
+
+See the Extensions documentation for the full plugin authoring API.
+
+---
+
+## Session store
+
+Controls how runner sessions (created via `POST /start`) are stored. Matters for horizontal scaling.
+
+```json
+{
+  "session_store": "memory",
+  "redis_url": "redis://localhost:6379/0",
+  "session_ttl_secs": 3600
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `session_store` | string | `"memory"` | `"memory"`: sessions stored in-process. Safe for single instances; not shared across replicas. `"redis"`: sessions stored in Redis; required for multi-instance deployments behind a load balancer. |
+| `redis_url` | string | — | Redis connection URL. Required when `session_store` is `"redis"`. Example: `redis://redis:6379/0`. |
+| `session_ttl_secs` | int | `3600` | Session TTL in seconds. Applies to the Redis store; expired sessions are automatically removed. |
+
+<Note>
+When `session_store` is `"redis"`, `GET /ready` returns `503` if the Redis connection is unhealthy. Use this endpoint for Kubernetes readiness probes.
+</Note>
+
+---
+
+## Recording
+
+Enables per-session mixed audio recording, uploaded asynchronously to S3 after each session ends.
+
+```json
+{
+  "recording": {
+    "enable": true,
+    "bucket": "your-recordings-bucket",
+    "base_path": "recordings/",
+    "format": "wav",
+    "worker_count": 4
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `recording.enable` | bool | `false` | Enable recording for all sessions. Overridden by `VOXRAY_RECORDING_ENABLE`. |
+| `recording.bucket` | string | — | S3 bucket name. Overridden by `VOXRAY_RECORDING_BUCKET`. |
+| `recording.base_path` | string | `"recordings/"` | Key prefix inside the bucket. Files land at `<base_path>/yyyy/mm/dd/<session-id>.wav`. Overridden by `VOXRAY_RECORDING_BASE_PATH`. |
+| `recording.format` | string | `"wav"` | File format. Currently `"wav"` (16-bit PCM mono). Overridden by `VOXRAY_RECORDING_FORMAT`. |
+| `recording.worker_count` | int | `1` | Number of background goroutines uploading to S3. Scale with session concurrency and S3 bandwidth. Overridden by `VOXRAY_RECORDING_WORKER_COUNT`. |
+
+AWS credentials for S3 upload are resolved via the standard AWS SDK v2 chain (environment variables, shared config, EC2/ECS IAM role, etc.). No Voxray-specific config is needed beyond the bucket name.
+
+---
+
+## Transcripts
+
+Persists per-message text transcripts (both user and assistant turns) to a relational database.
+
+```json
+{
+  "transcripts": {
+    "enable": true,
+    "driver": "postgres",
+    "dsn": "postgres://user:pass@localhost:5432/voxray?sslmode=disable",
+    "table_name": "call_transcripts"
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `transcripts.enable` | bool | `false` | Enable transcript logging. Overridden by `VOXRAY_TRANSCRIPTS_ENABLE`. |
+| `transcripts.driver` | string | — | SQL driver: `"postgres"` or `"mysql"`. Overridden by `VOXRAY_TRANSCRIPTS_DRIVER`. |
+| `transcripts.dsn` | string | — | Driver-specific connection string. Overridden by `VOXRAY_TRANSCRIPTS_DSN`. |
+| `transcripts.table_name` | string | `"call_transcripts"` | Target table. The table must already exist with the expected schema. Overridden by `VOXRAY_TRANSCRIPTS_TABLE`. |
+
+<Warning>
+The `dsn` field contains database credentials. Do not commit it. Set `VOXRAY_TRANSCRIPTS_DSN` in production.
+</Warning>
+
+---
+
+## Security
+
+Controls server authentication, CORS, request body limits, and TLS.
+
+```json
+{
+  "server_api_key": "",
+  "cors_allowed_origins": ["https://app.example.com"],
+  "max_request_body_bytes": 524288,
+  "tls_enable": false,
+  "tls_cert_file": "/etc/voxray/tls.crt",
+  "tls_key_file": "/etc/voxray/tls.key"
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `server_api_key` | string | `""` | When non-empty, all protected endpoints (`/ws`, `/webrtc/offer`, `/start`, `/sessions/*`) require `Authorization: Bearer <key>` or `X-API-Key: <key>`. Overridden by `VOXRAY_SERVER_API_KEY`. |
+| `cors_allowed_origins` | array | `[]` | Origins allowed in CORS responses. Empty = no CORS headers emitted. Overridden by `VOXRAY_CORS_ORIGINS` (comma-separated). |
+| `max_request_body_bytes` | int64 | `0` (no limit) | Maximum JSON request body size in bytes for `/webrtc/offer` and `/start`. `524288` = 512 KiB. Overridden by `VOXRAY_MAX_BODY_BYTES`. |
+| `tls_enable` | bool | `false` | Enable on-server TLS via `ListenAndServeTLS`. Overridden by `VOXRAY_TLS_ENABLE`. |
+| `tls_cert_file` | string | — | Path to TLS certificate PEM file. Overridden by `VOXRAY_TLS_CERT_FILE`. |
+| `tls_key_file` | string | — | Path to TLS private key PEM file. Overridden by `VOXRAY_TLS_KEY_FILE`. |
+
+<Tip>
+In most production deployments, TLS is terminated at a reverse proxy (nginx, AWS ALB, GCP Load Balancer) or Ingress controller. In that case, leave `tls_enable` false and bind to a private interface. Set `server_api_key` to protect voice endpoints even on internal networks.
+</Tip>
+
+---
+
+## Observability
+
+Controls structured logging and Prometheus metrics.
+
+```json
+{
+  "log_level": "info",
+  "json_logs": false,
+  "metrics_enabled": true
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `log_level` | string | `"info"` | Log verbosity: `"debug"`, `"info"`, or `"error"`. Overridden by `VOXRAY_LOG_LEVEL`. |
+| `json_logs` | bool | `false` | Emit one JSON object per log line (structured logging). Overridden by `VOXRAY_JSON_LOGS` (`"true"` or `"1"`). |
+| `metrics_enabled` | bool | `true` | When `true`, exposes Prometheus metrics at `GET /metrics` covering HTTP, WebRTC, STT, LLM, and TTS call counts and latencies. When `false`, `/metrics` returns `204 No Content` so scrape configs do not break. |
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "log_level": "debug",
+      "json_logs": true,
+      "metrics_enabled": true
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variables">
+    ```bash
+    VOXRAY_LOG_LEVEL=debug
+    VOXRAY_JSON_LOGS=true
+    # metrics_enabled has no env override; set it in config.json
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## MCP (Model Context Protocol)
+
+When configured, Voxray starts an MCP server subprocess at startup and registers its tools with the LLM service. The LLM can then call these tools during a conversation.
+
+```json
+{
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/data"],
+    "tools_filter": ["read_file", "list_directory"]
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `mcp.command` | string | Executable to run as the MCP server (e.g. `"npx"`, `"python"`, `"go"`). |
+| `mcp.args` | array | Arguments passed to `command` (e.g. `["-y", "my-mcp-server"]`). |
+| `mcp.tools_filter` | array | When non-empty, only these tool names are registered with the LLM. Useful for limiting scope when the MCP server exposes many tools. |
+
+<Note>
+The MCP subprocess communicates over stdio (the MCP stdio transport). Voxray manages the process lifecycle: it starts the subprocess when the server starts and terminates it on shutdown. The LLM provider must implement `LLMServiceWithTools` to use MCP tools; OpenAI and Anthropic providers support this.
+</Note>
+
+---
+
+## Complete annotated example
+
+The following shows a production-oriented `config.json` with all major sections populated. Copy `config.example.json` as your starting point and adapt from there.
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "transport": "both",
+
+  "provider": "openai",
+  "stt_provider": "openai",
+  "llm_provider": "openai",
+  "tts_provider": "openai",
+
+  "model": "gpt-4.1-mini",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "tts_voice": "alloy",
+
+  "api_keys": {
+    "openai": ""
+  },
+
+  "webrtc_ice_servers": [
+    "stun:stun.l.google.com:19302"
+  ],
+  "rtc_max_duration_secs": 1800,
+
+  "vad_type": "energy",
+  "vad_threshold": 0.01,
+  "vad_min_volume": 0.25,
+  "vad_start_secs_vad": 0.25,
+  "vad_stop_secs": 0.16,
+
+  "turn_detection": "silence",
+  "turn_stop_secs": 3.0,
+  "turn_pre_speech_ms": 10,
+  "turn_max_duration_secs": 8,
+  "user_turn_stop_timeout_secs": 4,
+  "user_idle_timeout_secs": 60,
+
+  "allow_interruptions": true,
+  "interruption_strategy": "min_words",
+  "min_words": 3,
+
+  "plugins": [],
+  "plugin_options": {},
+
+  "session_store": "redis",
+  "redis_url": "redis://redis:6379/0",
+  "session_ttl_secs": 3600,
+
+  "recording": {
+    "enable": false,
+    "bucket": "my-recordings-bucket",
+    "base_path": "recordings/",
+    "format": "wav",
+    "worker_count": 4
+  },
+
+  "transcripts": {
+    "enable": false,
+    "driver": "postgres",
+    "dsn": "",
+    "table_name": "call_transcripts"
+  },
+
+  "server_api_key": "",
+  "cors_allowed_origins": ["https://app.example.com"],
+  "max_request_body_bytes": 524288,
+  "tls_enable": false,
+
+  "log_level": "info",
+  "json_logs": true,
+  "metrics_enabled": true
+}
+```
+
+Set sensitive values (`api_keys.openai`, `transcripts.dsn`, `server_api_key`, `redis_url`) via their environment variable equivalents (`OPENAI_API_KEY`, `VOXRAY_TRANSCRIPTS_DSN`, `VOXRAY_SERVER_API_KEY`, and `redis_url` in config or a secrets-manager-injected env var) rather than committing them to this file.
+
+---
+
+## Environment variable reference
+
+All `VOXRAY_*` overrides are applied by `ApplyEnvOverrides` immediately after `LoadConfig` returns. API key env vars (`OPENAI_API_KEY`, `GROQ_API_KEY`, etc.) are resolved lazily per-provider at the first `GetAPIKey` call.
+
+| Variable | Overrides | Notes |
+|---|---|---|
+| `VOXRAY_CONFIG` | — | Config file path at startup (not applied by `ApplyEnvOverrides`; used by `main`). |
+| `VOXRAY_HOST` / `HOST` | `host` | `VOXRAY_HOST` takes priority over `HOST`. |
+| `VOXRAY_PORT` / `PORT` | `port` | `VOXRAY_PORT` takes priority over `PORT`. |
+| `VOXRAY_LOG_LEVEL` | `log_level` | `debug`, `info`, `error`. |
+| `VOXRAY_JSON_LOGS` | `json_logs` | `true` or `1`. |
+| `VOXRAY_SERVER_API_KEY` | `server_api_key` | Auth key for protected endpoints. |
+| `VOXRAY_CORS_ORIGINS` | `cors_allowed_origins` | Comma-separated list. |
+| `VOXRAY_MAX_BODY_BYTES` | `max_request_body_bytes` | Parsed as int64. |
+| `VOXRAY_TLS_ENABLE` | `tls_enable` | `true` or `1`. |
+| `VOXRAY_TLS_CERT_FILE` | `tls_cert_file` | Path string. |
+| `VOXRAY_TLS_KEY_FILE` | `tls_key_file` | Path string. |
+| `VOXRAY_RTC_MAX_DURATION_SECS` | `rtc_max_duration_secs` | Parsed as float64. |
+| `VOXRAY_VAD_BATCH_SIZE` | `vad_batch_size` | Parsed as int. |
+| `VOXRAY_PIPELINE_INPUT_QUEUE_CAP` | `pipeline_input_queue_cap` | Buffer size between transport and pipeline. |
+| `VOXRAY_WS_WRITE_COALESCE_MS` | `ws_write_coalesce_ms` | WebSocket write coalescing window. |
+| `VOXRAY_WS_WRITE_COALESCE_MAX_FRAMES` | `ws_write_coalesce_max_frames` | Max frames per coalesce window. |
+| `VOXRAY_RECORDING_ENABLE` | `recording.enable` | `true` or `1`. |
+| `VOXRAY_RECORDING_BUCKET` | `recording.bucket` | S3 bucket name. |
+| `VOXRAY_RECORDING_BASE_PATH` | `recording.base_path` | Key prefix. |
+| `VOXRAY_RECORDING_FORMAT` | `recording.format` | File extension. |
+| `VOXRAY_RECORDING_WORKER_COUNT` | `recording.worker_count` | Parsed as int. |
+| `VOXRAY_RECORDING_QUEUE_CAP` | `recording.queue_cap` | Upload job queue depth. |
+| `VOXRAY_RECORDING_MAX_RETRIES` | `recording.max_retries` | S3 retry count. |
+| `VOXRAY_TRANSCRIPTS_ENABLE` | `transcripts.enable` | `true` or `1`. |
+| `VOXRAY_TRANSCRIPTS_DRIVER` | `transcripts.driver` | `postgres` or `mysql`. |
+| `VOXRAY_TRANSCRIPTS_DSN` | `transcripts.dsn` | Database connection string. |
+| `VOXRAY_TRANSCRIPTS_TABLE` | `transcripts.table_name` | Target table name. |
+| `VOXRAY_DAILY_DIALIN_WEBHOOK_SECRET` | `daily_dialin_webhook_secret` | Validates Daily dial-in webhooks. |

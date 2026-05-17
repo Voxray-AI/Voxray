@@ -1,0 +1,233 @@
+---
+title: "ElevenLabs"
+description: "Use ElevenLabs for industry-leading TTS voice quality and Scribe-powered STT in your Voxray voice agent pipeline."
+---
+
+<CardGroup cols={3}>
+  <Card title="LLM" icon="brain" color="#94a3b8">
+    Not supported
+  </Card>
+  <Card title="STT" icon="microphone" color="#22c55e">
+    Supported
+  </Card>
+  <Card title="TTS" icon="volume-high" color="#22c55e">
+    Supported
+  </Card>
+</CardGroup>
+
+ElevenLabs is a voice AI platform known for its realistic, emotionally expressive text-to-speech and its Scribe transcription engine. Voxray supports ElevenLabs for both STT (via `"stt_provider": "elevenlabs"`) and TTS (via `"tts_provider": "elevenlabs"`). You can use one or both independently — pair ElevenLabs TTS with Groq STT, for example, if you want fast transcription with premium voice output.
+
+---
+
+## API Key
+
+Get your API key from the [ElevenLabs dashboard](https://elevenlabs.io) under **Profile → API Keys**.
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "api_keys": {
+        "elevenlabs": "your_elevenlabs_api_key"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    export ELEVENLABS_API_KEY=your_elevenlabs_api_key
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Quick Start Config
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "stt_provider": "elevenlabs",
+      "tts_provider": "elevenlabs",
+      "tts_voice": "<voice-id-from-elevenlabs>",
+      "llm_provider": "openai",
+      "model": "gpt-4.1-mini",
+      "api_keys": {
+        "elevenlabs": "your_elevenlabs_api_key",
+        "openai": "sk-..."
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variables">
+    ```bash
+    export ELEVENLABS_API_KEY=your_elevenlabs_api_key
+    export OPENAI_API_KEY=sk-...
+    ```
+
+    With a minimal `config.json`:
+
+    ```json
+    {
+      "stt_provider": "elevenlabs",
+      "tts_provider": "elevenlabs",
+      "tts_voice": "<voice-id-from-elevenlabs>",
+      "llm_provider": "openai",
+      "model": "gpt-4.1-mini"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  ElevenLabs does not provide LLM functionality. You must set `llm_provider` to a supported LLM provider (e.g. `openai`, `anthropic`, `groq`, `ollama`) when using ElevenLabs for STT and/or TTS.
+</Note>
+
+---
+
+## Text-to-Speech
+
+ElevenLabs TTS produces highly realistic, emotionally nuanced speech with a wide selection of pre-built voices. It is one of the highest-quality TTS providers available for voice agents.
+
+### Streaming
+
+ElevenLabs implements Voxray's `TTSStreamingService` interface. When `tts_provider` is set to `"elevenlabs"`, Voxray streams audio chunks as they are generated rather than waiting for the full response. This significantly reduces the time-to-first-audio compared to non-streaming TTS providers.
+
+### Selecting a Voice
+
+Set `"tts_voice"` to the **voice ID** string from the ElevenLabs Voice Library. Voice IDs are UUIDs, not display names.
+
+```json
+{
+  "tts_provider": "elevenlabs",
+  "tts_voice": "21m00Tcm4TlvDq8ikWAM"
+}
+```
+
+### Finding Voice IDs
+
+1. Log in to [elevenlabs.io](https://elevenlabs.io)
+2. Go to **Voices** in the left sidebar
+3. Click any voice to open it
+4. Click **Copy Voice ID** — the ID is a string like `21m00Tcm4TlvDq8ikWAM`
+
+Pre-built voices available across all plans include Rachel, Domi, Bella, Antoni, Elli, Josh, Arnold, Adam, and Sam. The full Voice Library (including community voices) is accessible from your dashboard.
+
+### Voice Cloning
+
+ElevenLabs supports custom voice clones from audio samples. Once cloned, the voice appears in your Voice Library with its own voice ID. Use it in Voxray exactly like any pre-built voice:
+
+```json
+{
+  "tts_provider": "elevenlabs",
+  "tts_voice": "your_cloned_voice_id"
+}
+```
+
+<Tip>
+  For production deployments, create a custom voice clone to ensure brand consistency. A cloned voice sounds identical to your source speaker and is tied to your account — it will not appear for other users.
+</Tip>
+
+### TTS Model
+
+You can optionally specify a TTS model via `"tts_model"`. ElevenLabs offers several models with different latency and quality trade-offs:
+
+```json
+{
+  "tts_provider": "elevenlabs",
+  "tts_voice": "21m00Tcm4TlvDq8ikWAM",
+  "tts_model": "eleven_turbo_v2_5"
+}
+```
+
+| Model | Latency | Quality | Notes |
+|---|---|---|---|
+| `eleven_turbo_v2_5` | Lowest | High | Recommended for real-time voice agents |
+| `eleven_multilingual_v2` | Medium | Highest | 29 languages, best naturalness |
+| `eleven_monolingual_v1` | Low | High | English only |
+
+When `tts_model` is not set, Voxray passes an empty string and ElevenLabs uses its default model.
+
+---
+
+## Speech-to-Text
+
+ElevenLabs provides transcription via **Scribe**, its proprietary speech recognition engine. Set `"stt_provider": "elevenlabs"` to use it.
+
+```json
+{
+  "stt_provider": "elevenlabs",
+  "stt_model": "scribe_v1"
+}
+```
+
+Specify the model with `"stt_model"`. If omitted, Voxray passes an empty string and ElevenLabs uses its default transcription model.
+
+---
+
+## Full Pipeline Examples
+
+### ElevenLabs STT + TTS with OpenAI LLM
+
+```json
+{
+  "transport": "both",
+  "host": "0.0.0.0",
+  "port": 8080,
+
+  "stt_provider": "elevenlabs",
+  "stt_model": "scribe_v1",
+
+  "llm_provider": "openai",
+  "model": "gpt-4.1-mini",
+
+  "tts_provider": "elevenlabs",
+  "tts_voice": "21m00Tcm4TlvDq8ikWAM",
+  "tts_model": "eleven_turbo_v2_5",
+
+  "api_keys": {
+    "elevenlabs": "your_elevenlabs_api_key",
+    "openai": "sk-..."
+  },
+
+  "webrtc_ice_servers": [
+    "stun:stun.l.google.com:19302"
+  ]
+}
+```
+
+### Groq STT + ElevenLabs TTS (mixed providers)
+
+```json
+{
+  "stt_provider": "groq",
+
+  "llm_provider": "anthropic",
+  "model": "claude-3-5-haiku-20241022",
+
+  "tts_provider": "elevenlabs",
+  "tts_voice": "21m00Tcm4TlvDq8ikWAM",
+  "tts_model": "eleven_turbo_v2_5",
+
+  "api_keys": {
+    "groq": "gsk_...",
+    "anthropic": "sk-ant-...",
+    "elevenlabs": "your_elevenlabs_api_key"
+  }
+}
+```
+
+Mixing providers is fully supported. Each stage (STT, LLM, TTS) is resolved independently from its own `*_provider` key.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| `401 Unauthorized` | Invalid or missing API key | Verify `ELEVENLABS_API_KEY` or `api_keys.elevenlabs` |
+| `404 Not Found` on TTS | Invalid voice ID | Copy the voice ID from the ElevenLabs dashboard |
+| High TTS latency | Using non-turbo model | Switch `tts_model` to `eleven_turbo_v2_5` |
+| Poor transcription accuracy | Background noise or low sample rate | Ensure clean 16kHz+ audio input from the client |
+| Voice sounds different than preview | Model mismatch | Match the model used when previewing the voice in the dashboard |

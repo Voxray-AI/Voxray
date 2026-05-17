@@ -1,0 +1,230 @@
+---
+title: "Tutorials Overview"
+description: "Hands-on tutorials that take you from a zero-dependency echo bot to a production-grade multi-provider voice pipeline with telephony."
+---
+
+Voxray tutorials are ordered by complexity. Each builds on the previous one, but you can jump directly to any tutorial if your prerequisites are met. The progression moves from setups that require no external accounts (useful for testing your installation and understanding the pipeline) through cloud providers, and finally to production-grade configurations with telephony, recording, and transcripts.
+
+<Note>
+  All tutorials assume you have completed the [Quickstart](/get-started/quickstart-websocket) and have a working Voxray binary. Each tutorial lists its required providers in the table below. Most providers offer a free tier or trial credits — links are included in each tutorial's prerequisites section.
+</Note>
+
+## Tutorial progression
+
+| Tutorial | Goal | Difficulty | Providers required | Estimated time |
+|----------|------|:----------:|-------------------|:--------------:|
+| [Echo Bot](#echo-bot) | Verify the full audio round-trip with no external API calls | Beginner | None | 5 min |
+| [Local LLM with Ollama](#local-llm-with-ollama) | Run a fully self-hosted voice agent — STT via Whisper, LLM via Ollama, no cloud | Beginner | Ollama (local) | 10 min |
+| [Cloud LLM with OpenAI](#cloud-llm-with-openai) | Full cloud pipeline — OpenAI for STT, LLM, and TTS | Intermediate | OpenAI | 10 min |
+| [Telephony with Twilio](#telephony-with-twilio) | Accept real phone calls and route them into a voice agent | Advanced | Twilio + Groq | 20 min |
+| [Production Pipeline](#production-pipeline) | Multi-provider pipeline with S3 recording and database transcripts | Advanced | Groq + Anthropic + ElevenLabs | 30 min |
+
+## Echo Bot
+
+**Goal:** Confirm your Voxray installation is correct and that audio flows end-to-end without calling any external provider. The echo plugin receives audio frames from the client and plays them back immediately. No API keys required.
+
+**What you will learn:**
+- How to enable the `echo` plugin
+- How to read pipeline frame logs to confirm audio is moving through each stage
+- How to identify transport-layer problems before adding provider complexity
+
+**Config:** Set `"plugins": ["echo"]` and `"transport": "websocket"`. Leave all provider fields empty. Connect with the browser client and speak — you should hear your own voice played back within 200–300 ms.
+
+This tutorial is also the fastest way to confirm a fresh installation is working before spending any API credits.
+
+[Go to Echo Bot tutorial &rarr;](/build/tutorials/echo-bot)
+
+---
+
+## Local LLM with Ollama
+
+**Goal:** Build a fully self-hosted voice agent where no audio or text leaves your machine. Ollama serves an LLM locally; the pipeline uses Whisper for STT and a local TTS model (or OpenAI TTS if you want audio quality without cloud LLM costs).
+
+**What you will learn:**
+- How to configure `"llm_provider": "ollama"` and point it at a local Ollama endpoint
+- How Voxray resolves the `provider` fallback versus task-specific provider keys
+- How to test that latency is acceptable on local hardware (and which model sizes are practical for real-time voice)
+- How to combine a cloud STT with a local LLM when local Whisper is too slow
+
+**Config highlights:**
+```json
+{
+  "llm_provider": "ollama",
+  "model": "llama3.2",
+  "stt_provider": "openai",
+  "tts_provider": "openai"
+}
+```
+
+**Prerequisites:** [Ollama](https://ollama.com) installed and running (`ollama serve`), a pulled model (`ollama pull llama3.2`). Optionally an OpenAI key for cloud STT/TTS.
+
+[Go to Local LLM with Ollama tutorial &rarr;](/build/tutorials/local-llm-ollama)
+
+---
+
+## Cloud LLM with OpenAI
+
+**Goal:** Wire up a complete cloud pipeline using OpenAI for all three stages — `gpt-4o-mini-transcribe` for STT, `gpt-4o-mini` for LLM, and OpenAI TTS for speech synthesis. This is the fastest path to a production-quality voice experience with a single API key.
+
+**What you will learn:**
+- How to set per-stage provider and model fields (`stt_model`, `model`, `tts_voice`)
+- How to configure a system prompt via the client context payload
+- How `turn_stop_secs` and `vad_min_volume` interact with OpenAI's transcription latency
+- How to read the Prometheus metrics at `/metrics` to measure STT, LLM, and TTS latency independently
+
+**Config highlights:**
+```json
+{
+  "transport": "websocket",
+  "stt_provider": "openai",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "llm_provider": "openai",
+  "model": "gpt-4o-mini",
+  "tts_provider": "openai",
+  "tts_voice": "nova",
+  "turn_detection": "silence",
+  "turn_stop_secs": 2.5,
+  "api_keys": { "openai": "sk-..." }
+}
+```
+
+**Prerequisites:** An OpenAI API key with access to `gpt-4o-mini` and `gpt-4o-mini-transcribe`.
+
+[Go to Cloud LLM with OpenAI tutorial &rarr;](/build/tutorials/cloud-llm-openai)
+
+---
+
+## Telephony with Twilio
+
+**Goal:** Accept real inbound phone calls via Twilio and route the caller's audio into a Voxray voice agent. The caller hears the agent's TTS responses over the phone. This tutorial uses Groq for low-latency STT and LLM, which is important for telephony where callers expect faster response than browser users.
+
+**What you will learn:**
+- How to set `"runner_transport": "twilio"` and configure the Twilio webhook
+- How to expose your local Voxray server to the internet using ngrok (or a similar tunnel) and set `proxy_host`
+- How telephony audio differs from browser audio (8 kHz µ-law vs 16 kHz PCM) and what Voxray handles automatically
+- How to handle dropped calls, reconnects, and telephony-specific error codes in the server logs
+
+**Config highlights:**
+```json
+{
+  "runner_transport": "twilio",
+  "proxy_host": "your-ngrok-subdomain.ngrok.io",
+  "stt_provider": "groq",
+  "llm_provider": "groq",
+  "model": "llama-3.1-8b-instant",
+  "tts_provider": "openai",
+  "tts_voice": "alloy",
+  "turn_detection": "silence",
+  "turn_stop_secs": 2.0,
+  "api_keys": {
+    "groq": "gsk_...",
+    "openai": "sk-..."
+  }
+}
+```
+
+**Prerequisites:** A Twilio account with a phone number, Groq API key, OpenAI API key (for TTS), and ngrok or a public server. Twilio offers trial credits sufficient for testing.
+
+[Go to Telephony with Twilio tutorial &rarr;](/build/tutorials/telephony-twilio)
+
+---
+
+## Production Pipeline
+
+**Goal:** Deploy a production-grade voice agent with a multi-provider pipeline, S3 conversation recording, Postgres transcript logging, Prometheus monitoring, and CORS configuration for a real front-end domain. This tutorial assembles all the pieces you have learned individually.
+
+**What you will learn:**
+- How to mix providers for best performance and cost: Groq (fast STT), Anthropic Claude (reasoning quality), ElevenLabs (high-quality voice)
+- How to enable and configure S3 recording (`recording` block) with async upload workers
+- How to enable Postgres transcript logging (`transcripts` block) and the expected schema
+- How to set `cors_allowed_origins` for a production front-end and `server_api_key` to protect the WebSocket endpoint
+- How to tune `user_idle_timeout_secs` and `rtc_max_duration_secs` for session lifecycle management
+- How to read Prometheus metrics and which counters matter most for production alerting
+
+**Config highlights:**
+```json
+{
+  "transport": "both",
+  "host": "0.0.0.0",
+  "port": 8080,
+
+  "stt_provider": "groq",
+  "llm_provider": "anthropic",
+  "model": "claude-haiku-3-5",
+  "tts_provider": "elevenlabs",
+  "tts_voice": "YOUR_ELEVENLABS_VOICE_ID",
+
+  "turn_detection": "silence",
+  "turn_stop_secs": 2.5,
+  "vad_min_volume": 0.2,
+  "user_idle_timeout_secs": 60,
+
+  "allow_interruptions": true,
+  "interruption_strategy": "min_words",
+  "min_words": 3,
+
+  "plugins": ["interruption_controller"],
+
+  "recording": {
+    "enable": true,
+    "bucket": "my-voice-recordings",
+    "base_path": "sessions/",
+    "format": "wav",
+    "worker_count": 4
+  },
+
+  "transcripts": {
+    "enable": true,
+    "driver": "postgres",
+    "dsn": "postgres://user:pass@db:5432/voxray?sslmode=require",
+    "table_name": "call_transcripts"
+  },
+
+  "cors_allowed_origins": ["https://app.yourcompany.com"],
+  "server_api_key": "your-internal-service-token",
+  "metrics_enabled": true,
+
+  "api_keys": {
+    "groq": "gsk_...",
+    "anthropic": "sk-ant-...",
+    "elevenlabs": "el_..."
+  }
+}
+```
+
+**Prerequisites:** Groq API key, Anthropic API key, ElevenLabs API key and a configured voice, an S3 bucket with write credentials (AWS env vars or IAM role), and a Postgres instance. Each provider offers free trial credits.
+
+[Go to Production Pipeline tutorial &rarr;](/build/tutorials/production-pipeline)
+
+---
+
+## Choosing a starting point
+
+If you are **evaluating Voxray** with no accounts set up, start with the Echo Bot. It proves your binary and browser client work in under 5 minutes.
+
+If you are **building a prototype** and have an OpenAI key, jump to Cloud LLM with OpenAI. One key, one config block, full pipeline.
+
+If you have **data residency or cost requirements**, do the Local LLM with Ollama tutorial next — you will understand how to mix local and cloud components and when each trade-off makes sense.
+
+If you are **building a phone product**, Telephony with Twilio is your path. Read it before the Production Pipeline tutorial because telephony introduces constraints (audio codec, session lifecycle, webhook reliability) that affect your architecture decisions.
+
+<CardGroup cols={2}>
+  <Card title="Echo Bot" icon="circle-play" href="/build/tutorials/echo-bot">
+    No providers needed. Verify your pipeline in 5 minutes.
+  </Card>
+  <Card title="Local LLM with Ollama" icon="computer" href="/build/tutorials/local-llm-ollama">
+    Fully self-hosted. No cloud API calls.
+  </Card>
+  <Card title="Cloud LLM with OpenAI" icon="cloud" href="/build/tutorials/cloud-llm-openai">
+    One API key. Full production-quality pipeline.
+  </Card>
+  <Card title="Telephony with Twilio" icon="phone" href="/build/tutorials/telephony-twilio">
+    Accept real phone calls into your voice agent.
+  </Card>
+  <Card title="Production Pipeline" icon="rocket" href="/build/tutorials/production-pipeline">
+    Multi-provider + recording + transcripts + monitoring.
+  </Card>
+  <Card title="Core Concepts" icon="book-open" href="/core-concepts/pipeline">
+    Understand the pipeline before diving into tutorials.
+  </Card>
+</CardGroup>

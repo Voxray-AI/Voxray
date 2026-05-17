@@ -1,0 +1,221 @@
+---
+title: "Ollama"
+description: "Run open-source LLMs locally with Ollama as the LLM provider in your Voxray voice agent pipeline. No API key required."
+---
+
+<CardGroup cols={3}>
+  <Card title="LLM" icon="brain" color="#22c55e">
+    Supported
+  </Card>
+  <Card title="STT" icon="microphone" color="#94a3b8">
+    Not supported
+  </Card>
+  <Card title="TTS" icon="volume-high" color="#94a3b8">
+    Not supported
+  </Card>
+</CardGroup>
+
+Ollama is a local LLM inference server that exposes an OpenAI-compatible REST API. It downloads and runs open-source models (Llama, Mistral, Phi, Gemma, and more) directly on your machine — no external API calls, no usage costs, and no data leaving your infrastructure.
+
+Voxray integrates Ollama as an LLM provider via `"llm_provider": "ollama"`. Because Ollama runs locally, you pair it with a cloud STT and TTS provider (Groq, ElevenLabs, OpenAI, etc.) for a full voice pipeline.
+
+---
+
+## Prerequisites
+
+### Install Ollama
+
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+```
+
+On macOS, you can also install via Homebrew:
+
+```bash
+brew install ollama
+```
+
+### Start the Ollama server
+
+```bash
+ollama serve
+```
+
+Ollama listens on `http://localhost:11434` by default and exposes an OpenAI-compatible API at `/v1`. Voxray connects to `http://localhost:11434/v1` unless you override `OLLAMA_BASE_URL`.
+
+### Pull a model
+
+```bash
+ollama pull llama3.1:8b
+```
+
+The model must be pulled before Voxray starts — Voxray does not auto-pull models. Verify it is available:
+
+```bash
+ollama list
+```
+
+---
+
+## Quick Start Config
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "llm_provider": "ollama",
+      "model": "llama3.1:8b",
+      "stt_provider": "groq",
+      "tts_provider": "groq",
+      "api_keys": {
+        "groq": "gsk_..."
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variables">
+    ```bash
+    # No Ollama API key needed — it runs locally
+    # Set STT/TTS keys for whichever cloud providers you choose
+    export GROQ_API_KEY=gsk_...
+
+    # Optional: override the Ollama server URL
+    export OLLAMA_BASE_URL=http://localhost:11434/v1
+    ```
+
+    With a minimal `config.json`:
+
+    ```json
+    {
+      "llm_provider": "ollama",
+      "model": "llama3.1:8b",
+      "stt_provider": "groq",
+      "tts_provider": "groq"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Ollama does not require an API key. The `OLLAMA_API_KEY` environment variable (and `"ollama"` key in `api_keys`) are accepted by Voxray but passed through unused — the Ollama server ignores them.
+</Note>
+
+---
+
+## Custom Ollama URL
+
+By default, Voxray connects to `http://localhost:11434/v1`. Override this with the `OLLAMA_BASE_URL` environment variable when running Ollama on a remote host or a non-default port:
+
+```bash
+# Remote Ollama server
+export OLLAMA_BASE_URL=http://192.168.1.50:11434/v1
+
+# Custom port
+export OLLAMA_BASE_URL=http://localhost:12000/v1
+```
+
+<Tip>
+  When running Voxray in Docker and Ollama on the host, use `http://host.docker.internal:11434/v1` as the base URL on macOS and Windows. On Linux, use the host's bridge IP (typically `http://172.17.0.1:11434/v1`).
+</Tip>
+
+---
+
+## Popular Models
+
+| Model | Size on Disk | Recommended VRAM | Best For |
+|---|---|---|---|
+| `llama3.2:3b` | ~2 GB | 4 GB | Lowest latency, resource-constrained |
+| `llama3.1:8b` | ~4.7 GB | 8 GB | Balanced quality and speed |
+| `mistral:7b` | ~4.1 GB | 8 GB | Strong reasoning, fast inference |
+| `llama3.1:70b` | ~40 GB | 48 GB | High quality, production-grade |
+| `llama3.1:405b` | ~230 GB | 256+ GB | Maximum quality, multi-GPU setups |
+
+Pull any model before referencing it in config:
+
+```bash
+ollama pull llama3.2:3b      # fastest, lowest latency
+ollama pull llama3.1:8b      # recommended default
+ollama pull mistral:7b       # strong reasoning
+ollama pull llama3.1:70b     # best quality (requires substantial VRAM)
+```
+
+Update the `"model"` key in `config.json` to match the pulled model name exactly (including the tag).
+
+---
+
+## GPU Acceleration
+
+Ollama automatically detects and uses available GPU hardware — no additional configuration is needed in Voxray:
+
+| Hardware | Requirement |
+|---|---|
+| NVIDIA GPU | CUDA drivers installed (`nvidia-smi` should work) |
+| Apple Silicon (M1/M2/M3/M4) | Metal is used automatically |
+| AMD GPU (Linux) | ROCm drivers installed |
+| CPU fallback | Always available; inference is slower |
+
+Check whether Ollama is using your GPU after starting `ollama serve`:
+
+```bash
+ollama ps
+```
+
+The output shows active models and whether they are loaded in GPU memory.
+
+---
+
+## Latency Guidance
+
+Voice agents are latency-sensitive. The LLM is typically the largest contributor to end-to-end response time with local inference.
+
+| Priority | Model | Notes |
+|---|---|---|
+| Lowest latency | `llama3.2:3b` | Fits comfortably in 4 GB VRAM; very fast on modern GPUs |
+| Balanced | `llama3.1:8b` | Good default; fits in 8 GB VRAM with room to spare |
+| Best quality | `llama3.1:70b` | Needs 48 GB+ VRAM; use multi-GPU or quantized variant |
+| Maximum quality | `llama3.1:405b` | Requires 256+ GB VRAM across multiple GPUs |
+
+<Tip>
+  For lowest latency in production, prefer `llama3.2:3b` or `llama3.1:8b`. Both run well on a single consumer GPU. For highest response quality with acceptable latency, use a quantized `llama3.1:70b` (the `q4_K_M` variant) if you have 24–48 GB VRAM.
+</Tip>
+
+---
+
+## Full Example: Local LLM with Groq STT and TTS
+
+```json
+{
+  "transport": "both",
+  "host": "0.0.0.0",
+  "port": 8080,
+
+  "llm_provider": "ollama",
+  "model": "llama3.1:8b",
+
+  "stt_provider": "groq",
+  "tts_provider": "groq",
+  "tts_voice": "Arista-PlayAI",
+
+  "api_keys": {
+    "groq": "gsk_..."
+  },
+
+  "webrtc_ice_servers": [
+    "stun:stun.l.google.com:19302"
+  ]
+}
+```
+
+Start Ollama and Voxray, then connect to `/ws` or `/webrtc/offer`. All LLM inference runs locally; only STT and TTS calls leave your machine.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| `connection refused` on LLM calls | Ollama not running | Run `ollama serve` |
+| Model not found error | Model not pulled | Run `ollama pull <model>` |
+| Slow first response | Model loading from disk | Wait for first load; subsequent calls use cached model |
+| Out of memory | Model too large for VRAM | Use a smaller model or a quantized variant |
+| High latency on CPU | No GPU available | Install GPU drivers or switch to a 3B model |

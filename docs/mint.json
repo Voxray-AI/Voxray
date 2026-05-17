@@ -1,0 +1,133 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Voxray",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0066FF",
+    "light": "#3385FF",
+    "dark": "#0044CC",
+    "background": {
+      "dark": "#0A0A0F"
+    },
+    "anchors": {
+      "from": "#0066FF",
+      "to": "#00CCFF"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/Voxray-AI/Voxray"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/get-started/introduction"
+  },
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/Voxray-AI/Voxray"
+    },
+    {
+      "name": "Discord",
+      "icon": "discord",
+      "url": "https://discord.gg/voxray"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": [
+        "get-started/introduction",
+        "get-started/quickstart-websocket",
+        "get-started/quickstart-webrtc",
+        "get-started/installation",
+        "get-started/first-voice-agent"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "core-concepts/architecture",
+        "core-concepts/pipeline-processors",
+        "core-concepts/transport-layer",
+        "core-concepts/audio-vad",
+        "core-concepts/providers-services",
+        "core-concepts/configuration"
+      ]
+    },
+    {
+      "group": "Build",
+      "pages": [
+        {
+          "group": "Tutorials",
+          "pages": [
+            "build/tutorials/overview",
+            "build/tutorials/echo-bot",
+            "build/tutorials/local-llm-ollama",
+            "build/tutorials/cloud-llm-openai",
+            "build/tutorials/telephony-twilio",
+            "build/tutorials/production-pipeline"
+          ]
+        },
+        {
+          "group": "Integrations",
+          "pages": [
+            "build/integrations/overview",
+            "build/integrations/openai",
+            "build/integrations/anthropic",
+            "build/integrations/groq",
+            "build/integrations/ollama",
+            "build/integrations/elevenlabs",
+            "build/integrations/sarvam",
+            "build/integrations/aws"
+          ]
+        },
+        "build/plugin-system",
+        "build/mcp-tools",
+        "build/extensions"
+      ]
+    },
+    {
+      "group": "Deploy",
+      "pages": [
+        "deploy/docker",
+        "deploy/docker-compose",
+        "deploy/production",
+        "deploy/scaling",
+        "deploy/telephony",
+        "deploy/observability",
+        "deploy/security"
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": [
+        "reference/api-reference",
+        "reference/configuration-reference",
+        "reference/provider-matrix",
+        "reference/faq",
+        "reference/glossary"
+      ]
+    },
+    {
+      "group": "Contributing",
+      "pages": [
+        "contributing/guide",
+        "contributing/adding-providers",
+        "contributing/testing"
+      ]
+    }
+  ],
+  "openapi": ["/swagger.json"],
+  "footerSocials": {
+    "github": "https://github.com/Voxray-AI/Voxray",
+    "discord": "https://discord.gg/voxray"
+  }
+}

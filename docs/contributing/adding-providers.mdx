@@ -1,0 +1,354 @@
+---
+title: "Adding Providers"
+description: "Step-by-step guide to adding a new STT, LLM, or TTS provider to Voxray"
+---
+
+Voxray selects providers at startup from `config.json`. Adding a new provider means creating a Go package under `pkg/services/`, implementing the correct interface, and registering the provider in the factory so it can be chosen by name. This guide walks through every step.
+
+<Note>
+Before starting, read `pkg/services/interfaces.go` and `pkg/services/factory.go`. The factory is the single file that wires provider names to concrete implementations — most of your registration work happens there.
+</Note>
+
+## Service Interfaces
+
+Every provider must satisfy one or more of the following Go interfaces. These are defined in `pkg/services/interfaces.go` and `pkg/services/llmapi/api.go`.
+
+### LLMService
+
+```go
+// LLMService provides chat completion; may stream text frames.
+// Defined in pkg/services/llmapi/api.go.
+type LLMService interface {
+    Chat(ctx context.Context, messages []map[string]any, onToken func(*frames.LLMTextFrame)) error
+}
+
+// LLMServiceWithTools is an LLM service that supports registering tools (e.g. from MCP).
+type LLMServiceWithTools interface {
+    LLMService
+    RegisterTool(schema schemas.FunctionSchema, handler ToolHandler)
+    ToolsSchema() *schemas.ToolsSchema
+}
+```
+
+`Chat` must stream tokens incrementally by calling `onToken` for each delta and return `nil` on success or a wrapped error on failure. Context cancellation must abort the stream and return promptly.
+
+### STTService
+
+```go
+// STTService transcribes audio to text (batch).
+type STTService interface {
+    Transcribe(ctx context.Context, audio []byte, sampleRate, numChannels int) ([]*frames.TranscriptionFrame, error)
+}
+
+// STTStreamingService extends STTService with real-time streaming transcription.
+type STTStreamingService interface {
+    STTService
+    // TranscribeStream sends TranscriptionFrames (interim and final) to outCh
+    // as audio arrives on audioCh, without waiting for the full segment.
+    TranscribeStream(
+        ctx context.Context,
+        audioCh <-chan []byte,
+        sampleRate, numChannels int,
+        outCh chan<- frames.Frame,
+    )
+}
+```
+
+`Transcribe` is the minimum requirement. If the upstream provider offers a streaming WebSocket or gRPC API, also implement `STTStreamingService` — the pipeline will use it automatically to reduce first-token latency.
+
+### TTSService
+
+```go
+// TTSService converts text to speech (batch).
+type TTSService interface {
+    Speak(ctx context.Context, text string, sampleRate int) ([]*frames.TTSAudioRawFrame, error)
+}
+
+// TTSStreamingService extends TTSService with incremental audio output.
+type TTSStreamingService interface {
+    TTSService
+    // SpeakStream streams TTSAudioRawFrames to outCh as they are produced,
+    // reducing time-to-first-audio.
+    SpeakStream(ctx context.Context, text string, sampleRate int, outCh chan<- frames.Frame)
+}
+```
+
+---
+
+## Steps
+
+<Steps>
+
+### Create a package under `pkg/services/<provider>/`
+
+Create a directory named after your provider key (lowercase, no spaces):
+
+```bash
+mkdir pkg/services/myprovider
+```
+
+Inside, create at minimum one Go file — conventionally `llm.go`, `stt.go`, or `tts.go` depending on which service you are implementing. Mirror the structure of an existing provider such as `pkg/services/groq/` or `pkg/services/elevenlabs/`.
+
+```text
+pkg/services/myprovider/
+├── client.go      # HTTP/gRPC client construction and auth
+├── llm.go         # LLMService implementation (if applicable)
+├── stt.go         # STTService / STTStreamingService (if applicable)
+└── tts.go         # TTSService / TTSStreamingService (if applicable)
+```
+
+Use the package name `myprovider`. Keep the service struct unexported and expose only a constructor:
+
+```go
+package myprovider
+
+// LLMService implements services.LLMService using MyProvider's API.
+type LLMService struct {
+    client *http.Client
+    apiKey string
+    model  string
+}
+
+// NewLLMService creates an LLMService.
+// If apiKey is empty, config.GetEnv("MYPROVIDER_API_KEY", "") is used.
+func NewLLMService(apiKey, model string) *LLMService {
+    if apiKey == "" {
+        apiKey = config.GetEnv("MYPROVIDER_API_KEY", "")
+    }
+    if model == "" {
+        model = "myprovider-default-model"
+    }
+    return &LLMService{client: &http.Client{Timeout: 30 * time.Second}, apiKey: apiKey, model: model}
+}
+```
+
+### Implement the required interface
+
+Implement `Chat`, `Transcribe`, or `Speak` (and their streaming variants) on your struct. A few requirements apply to every implementation:
+
+**Context cancellation.** Every network call must respect `ctx`. Pass it to HTTP requests, gRPC calls, or WebSocket dials. Return immediately when `ctx.Done()` is closed:
+
+```go
+func (s *LLMService) Chat(ctx context.Context, messages []map[string]any, onToken func(*frames.LLMTextFrame)) error {
+    req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.endpoint, body)
+    if err != nil {
+        return fmt.Errorf("myprovider: build request: %w", err)
+    }
+    // ...
+}
+```
+
+**Error wrapping.** Wrap all errors with provider context so callers can identify the source:
+
+```go
+return fmt.Errorf("myprovider llm: %w", err)
+```
+
+**Streaming (LLM).** Call `onToken` once per content delta. Do not buffer the full response before calling it:
+
+```go
+tf := &frames.LLMTextFrame{}
+tf.TextFrame = frames.TextFrame{
+    DataFrame:       frames.DataFrame{Base: frames.NewBase()},
+    Text:            delta,
+    AppendToContext: true,
+}
+tf.IncludesInterFrameSpace = true
+if onToken != nil {
+    onToken(tf)
+}
+```
+
+**Streaming (TTS).** Write `*frames.TTSAudioRawFrame` values to `outCh` as PCM chunks arrive. Do not close `outCh` — the pipeline owns the channel lifetime.
+
+**Logging.** Use the existing `pkg/logger` package. Avoid `fmt.Println` and avoid logging in the hot path (per-token, per-audio-chunk).
+
+**Metrics.** Record latency and error counts using the patterns in `pkg/metrics/prom.go`. See `pkg/observers/metrics.go` for how existing providers increment counters.
+
+### Add a provider constant and register in `SupportedXXXProviders`
+
+Open `pkg/services/factory.go` and add a constant for your provider key in the `const` block:
+
+```go
+const (
+    // ... existing constants ...
+    ProviderMyProvider = "myprovider"
+)
+```
+
+Then append the constant to every slice that applies to your provider:
+
+```go
+// SupportedLLMProviders — add if your provider implements LLMService.
+var SupportedLLMProviders = []string{
+    // ... existing entries ...
+    ProviderMyProvider,
+}
+
+// SupportedSTTProviders — add if your provider implements STTService.
+var SupportedSTTProviders = []string{
+    // ... existing entries ...
+    ProviderMyProvider,
+}
+
+// SupportedTTSProviders — add if your provider implements TTSService.
+var SupportedTTSProviders = []string{
+    // ... existing entries ...
+    ProviderMyProvider,
+}
+```
+
+Next, add a `case` to each relevant factory switch. Add your import at the top of the file alongside the existing provider imports:
+
+```go
+import (
+    // ... existing imports ...
+    "voxray-go/pkg/services/myprovider"
+)
+```
+
+Then in `NewLLMFromConfig`:
+
+```go
+case ProviderMyProvider:
+    return myprovider.NewLLMService(apiKey, model)
+```
+
+In `NewSTTFromConfig`:
+
+```go
+case ProviderMyProvider:
+    return myprovider.NewSTT(apiKey, cfg.STTModel)
+```
+
+In `NewTTSFromConfig`:
+
+```go
+case ProviderMyProvider:
+    return myprovider.NewTTS(apiKey, model, voice)
+```
+
+### Add the API key to `apiKeyForProvider`
+
+Add a `case` to the `apiKeyForProvider` switch in `factory.go`:
+
+```go
+case ProviderMyProvider:
+    return cfg.GetAPIKey("myprovider", "MYPROVIDER_API_KEY")
+```
+
+The first argument to `cfg.GetAPIKey` is the key used in the `api_keys` map of `config.json`; the second is the environment variable fallback. Callers can then supply the credential either way:
+
+```json
+{
+  "llm_provider": "myprovider",
+  "model": "myprovider-chat-v1",
+  "api_keys": {
+    "myprovider": "sk-..."
+  }
+}
+```
+
+or:
+
+```bash
+export MYPROVIDER_API_KEY="sk-..."
+```
+
+<Warning>
+Never hardcode API keys or secrets in source code. The `apiKeyForProvider` + environment variable pattern is the only approved mechanism for credential injection.
+</Warning>
+
+### Write tests
+
+**Unit tests** live alongside the implementation or under `tests/pkg/services/myprovider/`:
+
+```go
+package myprovider_test
+
+import (
+    "context"
+    "testing"
+
+    "voxray-go/pkg/services/myprovider"
+)
+
+func TestLLMServiceChat_Success(t *testing.T) {
+    // Use httptest.NewServer to mock the provider's HTTP endpoint.
+    // Verify that onToken is called for each delta and no error is returned.
+}
+
+func TestLLMServiceChat_ContextCancel(t *testing.T) {
+    // Cancel the context mid-stream and assert that Chat returns promptly
+    // with a context-related error.
+}
+
+func TestLLMServiceChat_ProviderError(t *testing.T) {
+    // Return a non-2xx status from the mock server.
+    // Assert the error is wrapped with "myprovider" in the message.
+}
+```
+
+**Integration tests** that exercise the live API are gated behind an environment variable check so they are skipped in CI unless the key is present:
+
+```go
+func TestLLMServiceChat_Integration(t *testing.T) {
+    apiKey := os.Getenv("MYPROVIDER_API_KEY")
+    if apiKey == "" {
+        t.Skip("MYPROVIDER_API_KEY not set; skipping integration test")
+    }
+    svc := myprovider.NewLLMService(apiKey, "myprovider-chat-v1")
+    // ... run a real completion and assert non-empty output ...
+}
+```
+
+Place integration tests under `tests/pkg/services/myprovider/` so they are picked up by `go test ./tests/...` while keeping `pkg/` fast.
+
+</Steps>
+
+---
+
+## Provider Checklist
+
+Use this checklist before opening a pull request. Every box must be checked.
+
+**Configuration**
+
+- [ ] No hardcoded API keys or secrets anywhere in the package.
+- [ ] API key is wired through `apiKeyForProvider` with both a `config.json` key and an environment variable fallback.
+- [ ] All config fields (model, voice, language, region, base URL, etc.) are documented in the PR description and in `docs/build/integrations/<provider>.mdx`.
+- [ ] Reasonable defaults are provided for optional fields (model name, sample rate, language, etc.).
+
+**Interface compliance**
+
+- [ ] The struct satisfies the interface at compile time (add `var _ services.LLMService = (*LLMService)(nil)` if helpful).
+- [ ] If the provider supports streaming, `STTStreamingService` or `TTSStreamingService` is also implemented, not just the batch interface.
+- [ ] `RealtimeService` is implemented if the provider offers a realtime/duplex API (and registered in `SupportedRealtimeProviders`).
+
+**Correctness and robustness**
+
+- [ ] `context.Context` is passed to every network call; cancellation aborts the operation promptly.
+- [ ] All errors from the upstream SDK or HTTP response are wrapped with provider context (`fmt.Errorf("myprovider: %w", err)`).
+- [ ] No `panic` in public API paths or on transient provider errors.
+- [ ] Goroutines launched inside the package are tied to a `context.Context` and exit when it is cancelled.
+- [ ] Shared mutable state (if any) is protected by a mutex with documented assumptions.
+
+**Observability**
+
+- [ ] Prometheus metrics (latency histogram, error counter) are recorded consistently with other providers.
+- [ ] Logging uses `pkg/logger` and avoids noisy per-token or per-chunk log lines.
+
+**Testing**
+
+- [ ] Unit tests cover at minimum: success path, context cancellation, and upstream error response.
+- [ ] Mock or recorded fixtures are used so unit tests are offline and deterministic.
+- [ ] Integration test is added under `tests/pkg/services/<provider>/` and is skipped when `MYPROVIDER_API_KEY` is unset.
+- [ ] `go test ./...` passes with no failures and no race conditions (`go test -race ./...`).
+
+**Registration**
+
+- [ ] Provider constant added to the `const` block in `factory.go`.
+- [ ] Constant appended to all applicable `Supported*Providers` slices.
+- [ ] `case` added in all applicable factory switch statements (`NewLLMFromConfig`, `NewSTTFromConfig`, `NewTTSFromConfig`).
+- [ ] `case` added in `apiKeyForProvider`.
+- [ ] Provider name is consistent across constant, config key, env var prefix, and documentation.

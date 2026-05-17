@@ -12,7 +12,7 @@ Single reference for integrating any client with the Voxray voice pipeline API: 
 
 ### API target
 
-- **Voxray server (github.com/Voxray-AI/Voxray):** Voice pipeline (STT → LLM → TTS) over WebSocket or WebRTC. See [CONNECTIVITY.md](./CONNECTIVITY.md) for entry points and [pkg/server/server.go](../pkg/server/server.go) for route registration.
+- **Voxray server (voxray-go):** Voice pipeline (STT → LLM → TTS) over WebSocket or WebRTC. See [CONNECTIVITY.md](./CONNECTIVITY.md) for entry points and [pkg/server/server.go](../pkg/server/server.go) for route registration.
 
 ### Base URL and config
 
@@ -32,7 +32,7 @@ Single reference for integrating any client with the Voxray voice pipeline API: 
 ### Dependencies
 
 - **Browser/JS:** None for the existing clients; they use the native `fetch()` API.
-- **Go:** Standard library `net/http`; for WebSocket use `github.com/Voxray-AI/Voxray/pkg/transport/websocket` (see [pkg/transport/websocket/client.go](../pkg/transport/websocket/client.go)).
+- **Go:** Standard library `net/http`; for WebSocket use `voxray-go/pkg/transport/websocket` (see [pkg/transport/websocket/client.go](../pkg/transport/websocket/client.go)).
 
 ### Configuring the API client
 
@@ -72,7 +72,7 @@ When `server_api_key` is set, the server checks `Authorization: Bearer <key>` or
 - `POST /webrtc/offer` and `POST /api/v1/webrtc/offer`
 - WebSocket upgrade `GET /ws`
 
-([requireAPIKey](https://github.com/github.com/Voxray-AI/Voxray/blob/main/pkg/server/server.go) in `pkg/server/server.go`.)
+([requireAPIKey](https://github.com/voxray-go/blob/main/pkg/server/server.go) in `pkg/server/server.go`.)
 
 **Browser (fetch):**
 

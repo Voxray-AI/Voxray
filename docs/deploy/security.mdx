@@ -1,0 +1,321 @@
+---
+title: "Security"
+description: "API key authentication, CORS, request body limits, secrets management, and container hardening for Voxray."
+---
+
+## API key authentication
+
+When `server_api_key` is set, Voxray enforces bearer token authentication on all sensitive endpoints. Requests missing a valid key receive `401 Unauthorized` with a standard error envelope.
+
+### Enabling authentication
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "server_api_key": "your-secret-key-here"
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    VOXRAY_SERVER_API_KEY=your-secret-key-here
+    ```
+
+    The environment variable overrides any value in `config.json`. Prefer environment variables over config file for secrets — see [Secrets management](#secrets-management) below.
+  </Tab>
+</Tabs>
+
+### Protected and unprotected endpoints
+
+| Endpoint | Protected | Notes |
+|----------|-----------|-------|
+| `POST /start` | Yes | Session creation |
+| `POST /webrtc/offer` | Yes | WebRTC signaling |
+| `POST /sessions/{id}/api/offer` | Yes | Per-session WebRTC offer (legacy path) |
+| `POST /api/v1/sessions/{id}/offer` | Yes | Per-session WebRTC offer (versioned path) |
+| `GET /ws` | Yes | WebSocket voice transport |
+| `GET /health` | No | Liveness probe — always open |
+| `GET /ready` | No | Readiness probe — always open |
+| `GET /metrics` | No | Prometheus — firewall separately |
+| `GET /swagger/` | No | API docs |
+
+<Note>
+`/health` and `/ready` are intentionally unauthenticated so load balancers and orchestrators can probe them without credentials. Restrict `/metrics` access at the network level rather than relying on API key auth.
+</Note>
+
+### Sending the API key
+
+Voxray accepts the key in either of two headers — use whichever fits your client library:
+
+```bash
+# Authorization: Bearer
+curl -X POST https://voxray.example.com/start \
+  -H "Authorization: Bearer your-secret-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# X-API-Key
+curl -X POST https://voxray.example.com/start \
+  -H "X-API-Key: your-secret-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Without a valid key, the response is:
+
+```bash
+# No key — rejected
+curl -X POST https://voxray.example.com/start \
+  -H "Content-Type: application/json" \
+  -d '{}'
+# → 401 {"error":{"code":"unauthorized","message":"Unauthorized"}}
+```
+
+---
+
+## CORS configuration
+
+Voxray's CORS behavior is explicitly opt-in. An empty `cors_allowed_origins` does not mean "allow all" — it means no `Access-Control-Allow-Origin` header is set, which will cause browsers to block cross-origin requests.
+
+<Warning>
+If `cors_allowed_origins` is omitted or empty and you are serving browser clients, your front-end JavaScript will fail with a CORS error. Set origins explicitly for every browser-facing deployment.
+</Warning>
+
+### Setting allowed origins
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "cors_allowed_origins": [
+        "https://yourapp.com",
+        "https://www.yourapp.com"
+      ]
+    }
+    ```
+
+    Multiple origins are supported. Voxray reflects the matching origin in the response header — it does not echo a wildcard.
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    # Comma-separated; whitespace around commas is trimmed
+    VOXRAY_CORS_ORIGINS=https://yourapp.com,https://www.yourapp.com
+    ```
+
+    The environment variable overrides `cors_allowed_origins` in `config.json` entirely (not merged). If you set it to a single origin, only that origin will be allowed regardless of what is in the config file.
+  </Tab>
+</Tabs>
+
+### Headers always allowed
+
+Regardless of origin configuration, Voxray always includes these in `Access-Control-Allow-Headers`:
+
+```
+Content-Type, Authorization, X-API-Key
+```
+
+This means browser clients can send the API key via either `Authorization: Bearer` or `X-API-Key` without needing custom CORS preflight configuration.
+
+### CORS and WebSocket
+
+WebSocket connections (`GET /ws`) go through the same CORS check as HTTP endpoints. If your browser client uses the native `WebSocket` API, ensure the origin header sent by the browser matches one of your configured allowed origins.
+
+---
+
+## Request body limits
+
+Voxray limits JSON request body size on all endpoints that accept a body (`/start`, `/webrtc/offer`, `/sessions/{id}/api/offer`, `/daily-dialin-webhook`). This prevents large-payload denial-of-service without requiring any middleware.
+
+| Setting | Default | Recommended production value |
+|---------|---------|------------------------------|
+| `max_request_body_bytes` | `262144` (256 KB) | `1048576` (1 MiB) |
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "max_request_body_bytes": 1048576
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    VOXRAY_MAX_BODY_BYTES=1048576
+    ```
+  </Tab>
+</Tabs>
+
+Requests that exceed the limit receive a `400 Bad Request` with an error indicating the body was too large. The connection is not terminated — only the oversized request is rejected.
+
+<Info>
+The default 256 KB limit is sufficient for all standard API payloads. The 1 MiB recommendation adds headroom for large SDP offers with many ICE candidates or custom `body` fields in `/start` without creating risk of multi-megabyte abuse.
+</Info>
+
+---
+
+## Secrets management
+
+### Never commit API keys to git
+
+Voxray supports two places to specify API keys: the `api_keys` map in `config.json`, and environment variables. The environment variable path is strongly preferred for production.
+
+**What not to do:**
+
+```json
+{
+  "api_keys": {
+    "openai": "sk-proj-...",
+    "daily_api_key": "..."
+  }
+}
+```
+
+If this `config.json` is committed to git, the keys are permanently in history even after deletion.
+
+**What to do instead:**
+
+```bash
+# Docker
+docker run -p 8080:8080 \
+  -e OPENAI_API_KEY=sk-proj-... \
+  -e DAILY_API_KEY=... \
+  -e VOXRAY_SERVER_API_KEY=... \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  voxray:latest
+
+# Kubernetes — reference a Secret
+env:
+  - name: OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: voxray-secrets
+        key: openai-api-key
+  - name: VOXRAY_SERVER_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: voxray-secrets
+        key: server-api-key
+```
+
+### config.json and git
+
+Voxray's default `.gitignore` excludes `config.json`. Verify two things before your first commit:
+
+1. `config.json` is listed in `.gitignore` (or is absent from the repo entirely)
+2. `config.example.json`, if it exists, does not contain real provider keys — only placeholder strings like `"YOUR_OPENAI_KEY_HERE"`
+
+```bash
+# Audit for real-looking keys in example config
+grep -E 'sk-|key-|Bearer ' config.example.json
+```
+
+### Key rotation
+
+Voxray caches resolved API keys in memory after the first lookup. To rotate any key — provider API keys or `server_api_key` — a process restart is required. There is no hot-reload mechanism for secrets in the current release.
+
+For zero-downtime rotation in Kubernetes:
+
+1. Update the Secret with the new key value
+2. Perform a rolling deployment (`kubectl rollout restart deployment/voxray`)
+3. Kubernetes will bring up new pods with the new key before terminating old pods
+
+---
+
+## Container hardening
+
+### Non-root user
+
+The Voxray Dockerfile runs the server as a non-root user named `voxray`. This is the default — no configuration change is required. Verify with:
+
+```bash
+docker run --rm voxray:latest id
+# uid=1001(voxray) gid=1001(voxray)
+```
+
+Do not override the user with `--user root` in production. If a bind port below 1024 is required, use a reverse proxy instead of running as root.
+
+### Read-only config mount
+
+Mount `config.json` as read-only. The `:ro` flag prevents the process from modifying the config file, which closes a class of config-corruption bugs and limits blast radius if the process is compromised:
+
+```bash
+docker run -v $(pwd)/config.json:/app/config.json:ro voxray:latest
+```
+
+In Docker Compose:
+
+```yaml
+services:
+  voxray:
+    image: voxray:latest
+    volumes:
+      - ./config.json:/app/config.json:ro
+```
+
+### Minimal base image
+
+The Voxray image is built on Alpine Linux 3.20, which has a base size of approximately 7 MB. The attack surface is minimal — no shell utilities, no package manager, no cron, no sshd in the final stage.
+
+```dockerfile
+# Final stage — Alpine 3.20 only
+FROM alpine:3.20
+```
+
+### Network policies
+
+In Kubernetes, restrict outbound traffic from Voxray pods to only the external APIs they need to reach. Voxray does not require inbound connections from other pods except your load balancer or ingress.
+
+Example NetworkPolicy skeleton:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: voxray-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: voxray
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+```
+
+Adjust the CIDR blocks and pod selectors to match your cluster topology.
+
+---
+
+## Production security checklist
+
+Run through every item before promoting to production.
+
+- [ ] TLS enabled — on-server (`tls_enable: true`) or reverse proxy termination
+- [ ] `server_api_key` set to a long random string — use a secrets manager or environment variable; rotate on suspected compromise
+- [ ] CORS origins explicitly set — `cors_allowed_origins` lists every domain your front-end runs on; no wildcards
+- [ ] Body size limit configured — `max_request_body_bytes: 1048576` or appropriate for your payload sizes
+- [ ] `/metrics` not publicly accessible — firewalled at the network level or restricted to your Prometheus scrape CIDR
+- [ ] API keys in environment variables — `OPENAI_API_KEY`, `DAILY_API_KEY`, `VOXRAY_SERVER_API_KEY`, and all other provider keys sourced from env or a secrets manager
+- [ ] Config file not committed to git — `config.json` in `.gitignore`; `config.example.json` contains only placeholder values
+- [ ] Running as non-root — default Docker image user is `voxray` (uid 1001); do not override with `--user root`
+- [ ] Network policies restrict outbound to only required provider APIs — no unrestricted egress from Voxray pods

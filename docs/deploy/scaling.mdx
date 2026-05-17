@@ -1,0 +1,294 @@
+---
+title: "Scaling"
+description: "Run Voxray from a single instance to a horizontally-scaled cluster: session store configuration, load balancer requirements, performance tuning, and storage at scale."
+---
+
+## Single-instance vs multi-instance
+
+Voxray follows a **one goroutine per active connection** model. Each Runner goroutine is fully isolated, so vertical scaling (larger CPU/memory) is the first lever to pull.
+
+<Tabs>
+  <Tab title="Single instance (default)">
+    The default session store is **in-memory**. No external dependencies are needed.
+
+    ```json
+    {
+      "session_store": "memory"
+    }
+    ```
+
+    All session state lives in the process. Restarting the process loses in-flight sessions. This mode is appropriate for development, single-region deployments, and workloads where one instance can handle peak load.
+
+    <Note>
+      Vertical scaling — giving the instance more CPU cores and RAM — is the simplest path to higher throughput. Go's goroutine scheduler saturates available cores automatically.
+    </Note>
+  </Tab>
+  <Tab title="Multiple instances (Redis)">
+    To run more than one instance behind a load balancer, switch to the **Redis session store**. All instances share session state through Redis, so any instance can resume a session created on another.
+
+    ```json
+    {
+      "session_store": "redis",
+      "redis_url": "redis://redis:6379/0",
+      "session_ttl_secs": 3600
+    }
+    ```
+
+    Equivalent environment variables:
+
+    | Variable | Example |
+    |----------|---------|
+    | `VOXRAY_SESSION_STORE` | `redis` |
+    | `VOXRAY_REDIS_URL` | `redis://redis:6379/0` |
+
+    `session_ttl_secs` controls how long a session record is retained in Redis after it is written. Set this to at least the maximum expected call duration plus a safety margin.
+
+    <Warning>
+      When `session_store=redis` is active, the `/ready` readiness probe returns **503** if Redis is unreachable. Kubernetes will stop routing traffic to that pod until Redis recovers. Do not rely on `/health` (liveness) alone for multi-instance deployments.
+    </Warning>
+  </Tab>
+</Tabs>
+
+---
+
+## Load balancer requirements
+
+### WebSocket upgrade passthrough
+
+All load balancers in front of Voxray must pass the `Upgrade: websocket` and `Connection: Upgrade` headers through without stripping them. Without this, WebSocket handshakes fail at the proxy.
+
+```nginx
+# nginx example
+location /ws {
+    proxy_pass         http://voxray_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header   Upgrade $http_upgrade;
+    proxy_set_header   Connection "upgrade";
+    proxy_read_timeout 3600s;
+}
+```
+
+Increase `proxy_read_timeout` (nginx) or the equivalent idle-connection timeout in your load balancer to match the longest expected call duration. A 60-second default will terminate active voice sessions.
+
+### WebRTC signaling
+
+WebRTC media is peer-to-peer: once ICE negotiation completes, audio flows directly between the client and the provider (or via TURN). The Voxray server only handles signaling.
+
+- `POST /webrtc/offer` — stateless; can land on any instance.
+- `POST /start` and `PATCH /sessions/{id}/api/offer` — session lookup is backed by Redis in multi-instance mode, so these are also instance-agnostic.
+
+No sticky sessions (IP affinity) are required when Redis is the session store. You may enable session affinity as an optimization to reduce Redis round-trips, but it is not mandatory for correctness.
+
+### Telephony WebSocket backhaul
+
+Telephony providers (Twilio, Telnyx, Plivo, Exotel) open a persistent WebSocket to `/telephony/ws`. This connection must remain on the same instance for the call's lifetime. Use cookie-based or IP-based session affinity for telephony traffic, or terminate telephony on a dedicated instance pool.
+
+---
+
+## Performance tuning
+
+The following config keys control buffering and write behavior on the hot path between transport and pipeline.
+
+| Config Key | Env Variable | Default | Description |
+|------------|-------------|---------|-------------|
+| `pipeline_input_queue_cap` | `VOXRAY_PIPELINE_INPUT_QUEUE_CAP` | `256` | Channel buffer between transport read and pipeline push. When full, the reader blocks — back-pressure propagates to the transport rather than unbounded memory growth. Increase under bursty audio input. |
+| `ws_write_coalesce_ms` | `VOXRAY_WS_WRITE_COALESCE_MS` | `0` (disabled) | When greater than zero, the WebSocket writer batches frames within this window (milliseconds) before flushing. Reduces syscall count; adds a small fixed latency. |
+| `ws_write_coalesce_max_frames` | `VOXRAY_WS_WRITE_COALESCE_MAX_FRAMES` | — | Maximum frames per coalesce batch. Only active when `ws_write_coalesce_ms` > 0. |
+
+<Tip>
+  Enable write coalescing only when syscall overhead is measurably impacting throughput (e.g., many concurrent low-bandwidth sessions). For latency-sensitive voice agents, keep `ws_write_coalesce_ms=0`.
+</Tip>
+
+---
+
+## S3 recording at scale
+
+Recording uploads run through an async worker pool so they never block the voice pipeline.
+
+### Worker pool configuration
+
+| Config Key | Env Variable | Default | Description |
+|------------|-------------|---------|-------------|
+| `recording.worker_count` | `VOXRAY_RECORDING_WORKER_COUNT` | `2` | Number of goroutines processing the upload queue concurrently. |
+| `recording.queue_cap` | `VOXRAY_RECORDING_QUEUE_CAP` | `32` | Job queue capacity. When full, new upload jobs are dropped (with a log warning). Size this to absorb bursts between worker completions. |
+| `recording.max_retries` | `VOXRAY_RECORDING_MAX_RETRIES` | `3` | Retry attempts per upload on S3 error, with exponential backoff. |
+
+Each worker is a lightweight goroutine. Memory usage is bounded because uploads stream from a temporary file to S3 — the full WAV is never buffered in memory. Scale `worker_count` proportionally to your calls-per-minute volume and typical recording duration.
+
+### Storage layout
+
+Recordings are stored under the configured S3 bucket and base path using a date-partitioned key:
+
+```text
+s3://{bucket}/{base_path}/YYYY/MM/DD/{sessionId}.{format}
+```
+
+For example, with `recording.base_path = "recordings/"` and `recording.format = "wav"`:
+
+```text
+s3://my-bucket/recordings/2026/05/15/sess_abc123.wav
+```
+
+This layout makes lifecycle policies (e.g., S3 Intelligent-Tiering by prefix) and date-range queries straightforward without a separate index.
+
+<Note>
+  Enable recording by setting `"recording.enable": true` (or `VOXRAY_RECORDING_ENABLE=true`) alongside the bucket and credentials. AWS credentials must be available via the standard chain: env vars, instance role, or shared credentials file.
+</Note>
+
+---
+
+## Transcript database at scale
+
+When transcript logging is enabled, Voxray writes each turn (speaker role, text, sequence number, timestamp) to a SQL database. The table is created automatically on startup if it does not exist.
+
+### Supported drivers
+
+<Tabs>
+  <Tab title="PostgreSQL">
+    ```json
+    {
+      "transcripts.enable": true,
+      "transcripts.driver": "postgres",
+      "transcripts.dsn": "postgres://user:pass@host:5432/db?sslmode=require",
+      "transcripts.table": "call_transcripts"
+    }
+    ```
+
+    Use `sslmode=require` in production. For connection pooling, set `pool_max_conns` (pgx DSN) or use PgBouncer in transaction mode in front of Postgres.
+  </Tab>
+  <Tab title="MySQL">
+    ```json
+    {
+      "transcripts.enable": true,
+      "transcripts.driver": "mysql",
+      "transcripts.dsn": "user:pass@tcp(host:3306)/db",
+      "transcripts.table": "call_transcripts"
+    }
+    ```
+
+    Append `?parseTime=true` to the DSN if your application reads `created_at` as `time.Time`.
+  </Tab>
+</Tabs>
+
+### Table schema
+
+The following schema is auto-created on startup:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `session_id` | `TEXT` / `VARCHAR` | Voxray session identifier |
+| `role` | `TEXT` / `VARCHAR` | Speaker role (`user` or `assistant`) |
+| `text` | `TEXT` | Transcript text for this turn |
+| `seq` | `INTEGER` | Turn sequence number within the session |
+| `created_at` | `TIMESTAMP` | Wall-clock time of the turn |
+
+Connection pooling is handled by Go's `database/sql` package. To tune pool size, append DSN parameters specific to your driver (e.g., `max_open_conns`, `max_idle_conns` via pgx extended DSN, or use a proxy like PgBouncer).
+
+---
+
+## Kubernetes deployment
+
+The following example deploys three Voxray replicas backed by a Redis session store, with secrets injected via Kubernetes Secrets.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voxray
+  labels:
+    app: voxray
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: voxray
+  template:
+    metadata:
+      labels:
+        app: voxray
+    spec:
+      containers:
+        - name: voxray
+          image: your-registry/voxray-go:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: VOXRAY_SESSION_STORE
+              value: "redis"
+            - name: VOXRAY_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: voxray-secrets
+                  key: redis-url
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: voxray-secrets
+                  key: openai-api-key
+            - name: VOXRAY_JSON_LOGS
+              value: "true"
+            - name: VOXRAY_LOG_LEVEL
+              value: "info"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "2"
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: voxray
+spec:
+  selector:
+    app: voxray
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+```
+
+### Horizontal Pod Autoscaler
+
+Voxray exposes `http_active_connections` as a Prometheus gauge. Use the Prometheus Adapter to surface this as a custom metric, then configure an HPA to scale based on connections per pod:
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: voxray-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: voxray
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Pods
+      pods:
+        metric:
+          name: http_active_connections
+        target:
+          type: AverageValue
+          averageValue: "50"
+```
+
+<Note>
+  Set `minReplicas: 2` for production to maintain availability during a single pod restart or rolling update.
+</Note>

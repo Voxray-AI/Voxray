@@ -1,0 +1,366 @@
+---
+title: "Configuration Reference"
+description: "Complete reference for all Voxray configuration fields and environment variable overrides"
+---
+
+Voxray is configured through a JSON file combined with environment variable overrides. This page documents every configuration field, its type, default value, and the corresponding environment variable where applicable.
+
+---
+
+## Config Loading
+
+### Config File
+
+Pass the path to your config file with the `-config` flag at startup:
+
+```bash
+./voxray -config /path/to/config.json
+```
+
+Alternatively, set the `VOXRAY_CONFIG` environment variable and omit the flag:
+
+```bash
+export VOXRAY_CONFIG=/path/to/config.json
+./voxray
+```
+
+When neither is provided, Voxray looks for `config.json` in the current working directory.
+
+### Loading Order and Precedence
+
+<Note>
+  Environment variables always win. The resolution order for every field is:
+
+  1. **Environment variable** (highest priority — overrides everything)
+  2. **config.json field** (applied after file load)
+  3. **Built-in default** (used when the field is absent from the file)
+
+  This means you can ship a base `config.json` and override individual values at deploy time without modifying the file — a standard 12-factor pattern.
+</Note>
+
+### 12-Factor Best Practice
+
+<Warning>
+  Never commit secrets (API keys, `server_api_key`, database DSNs) to source control. Use environment variables for all sensitive values in production and CI environments. Reserve inline `api_keys` in `config.json` for local development only.
+</Warning>
+
+---
+
+## Environment Variable Reference
+
+All `VOXRAY_*` variables are read by `ApplyEnvOverrides` immediately after the config file is parsed. Unset variables leave the corresponding config field unchanged.
+
+### Server
+
+| Environment Variable | Config Field | Type | Description |
+|---|---|---|---|
+| `VOXRAY_HOST` or `HOST` | `host` | string | Server bind address. `VOXRAY_HOST` takes precedence over `HOST`. |
+| `VOXRAY_PORT` or `PORT` | `port` | int | Server listen port. `VOXRAY_PORT` takes precedence over `PORT`. |
+| `VOXRAY_LOG_LEVEL` | `log_level` | string | Log verbosity: `"debug"`, `"info"`, or `"error"`. Value is lowercased and trimmed. |
+| `VOXRAY_JSON_LOGS` | `json_logs` | bool | Set to `"true"` or `"1"` to enable JSON log output (one object per line). |
+
+### Security
+
+| Environment Variable | Config Field | Type | Description |
+|---|---|---|---|
+| `VOXRAY_SERVER_API_KEY` | `server_api_key` | string | When set, all protected endpoints require `Authorization: Bearer <key>` or `X-API-Key: <key>`. |
+| `VOXRAY_MAX_BODY_BYTES` | `max_request_body_bytes` | int64 | Maximum JSON request body size in bytes. `0` disables the limit. |
+| `VOXRAY_CORS_ORIGINS` | `cors_allowed_origins` | []string | Comma-separated list of allowed CORS origins (e.g. `https://app.example.com,https://staging.example.com`). Empty means no CORS headers. |
+| `VOXRAY_DAILY_DIALIN_WEBHOOK_SECRET` | `daily_dialin_webhook_secret` | string | Secret validated via `X-Webhook-Secret` header for `POST /daily-dialin-webhook`. |
+
+### TLS
+
+| Environment Variable | Config Field | Type | Description |
+|---|---|---|---|
+| `VOXRAY_TLS_ENABLE` | `tls_enable` | bool | Set to `"true"` or `"1"` to enable HTTPS (`ListenAndServeTLS`). |
+| `VOXRAY_TLS_CERT_FILE` | `tls_cert_file` | string | Path to the TLS certificate file (PEM). Required when TLS is enabled. |
+| `VOXRAY_TLS_KEY_FILE` | `tls_key_file` | string | Path to the TLS private key file (PEM). Required when TLS is enabled. |
+
+### Transport and Pipeline
+
+| Environment Variable | Config Field | Type | Description |
+|---|---|---|---|
+| `VOXRAY_RTC_MAX_DURATION_SECS` | `rtc_max_duration_secs` | float64 | Maximum lifetime for RTC/WebSocket voice sessions in seconds after first inbound audio. `0` disables the limit. |
+| `VOXRAY_PIPELINE_INPUT_QUEUE_CAP` | `pipeline_input_queue_cap` | int | Buffer size between transport read and pipeline push. Default `256`. |
+| `VOXRAY_WS_WRITE_COALESCE_MS` | `ws_write_coalesce_ms` | int | WebSocket write coalescing window in milliseconds. `0` (default) disables coalescing. |
+| `VOXRAY_WS_WRITE_COALESCE_MAX_FRAMES` | `ws_write_coalesce_max_frames` | int | Maximum frames to coalesce per WebSocket write batch when coalescing is enabled. |
+
+### VAD
+
+| Environment Variable | Config Field | Type | Description |
+|---|---|---|---|
+| `VOXRAY_VAD_BATCH_SIZE` | `vad_batch_size` | int | Number of consecutive VAD chunks to batch before inference (e.g. for Silero). Default `1` (no batching). |
+
+### Recording
+
+| Environment Variable | Config Field | Type | Description |
+|---|---|---|---|
+| `VOXRAY_RECORDING_ENABLE` | `recording.enable` | bool | Set to `"true"` or `"1"` to enable per-session audio recording. |
+| `VOXRAY_RECORDING_BUCKET` | `recording.bucket` | string | S3 bucket name for recording uploads. |
+| `VOXRAY_RECORDING_BASE_PATH` | `recording.base_path` | string | Key prefix within the S3 bucket (e.g. `"recordings/"`). |
+| `VOXRAY_RECORDING_FORMAT` | `recording.format` | string | File format/extension (e.g. `"wav"`). |
+| `VOXRAY_RECORDING_WORKER_COUNT` | `recording.worker_count` | int | Number of async S3 uploader worker goroutines. |
+| `VOXRAY_RECORDING_QUEUE_CAP` | `recording.queue_cap` | int | Upload job queue capacity. Default `32`. |
+| `VOXRAY_RECORDING_MAX_RETRIES` | `recording.max_retries` | int | Number of S3 upload retry attempts on failure with exponential backoff. Default `3`. |
+
+### Transcripts
+
+| Environment Variable | Config Field | Type | Description |
+|---|---|---|---|
+| `VOXRAY_TRANSCRIPTS_ENABLE` | `transcripts.enable` | bool | Set to `"true"` or `"1"` to enable per-message transcript logging to a SQL database. |
+| `VOXRAY_TRANSCRIPTS_DRIVER` | `transcripts.driver` | string | SQL driver name (e.g. `"postgres"`, `"mysql"`). Required when transcripts are enabled. |
+| `VOXRAY_TRANSCRIPTS_DSN` | `transcripts.dsn` | string | SQL data source name / connection string. Required when transcripts are enabled. |
+| `VOXRAY_TRANSCRIPTS_TABLE` | `transcripts.table_name` | string | SQL table for transcript rows. Default `"call_transcripts"`. |
+
+### API Keys (Provider-Specific)
+
+API keys are not read through `ApplyEnvOverrides` — they are resolved lazily by `GetAPIKey` when each provider is first used. The table below lists the environment variable each provider checks when `api_keys.<provider>` is absent from `config.json`.
+
+| Provider | `api_keys` key | Environment Variable |
+|---|---|---|
+| OpenAI | `openai` | `OPENAI_API_KEY` |
+| Groq | `groq` | `GROQ_API_KEY` |
+| Sarvam | `sarvam` | `SARVAM_API_KEY` |
+| Anthropic | `anthropic` | `ANTHROPIC_API_KEY` |
+| ElevenLabs | `elevenlabs` | `ELEVENLABS_API_KEY` |
+| Google | `google` | `GOOGLE_API_KEY` |
+| AWS | `aws` | `AWS_SECRET_ACCESS_KEY` |
+| Mistral | `mistral` | `MISTRAL_API_KEY` |
+| DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` |
+| xAI (Grok) | `xai` | `XAI_API_KEY` |
+| Cerebras | `cerebras` | `CEREBRAS_API_KEY` |
+| Ollama | `ollama` | `OLLAMA_API_KEY` |
+| Qwen | `qwen` | `DASHSCOPE_API_KEY` or `QWEN_API_KEY` |
+| Whisper | `whisper` | `WHISPER_API_KEY` (falls back to `OPENAI_API_KEY`) |
+| AsyncAI | `asyncai` | `ASYNC_AI_API_KEY` |
+| Camb | `camb` | `CAMB_API_KEY` |
+| Fish | `fish` | `FISH_API_KEY` |
+| Gradium | `gradium` | `GRADIUM_API_KEY` |
+| Hume | `hume` | `HUME_API_KEY` |
+| Inworld | `inworld` | `INWORLD_API_KEY` |
+| Minimax | `minimax` | `MINIMAX_API_KEY` |
+| Moondream | `moondream` | `MOONDREAM_API_KEY` |
+| Neuphonic | `neuphonic` | `NEUPHONIC_API_KEY` |
+| OpenPipe | `openpipe` | `OPENPIPE_API_KEY` |
+| Soniox | `soniox` | `SONIOX_API_KEY` |
+| XTTS | `xtts` | `XTTS_API_KEY` |
+| Google Cloud Project | `google_cloud_project` | `GOOGLE_CLOUD_PROJECT` |
+| Google Cloud Location | `google_cloud_location` | `GOOGLE_CLOUD_LOCATION` |
+| AWS Region | `aws_region` | `AWS_REGION` (default `"us-east-1"`) |
+
+---
+
+## config.json Field Reference
+
+### Server
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `host` | string | `"localhost"` | Server bind address. Use `"0.0.0.0"` to listen on all interfaces. |
+| `port` | int | `3042` | Server listen port. |
+| `log_level` | string | `"info"` | Log verbosity: `"debug"`, `"info"`, or `"error"`. |
+| `json_logs` | bool | `false` | Enable one-JSON-object-per-line structured logging. |
+
+### Providers
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `provider` | string | — | Default provider for all tasks when task-specific keys are absent. |
+| `stt_provider` | string | — | STT provider key (e.g. `"sarvam"`, `"openai"`, `"groq"`). Falls back to `provider`. |
+| `llm_provider` | string | — | LLM provider key (e.g. `"openai"`, `"anthropic"`, `"groq"`). Falls back to `provider`. |
+| `tts_provider` | string | — | TTS provider key (e.g. `"sarvam"`, `"elevenlabs"`, `"openai"`). Falls back to `provider`. |
+| `model` | string | `"gpt-3.5-turbo"` (OpenAI) | LLM chat model name. Provider-specific (e.g. `"llama-3.1-8b-instant"` for Groq). |
+| `stt_model` | string | Provider default | STT model identifier (e.g. `"saarika:v2.5"` for Sarvam, `"whisper-large-v3-turbo"` for Groq). |
+| `stt_language` | string | — | BCP-47 language code for STT (e.g. `"hi-IN"`, `"en-IN"`). Empty means auto-detect. |
+| `tts_model` | string | Provider default | TTS model identifier (e.g. `"bulbul:v2"` for Sarvam). |
+| `tts_voice` | string | Provider default | TTS speaker/voice name or ID (e.g. `"anushka"` for Sarvam, voice UUID for ElevenLabs). |
+
+### API Keys
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `api_keys` | `map[string]string` | Map of provider name to API key string. Keys are looked up before falling back to environment variables. See the API keys table above for key names per provider. |
+
+### Transport
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `transport` | string | `"websocket"` | Network transport(s) to enable. `""` or `"websocket"`: WebSocket only (`/ws`). `"smallwebrtc"`: SmallWebRTC only (`/webrtc/offer`). `"both"`: both on the same HTTP server. |
+| `webrtc_ice_servers` | []string | — | ICE server URLs for SmallWebRTC (STUN/TURN). When empty, a default STUN server is used. |
+| `rtc_max_duration_secs` | float64 | `0` | Maximum voice session duration in seconds. `0` or negative disables enforcement. |
+| `pipeline_input_queue_cap` | int | `256` | Buffer capacity between transport read and pipeline push. Increase under high concurrent load. |
+| `ws_write_coalesce_ms` | int | `0` | WebSocket write coalescing window in milliseconds. `0` disables coalescing. When enabled, reduces syscalls at the cost of slight added latency. |
+| `ws_write_coalesce_max_frames` | int | — | Max frames per coalesced WebSocket write when coalescing is enabled. |
+
+### TLS
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `tls_enable` | bool | `false` | Enable HTTPS. When true, `tls_cert_file` and `tls_key_file` are required. |
+| `tls_cert_file` | string | — | Filesystem path to the TLS certificate (PEM format). |
+| `tls_key_file` | string | — | Filesystem path to the TLS private key (PEM format). |
+
+### Security
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `server_api_key` | string | — | When non-empty, protected endpoints require `Authorization: Bearer <key>` or `X-API-Key: <key>`. |
+| `max_request_body_bytes` | int64 | `262144` (256 KB) | Maximum JSON request body size. `0` disables the limit. Applies to `/webrtc/offer`, `/start`, etc. |
+| `cors_allowed_origins` | []string | `[]` | List of origins allowed for CORS. Empty means no CORS headers are added. |
+
+### Turn Detection
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `turn_detection` | string | `"none"` | Turn detection mode. `"none"`: disabled. `"silence"`: end turn after a silence gap. |
+| `turn_stop_secs` | float64 | `3.0` | Silence duration (seconds) after speech that triggers an end-of-turn. Only used when `turn_detection` is `"silence"`. |
+| `turn_pre_speech_ms` | float64 | `500` | Pre-speech audio padding in milliseconds prepended to each turn. |
+| `turn_max_duration_secs` | float64 | `8.0` | Maximum turn/segment duration in seconds before forcing an end-of-turn. |
+| `vad_start_secs` | float64 | `0` | VAD start trigger time for turn detection in seconds. |
+| `turn_async` | bool | `false` | Use async `AnalyzeEndOfTurn` instead of synchronous `AppendAudio`. |
+
+### User Lifecycle
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `user_turn_stop_timeout_secs` | float64 | Falls back to `turn_stop_secs` or `5.0` | Timeout with no activity before forcing a user turn stop. |
+| `user_idle_timeout_secs` | float64 | `0` | After the bot finishes speaking, emit a `UserIdleFrame` when the user has been idle for this many seconds. `0` disables idle detection. |
+
+### VAD (Voice Activity Detection)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `vad_type` | string | `"energy"` | VAD backend. `"energy"`: RMS energy detector. `"silero"`: Silero VAD neural model. |
+| `vad_threshold` | float64 | `0.02` | RMS threshold for the energy VAD detector. Lower values detect quieter speech. |
+| `vad_confidence` | float64 | `0.7` | Confidence threshold for neural VAD (Silero). Range `0–1`. |
+| `vad_start_secs_vad` | float64 | `0.2` | Minimum speech duration (seconds) before VAD considers audio as a valid utterance start. |
+| `vad_stop_secs` | float64 | `0.2` | Trailing silence (seconds) required for VAD to declare end of speech. |
+| `vad_min_volume` | float64 | `0.6` | Minimum audio volume for VAD activation (normalized `0–1`). Raise to suppress background noise; lower if VAD misses quiet speech. |
+| `vad_batch_size` | int | `1` | Number of consecutive audio chunks to batch before VAD inference. Values greater than `1` are useful with Silero to match its expected frame size. |
+
+### Interruptions
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `allow_interruptions` | bool | `false` | Allow the user to interrupt bot speech mid-utterance. |
+| `interruption_strategy` | string | — | Interruption strategy. `"keyword"`: interrupt only when a keyword is detected (future). Default strategy fires on any user speech. |
+| `min_words` | int | — | Minimum word count in the user's utterance before interruption is triggered. Used with `"keyword"` strategy. |
+
+### Runner and Telephony
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `runner_transport` | string | — | Development/telephony runner transport. Options: `"webrtc"`, `"daily"`, `"twilio"`, `"telnyx"`, `"plivo"`, `"exotel"`, `"livekit"`. Empty uses the standard WebSocket transport at `/ws`. |
+| `runner_port` | int | `8080` | Port override for runner transports. Python runner uses `7860`. |
+| `proxy_host` | string | — | Public hostname for telephony webhook XML (e.g. `"mybot.ngrok.io"`). No protocol prefix. |
+| `dialin` | bool | `false` | Enable Daily PSTN dial-in webhook at `POST /daily-dialin-webhook`. Only valid with `runner_transport=daily`. |
+| `daily_dialin_webhook_secret` | string | — | When set, requires `X-Webhook-Secret: <secret>` on `POST /daily-dialin-webhook`. |
+
+### Session Store
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `session_store` | string | `"memory"` | Session storage backend. `"memory"`: in-process, not shared across instances. `"redis"`: shared via Redis for horizontal scaling. |
+| `redis_url` | string | — | Redis connection URL (e.g. `"redis://localhost:6379/0"`). Required when `session_store` is `"redis"`. |
+| `session_ttl_secs` | int | `3600` | Session TTL in seconds. Applies to the Redis store. |
+
+### Observability
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `metrics_enabled` | *bool | `true` | Expose Prometheus metrics at `/metrics`. When omitted (null), defaults to `true`. Set to `false` to disable. |
+
+### Recording
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `recording.enable` | bool | `false` | Enable per-session audio recording with async S3 upload. |
+| `recording.bucket` | string | — | S3 bucket name for recordings. |
+| `recording.base_path` | string | — | Key prefix within the S3 bucket (e.g. `"recordings/"`). |
+| `recording.format` | string | — | File format/extension (e.g. `"wav"`). |
+| `recording.worker_count` | int | — | Number of concurrent S3 upload worker goroutines. |
+| `recording.queue_cap` | int | `32` | Upload job queue capacity. Tune based on S3 bandwidth and concurrent session count. |
+| `recording.max_retries` | int | `3` | S3 upload retry attempts on failure. Uses exponential backoff between attempts. |
+
+### Transcripts
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `transcripts.enable` | bool | `false` | Enable per-message transcript logging to a SQL database. |
+| `transcripts.driver` | string | — | SQL driver name (e.g. `"postgres"`, `"mysql"`). Required when enabled. |
+| `transcripts.dsn` | string | — | SQL connection string / DSN. Required when enabled. |
+| `transcripts.table_name` | string | `"call_transcripts"` | SQL table to write transcript rows into. |
+
+### Plugins
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `plugins` | []string | `[]` | List of plugin names to activate (e.g. `["echo", "frame_filter"]`). |
+| `plugin_options` | `map[string]json.RawMessage` | — | Per-plugin JSON configuration. Key is the plugin name; value is a raw JSON object passed to the plugin on init. |
+
+### MCP (Model Context Protocol)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mcp.command` | string | — | MCP server executable (e.g. `"npx"`, `"go"`). |
+| `mcp.args` | []string | — | Arguments to the MCP server command (e.g. `["-y", "mcp-server"]`). |
+| `mcp.tools_filter` | []string | — | When non-empty, only the listed tool names are registered with the LLM. All tools are registered when this field is omitted. |
+
+---
+
+## Minimal Config Example
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "api_keys": {
+    "openai": "sk-..."
+  }
+}
+```
+
+## Full Example with Common Settings
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+
+  "stt_provider": "groq",
+  "llm_provider": "openai",
+  "tts_provider": "openai",
+
+  "model": "gpt-4.1-mini",
+  "stt_model": "whisper-large-v3-turbo",
+
+  "transport": "both",
+  "webrtc_ice_servers": [
+    "stun:stun.l.google.com:19302"
+  ],
+
+  "turn_detection": "silence",
+  "turn_stop_secs": 3.0,
+  "vad_type": "energy",
+  "vad_threshold": 0.01,
+  "vad_min_volume": 0.25,
+
+  "allow_interruptions": true,
+
+  "log_level": "info",
+  "json_logs": true,
+
+  "metrics_enabled": true,
+  "server_api_key": "",
+  "cors_allowed_origins": [],
+  "max_request_body_bytes": 262144,
+
+  "plugins": []
+}
+```
+
+<Tip>
+  In production, omit all `api_keys` entries from `config.json` and set the corresponding environment variables instead (e.g. `OPENAI_API_KEY`, `GROQ_API_KEY`). This keeps secrets out of config files that might be checked into version control or shipped in container images.
+</Tip>

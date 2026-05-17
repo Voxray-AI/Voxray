@@ -1,0 +1,213 @@
+---
+title: "Integrations Overview"
+description: "Voxray supports 30+ STT, LLM, TTS, and realtime providers. Mix and match across pipeline stages — use a different provider for each of STT, LLM, and TTS, or point all three at a single service."
+---
+
+## Provider Matrix
+
+Each row is a provider supported by Voxray. Checkmarks indicate which pipeline stages the provider covers. The **API Key Env Var** column shows the environment variable Voxray reads when no key is set in `api_keys`.
+
+| Provider | STT | LLM | TTS | Realtime | API Key Env Var |
+|----------|:---:|:---:|:---:|:--------:|-----------------|
+| OpenAI | ✓ | ✓ | ✓ | ✓ | `OPENAI_API_KEY` |
+| Anthropic | | ✓ | | | `ANTHROPIC_API_KEY` |
+| Groq | ✓ | ✓ | ✓ | | `GROQ_API_KEY` |
+| Grok (xAI) | | ✓ | | | `XAI_API_KEY` |
+| Cerebras | | ✓ | | | `CEREBRAS_API_KEY` |
+| Mistral | | ✓ | | | `MISTRAL_API_KEY` |
+| DeepSeek | | ✓ | | | `DEEPSEEK_API_KEY` |
+| AWS | ✓ | ✓ | ✓ | | AWS SDK credential chain |
+| Google (Gemini) | ✓ | ✓ | ✓ | | `GOOGLE_API_KEY` |
+| Google Vertex AI | | ✓ | | | Application Default Credentials |
+| Ollama | | ✓ | | | `OLLAMA_API_KEY` (optional) |
+| Qwen (Dashscope) | | ✓ | | | `DASHSCOPE_API_KEY` |
+| AsyncAI | | ✓ | | | `ASYNC_AI_API_KEY` |
+| Fish | | ✓ | | | `FISH_API_KEY` |
+| Inworld | | ✓ | ✓ | | `INWORLD_API_KEY` |
+| Minimax | | ✓ | ✓ | | `MINIMAX_API_KEY` |
+| Moondream | | ✓ | | | `MOONDREAM_API_KEY` |
+| OpenPipe | | ✓ | | | `OPENPIPE_API_KEY` |
+| ElevenLabs | ✓ | | ✓ | | `ELEVENLABS_API_KEY` |
+| Sarvam | ✓ | | ✓ | | `SARVAM_API_KEY` |
+| Hume | | | ✓ | ✓ | `HUME_API_KEY` |
+| Neuphonic | | | ✓ | | `NEUPHONIC_API_KEY` |
+| XTTS | | | ✓ | | `XTTS_API_KEY` (self-hosted) |
+| Whisper | ✓ | | | | `WHISPER_API_KEY` or `OPENAI_API_KEY` |
+| Camb | ✓ | | | | `CAMB_API_KEY` |
+| Gradium | ✓ | | | | `GRADIUM_API_KEY` |
+| Soniox | ✓ | | | | `SONIOX_API_KEY` |
+
+<Note>
+  Google Vertex AI uses [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials) rather than an API key. Set `GOOGLE_CLOUD_PROJECT` and optionally `GOOGLE_CLOUD_LOCATION` (default: `us-central1`). AWS similarly uses the SDK credential chain — see the [AWS integration guide](/build/integrations/aws) for details.
+</Note>
+
+## Setting API Keys
+
+API keys can be provided two ways. Environment variables take precedence when both are set.
+
+**Config file (`api_keys` object):**
+
+```json
+{
+  "api_keys": {
+    "openai": "sk-...",
+    "groq": "gsk_...",
+    "elevenlabs": "el_..."
+  }
+}
+```
+
+**Environment variables:**
+
+```bash
+export OPENAI_API_KEY=sk-...
+export GROQ_API_KEY=gsk_...
+export ELEVENLABS_API_KEY=el_...
+```
+
+## Mix-and-Match Providers
+
+STT, LLM, and TTS are configured independently with `stt_provider`, `llm_provider`, and `tts_provider`. There is no requirement to use the same vendor for all three stages. Use `provider` as a fallback when you want the same vendor across all stages without repeating it.
+
+```json
+{
+  "stt_provider": "groq",
+  "llm_provider": "anthropic",
+  "tts_provider": "elevenlabs"
+}
+```
+
+### Recommended Combinations
+
+<AccordionGroup>
+  <Accordion title="Budget — Groq across the board">
+    All three stages run on Groq. One API key covers STT, LLM, and TTS. Groq's free tier is generous for development and light production use.
+
+    ```json
+    {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "stt_model": "whisper-large-v3-turbo",
+      "api_keys": {
+        "groq": "gsk_..."
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Quality — Groq STT + Anthropic LLM + ElevenLabs TTS">
+    Fast transcription from Groq, high-quality reasoning from Anthropic Claude, and expressive voice synthesis from ElevenLabs. A common production stack for voice agents where quality matters more than cost.
+
+    ```json
+    {
+      "stt_provider": "groq",
+      "llm_provider": "anthropic",
+      "tts_provider": "elevenlabs",
+      "model": "claude-3-5-sonnet-20241022",
+      "tts_voice": "Rachel",
+      "api_keys": {
+        "groq": "gsk_...",
+        "anthropic": "sk-ant-...",
+        "elevenlabs": "el_..."
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Local — Ollama LLM + Groq STT + Sarvam TTS">
+    Run the LLM entirely on-premises with Ollama. Only a Groq API key is required for STT; Sarvam handles TTS. Suitable for air-gapped or privacy-sensitive deployments where the LLM cannot leave your network.
+
+    ```json
+    {
+      "stt_provider": "groq",
+      "llm_provider": "ollama",
+      "tts_provider": "sarvam",
+      "model": "llama3.2",
+      "api_keys": {
+        "groq": "gsk_..."
+      }
+    }
+    ```
+
+    Start Ollama locally with `ollama serve` before running Voxray. No Sarvam key is needed for TTS if you are using a self-hosted Sarvam-compatible endpoint.
+  </Accordion>
+
+  <Accordion title="AWS-native — Transcribe + Bedrock + Polly">
+    All three stages run inside AWS. A single IAM policy covers all required permissions. Ideal for AWS-first infrastructure where data residency and VPC network paths are a priority.
+
+    ```json
+    {
+      "stt_provider": "aws",
+      "llm_provider": "aws",
+      "tts_provider": "aws",
+      "model": "anthropic.claude-3-haiku-20240307-v1:0",
+      "tts_voice": "Joanna",
+      "api_keys": {
+        "aws_region": "us-east-1"
+      }
+    }
+    ```
+
+    See the [AWS integration guide](/build/integrations/aws) for IAM policy details and Bedrock model access setup.
+  </Accordion>
+
+  <Accordion title="Indian languages — Sarvam STT + Groq LLM + Sarvam TTS">
+    Sarvam provides first-class support for Hindi, Tamil, Telugu, Bengali, Kannada, and other Indian languages. Groq handles LLM inference. This stack is production-ready for Indian-language voice agents.
+
+    ```json
+    {
+      "stt_provider": "sarvam",
+      "llm_provider": "groq",
+      "tts_provider": "sarvam",
+      "model": "llama-3.1-8b-instant",
+      "stt_model": "saarika:v2.5",
+      "stt_language": "hi-IN",
+      "tts_model": "bulbul:v2",
+      "tts_voice": "anushka",
+      "api_keys": {
+        "sarvam": "...",
+        "groq": "gsk_..."
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Integration Guides
+
+<CardGroup cols={3}>
+  <Card title="OpenAI" icon="robot" href="/build/integrations/openai">
+    GPT-4.1, Whisper, and TTS voices. The default provider when no provider is configured.
+  </Card>
+  <Card title="Anthropic" icon="brain" href="/build/integrations/anthropic">
+    Claude 3 and Claude 3.5 models via the Anthropic API.
+  </Card>
+  <Card title="Groq" icon="bolt" href="/build/integrations/groq">
+    Ultra-fast LPU inference for STT, LLM, and TTS on a single API key.
+  </Card>
+  <Card title="Ollama" icon="server" href="/build/integrations/ollama">
+    Run open-weight models locally or on-prem. No API key required.
+  </Card>
+  <Card title="ElevenLabs" icon="waveform-lines" href="/build/integrations/elevenlabs">
+    High-quality neural TTS with voice cloning and 30+ languages.
+  </Card>
+  <Card title="Sarvam" icon="language" href="/build/integrations/sarvam">
+    STT and TTS optimized for Hindi and other Indian languages.
+  </Card>
+  <Card title="AWS" icon="aws" href="/build/integrations/aws">
+    Amazon Transcribe, Bedrock, and Polly via the AWS SDK credential chain.
+  </Card>
+</CardGroup>
+
+## Not Listed?
+
+If you need a provider that is not in the matrix above, Voxray's provider system is designed to be extended. Each provider is a small Go package that implements one or more of the `LLMService`, `STTService`, or `TTSService` interfaces defined in `pkg/services`.
+
+To add a new provider:
+
+1. Create a package under `pkg/services/<provider-name>/` implementing the relevant interface(s).
+2. Register the provider constant and add it to the appropriate `Supported*Providers` slice in `pkg/services/factory.go`.
+3. Add a case to `NewLLMFromConfig`, `NewSTTFromConfig`, or `NewTTSFromConfig` (whichever applies).
+4. Add the API key resolution case to `apiKeyForProvider` in the same file.
+
+See the [contributing guide](/contributing/adding-providers) for the full walkthrough, interface signatures, and a reference implementation you can use as a starting point.

@@ -1,0 +1,317 @@
+---
+title: "Docker Compose"
+description: "Run Voxray locally or on a single host with Docker Compose — optional Redis for session persistence and horizontal scaling."
+---
+
+The repository ships a `docker-compose.yml` for local development and single-node deployments. It builds the Voxray image from source, mounts your `config.json`, and optionally starts a Redis instance for shared session state.
+
+<Info>
+Docker Compose is the right tool for local development and single-host staging environments. For production at scale — multiple hosts, rolling deploys, autoscaling — use Kubernetes instead. See the [scaling guide](/deploy/scaling) for a Helm-based setup.
+</Info>
+
+## docker-compose.yml
+
+```yaml title="docker-compose.yml"
+# Optional docker-compose for local development or single-node deployment.
+# For production, use orchestration (Kubernetes, etc.) and set env vars or mount config.
+
+services:
+  voxray:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - VOXRAY_CONFIG=/app/config.json
+      # Override with env or config file: PORT, HOST, VOXRAY_LOG_LEVEL, VOXRAY_JSON_LOGS
+      # - PORT=8080
+      # - VOXRAY_LOG_LEVEL=info
+    volumes:
+      - ./config.json:/app/config.json:ro
+    # Optional: use Redis for session store when scaling horizontally
+    # depends_on:
+    #   - redis
+    # environment:
+    #   - session_store=redis
+    #   - redis_url=redis://redis:6379/0
+
+  # Uncomment to use Redis-backed session store (horizontal scaling)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+
+# volumes:
+#   redis_data:
+```
+
+### Field annotations
+
+| Field | Value | What it does |
+|-------|-------|--------------|
+| `build: .` | Current directory | Builds the Docker image from the `Dockerfile` in the repo root each time `docker compose up --build` is run. Omit `--build` to reuse a previously built image. |
+| `ports: "8080:8080"` | `host:container` | Maps host port 8080 to the container's listening port. Change the left side to run multiple instances on different host ports. |
+| `VOXRAY_CONFIG` | `/app/config.json` | Tells Voxray where to read its config at startup. Must match the volume mount destination. |
+| `volumes: ./config.json:/app/config.json:ro` | Host path → container path | Mounts your local `config.json` read-only into the container. The `:ro` flag prevents the process from accidentally writing to the file. |
+| `depends_on: redis` | (commented out) | Uncomment together with the redis service to ensure Redis starts before Voxray. |
+| `redis: image: redis:7-alpine` | (commented out) | Lightweight Redis 7 on Alpine. Used only when `session_store: redis` is set in config. |
+| `redis_data` named volume | (commented out) | Persists Redis data across `docker compose down` restarts. Without this, session data is lost when the Redis container stops. |
+
+## Prerequisites
+
+Before running Compose, create your config file from the example:
+
+```bash
+cp config.example.json config.json
+```
+
+Open `config.json` and fill in at minimum:
+- Your LLM provider API key (e.g. `openai_api_key` or `groq_api_key`)
+- Your STT provider API key (if not using the same provider)
+- Your TTS provider API key
+
+<Warning>
+Do not commit `config.json` to version control — it contains API keys. The repository `.gitignore` excludes it by default. Use environment variables or a secrets manager for production credentials.
+</Warning>
+
+## Basic usage
+
+### Start (single instance, in-memory sessions)
+
+```bash
+# Build and start in the foreground
+docker compose up
+
+# Or build and start detached
+docker compose up -d --build
+```
+
+On first run, Docker builds the Voxray image from source. Subsequent runs reuse the cached image unless you pass `--build`.
+
+### View logs
+
+```bash
+# Tail logs from the voxray service
+docker compose logs -f voxray
+
+# Tail all services (voxray + redis if running)
+docker compose logs -f
+```
+
+### Stop
+
+```bash
+# Stop and remove containers (volumes are preserved)
+docker compose down
+
+# Stop, remove containers, and remove named volumes
+docker compose down -v
+```
+
+<Note>
+`docker compose down` without `-v` preserves the `redis_data` named volume, so Redis session state survives a compose restart. Use `-v` only when you want a completely clean slate.
+</Note>
+
+## Environment variable injection
+
+There are two ways to pass provider API keys and runtime settings to Voxray in Compose.
+
+### Option A: Inline in docker-compose.yml
+
+Add keys directly to the `environment` block. This is convenient for local development but keep the file out of version control.
+
+```yaml title="docker-compose.yml (with inline keys)"
+services:
+  voxray:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - VOXRAY_CONFIG=/app/config.json
+      - GROQ_API_KEY=gsk_...
+      - OPENAI_API_KEY=sk-...
+      - VOXRAY_LOG_LEVEL=debug
+      - VOXRAY_JSON_LOGS=true
+    volumes:
+      - ./config.json:/app/config.json:ro
+```
+
+### Option B: .env file (recommended)
+
+Create a `.env` file in the same directory as `docker-compose.yml`. Compose automatically loads it.
+
+```bash title=".env"
+GROQ_API_KEY=gsk_...
+OPENAI_API_KEY=sk-...
+VOXRAY_LOG_LEVEL=info
+VOXRAY_JSON_LOGS=true
+```
+
+Reference the variables in `docker-compose.yml` using `${VAR}` syntax:
+
+```yaml title="docker-compose.yml (with .env interpolation)"
+services:
+  voxray:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - VOXRAY_CONFIG=/app/config.json
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - VOXRAY_LOG_LEVEL=${VOXRAY_LOG_LEVEL:-info}
+      - VOXRAY_JSON_LOGS=${VOXRAY_JSON_LOGS:-false}
+    volumes:
+      - ./config.json:/app/config.json:ro
+```
+
+Add `.env` to `.gitignore` so secrets are never committed.
+
+<Tip>
+The `${VAR:-default}` syntax in Compose sets a fallback value when the variable is absent from `.env`. Use it for optional settings like `VOXRAY_LOG_LEVEL` so the compose file works without a fully populated `.env`.
+</Tip>
+
+## Enabling Redis for session persistence
+
+The default configuration keeps session state in memory. This is fine for a single container, but state is lost if the container restarts and cannot be shared across replicas.
+
+Uncomment the Redis service and volume in `docker-compose.yml`:
+
+```yaml title="docker-compose.yml (with Redis enabled)"
+services:
+  voxray:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - VOXRAY_CONFIG=/app/config.json
+      - session_store=redis
+      - redis_url=redis://redis:6379/0
+    volumes:
+      - ./config.json:/app/config.json:ro
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+```
+
+Then start both services:
+
+```bash
+docker compose up -d
+```
+
+### Why the named volume matters
+
+Without `redis_data:/data`, Redis stores all data in the container's writable layer. When the Redis container is removed (e.g. `docker compose down`), all session state is discarded. With the named volume, `redis_data` persists on the host even after the container is gone. The next `docker compose up` reattaches the same volume and Redis resumes from its previous state.
+
+### Readiness probe with Redis
+
+When `session_store=redis` is configured, the `/ready` endpoint returns `503 Service Unavailable` if Redis is unreachable. Use this to gate traffic:
+
+```bash
+# Check readiness before routing traffic
+curl -sf http://localhost:8080/ready && echo "ready" || echo "not ready"
+```
+
+## Multi-replica setup
+
+To run two Voxray replicas behind a single Compose network (for load testing or verifying Redis session sharing), use the `deploy.replicas` key. This requires Redis — sessions must be stored externally so either replica can serve them.
+
+```yaml title="docker-compose.yml (two replicas)"
+services:
+  voxray:
+    build: .
+    ports:
+      - "8080-8081:8080"   # Maps host 8080→replica-1, 8081→replica-2
+    environment:
+      - VOXRAY_CONFIG=/app/config.json
+      - session_store=redis
+      - redis_url=redis://redis:6379/0
+    volumes:
+      - ./config.json:/app/config.json:ro
+    depends_on:
+      - redis
+    deploy:
+      replicas: 2
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+```
+
+Start with:
+
+```bash
+docker compose up -d --scale voxray=2
+```
+
+<Warning>
+The `deploy.replicas` key is honoured by `docker compose` but ignored when using plain `docker-compose` (V1 CLI). Use the `docker compose` (V2) plugin, which ships with Docker Desktop and Docker Engine 20.10+.
+</Warning>
+
+Also update `config.json` to set the session store:
+
+```json title="config.json (session store)"
+{
+  "session_store": "redis",
+  "redis_url": "redis://redis:6379/0"
+}
+```
+
+<Note>
+For true production horizontal scaling across multiple hosts, Docker Compose is not the right tool. Use Kubernetes with a Deployment, a Service, and a Redis instance (or Elasticache/Memorystore). See the [scaling guide](/deploy/scaling) for a complete Kubernetes manifest.
+</Note>
+
+## Common commands reference
+
+```bash
+# Build and start (foreground)
+docker compose up
+
+# Build and start (detached)
+docker compose up -d --build
+
+# Start with Redis (after uncommenting redis service)
+docker compose up -d
+
+# Scale to 2 voxray replicas
+docker compose up -d --scale voxray=2
+
+# Tail voxray logs
+docker compose logs -f voxray
+
+# Tail all service logs
+docker compose logs -f
+
+# Restart just the voxray service (e.g. after config change)
+docker compose restart voxray
+
+# Stop all services, preserve volumes
+docker compose down
+
+# Stop all services, remove volumes (full reset)
+docker compose down -v
+
+# Check running services
+docker compose ps
+```
+
+## Next steps
+
+- [Docker](/deploy/docker) — single-container build details and Dockerfile reference
+- [Deployment overview](/deploy/overview) — full environment variable reference, TLS, security checklist
+- [Scaling](/deploy/scaling) — Kubernetes deployment for multi-host production

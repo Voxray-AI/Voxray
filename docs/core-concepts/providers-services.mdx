@@ -1,0 +1,203 @@
+---
+title: "Providers & Services"
+description: "How Voxray abstracts STT, LLM, and TTS behind Go interfaces, and how to select any supported provider by changing a single config value."
+---
+
+## What are services?
+
+Voxray organizes all AI calls — speech recognition, language model inference, and speech synthesis — behind three Go interfaces: `STTService`, `LLMService`, and `TTSService`. The rest of the pipeline (VAD, turn detection, transport, recording) never imports a provider SDK directly. It only calls methods on these interfaces.
+
+This means you can swap from OpenAI Whisper to Groq's transcription endpoint, or from OpenAI GPT-4o to Anthropic Claude, by changing one or two keys in `config.json`. No code changes, no recompilation.
+
+<Tip>
+Provider selection, model names, and voices are all resolved at startup from `config.json`. After the factory constructs the service objects, every pipeline stage works identically regardless of which provider is underneath.
+</Tip>
+
+---
+
+## Service interfaces
+
+These are the actual Go interfaces every provider implementation must satisfy. They live in `pkg/services/interfaces.go` and `pkg/services/llmapi/api.go`.
+
+```go
+// STTService — batch transcription. The pipeline calls this for each audio segment.
+type STTService interface {
+    Transcribe(ctx context.Context, audio []byte, sampleRate, numChannels int) ([]*frames.TranscriptionFrame, error)
+}
+
+// STTStreamingService — extends STTService with streaming transcription.
+// Providers that implement this send interim and final TranscriptionFrames as
+// audio arrives on audioCh, without waiting for the full segment.
+type STTStreamingService interface {
+    STTService
+    TranscribeStream(
+        ctx context.Context,
+        audioCh <-chan []byte,
+        sampleRate, numChannels int,
+        outCh chan<- frames.Frame,
+    )
+}
+
+// TTSService — batch synthesis. Returns raw PCM audio frames from a complete text string.
+type TTSService interface {
+    Speak(ctx context.Context, text string, sampleRate int) ([]*frames.TTSAudioRawFrame, error)
+}
+
+// TTSStreamingService — extends TTSService with incremental audio output.
+// Providers that implement this begin writing TTSAudioRawFrames to outCh
+// before the full response is received, reducing time-to-first-audio.
+type TTSStreamingService interface {
+    TTSService
+    SpeakStream(ctx context.Context, text string, sampleRate int, outCh chan<- frames.Frame)
+}
+
+// LLMService — chat completion with optional token streaming.
+// The onToken callback receives each LLMTextFrame as tokens arrive.
+type LLMService interface {
+    Chat(ctx context.Context, messages []map[string]any, onToken func(*frames.LLMTextFrame)) error
+}
+
+// LLMServiceWithTools — extends LLMService with function/tool calling.
+// Registered tools are forwarded to the LLM in its next chat request.
+// Tool handlers are invoked synchronously during streaming.
+type LLMServiceWithTools interface {
+    LLMService
+    RegisterTool(schema schemas.FunctionSchema, handler ToolHandler)
+    ToolsSchema() *schemas.ToolsSchema
+}
+
+// ToolHandler — called when the LLM emits a tool call.
+// Returns the result string to feed back into the conversation.
+type ToolHandler func(ctx context.Context, toolName string, arguments map[string]any) (string, error)
+```
+
+---
+
+## Realtime sessions
+
+Some providers (OpenAI Realtime, Hume, Inworld) expose a single bidirectional session that merges STT, LLM, and TTS into one persistent connection, rather than three separate request/response calls. Voxray models this with a separate `RealtimeSession` interface.
+
+```go
+// RealtimeSession — long-lived bidirectional AI conversation.
+// Audio and text flow in; LLM text and TTS audio flow out over Events().
+type RealtimeSession interface {
+    SendText(ctx context.Context, text string) error
+    SendAudio(ctx context.Context, audio []byte, sampleRate, numChannels int) error
+    Events() <-chan RealtimeEvent
+    Close(ctx context.Context) error
+}
+
+// RealtimeService — factory for realtime sessions.
+type RealtimeService interface {
+    NewSession(ctx context.Context, cfg RealtimeConfig) (RealtimeSession, error)
+}
+```
+
+<Note>
+Realtime providers bypass the independent STT → LLM → TTS chain. Instead, `RealtimeSession.Events()` emits `RealtimeEvent` values that carry either `LLMTextFrame` or `TTSAudioRawFrame` — whatever the provider sends first. This achieves lower latency but removes the ability to mix providers (e.g. OpenAI Realtime STT + Anthropic LLM). Use `realtime.NewFromConfig(cfg, provider)` to construct realtime sessions; never call `NewLLMFromConfig` / `NewSTTFromConfig` / `NewTTSFromConfig` for realtime providers.
+</Note>
+
+---
+
+## Factory functions
+
+`pkg/services/factory.go` wires provider constants to concrete implementations. You never construct provider clients directly.
+
+| Function | Purpose |
+|---|---|
+| `NewLLMFromConfig(cfg, provider, model)` | Returns an `LLMService` for `provider` using `model`. Falls back to `gpt-3.5-turbo` if model is empty and provider is OpenAI. |
+| `NewSTTFromConfig(cfg, provider)` | Returns an `STTService` for `provider`. Uses `cfg.STTModel` and `cfg.STTLanguage` where the provider supports them. |
+| `NewTTSFromConfig(cfg, provider, model, voice)` | Returns a `TTSService` for `provider`. Voice defaults apply per-provider (e.g. `"Joanna"` for AWS Polly). |
+| `NewServicesFromConfig(cfg)` | Convenience wrapper. Resolves `stt_provider`, `llm_provider`, `tts_provider` (or falls back to `provider`) and returns all three services at once. |
+
+`NewServicesFromConfig` is what the pipeline runner calls at startup. It applies the provider precedence rules so you don't have to call the individual functions yourself unless you need fine-grained control.
+
+---
+
+## API key resolution
+
+For every provider, the factory calls `cfg.GetAPIKey(serviceName, envVarName)`. The resolution order is:
+
+1. **`config.api_keys[serviceName]`** — value in the JSON config's `api_keys` map.
+2. **Environment variable** — the provider-specific env var (e.g. `OPENAI_API_KEY`).
+3. **Empty string** — the service is constructed with an empty key. Most providers will return authentication errors at the first API call.
+
+<Warning>
+Never commit API keys to source control. In production, set them via environment variables or a secrets manager and leave `api_keys` values empty (or omit the keys entirely) in `config.json`.
+</Warning>
+
+Special cases:
+
+| Provider | Notes |
+|---|---|
+| `google_vertex` | Uses Application Default Credentials (ADC). No API key is looked up — configure via `gcloud auth application-default login` or a service account. |
+| `qwen` | Checks `DASHSCOPE_API_KEY` first, then `QWEN_API_KEY`. |
+| `whisper` | Checks `WHISPER_API_KEY` first, then falls back to `OPENAI_API_KEY`. |
+| `aws` | Secret key is resolved for auth; region is read separately from `api_keys.aws_region` or `AWS_REGION` (defaults to `us-east-1`). |
+| `google` | Project and location for Cloud Speech/TTS are resolved from `api_keys.google_cloud_project` / `GOOGLE_CLOUD_PROJECT` and `api_keys.google_cloud_location` / `GOOGLE_CLOUD_LOCATION` (defaults to `us-central1`). |
+
+---
+
+## Provider support matrix
+
+The table below covers every provider registered in `factory.go`. The **API Key Env Var** column is the fallback environment variable if the key is not in `api_keys`.
+
+| Provider | Config Key | STT | LLM | TTS | Realtime | API Key Env Var |
+|---|---|:---:|:---:|:---:|:---:|---|
+| OpenAI | `openai` | Yes | Yes | Yes | Yes | `OPENAI_API_KEY` |
+| Groq | `groq` | Yes | Yes | Yes | No | `GROQ_API_KEY` |
+| Anthropic | `anthropic` | No | Yes | No | No | `ANTHROPIC_API_KEY` |
+| Grok (xAI) | `grok` | No | Yes | No | No | `XAI_API_KEY` |
+| Cerebras | `cerebras` | No | Yes | No | No | `CEREBRAS_API_KEY` |
+| Mistral | `mistral` | No | Yes | No | No | `MISTRAL_API_KEY` |
+| DeepSeek | `deepseek` | No | Yes | No | No | `DEEPSEEK_API_KEY` |
+| AWS | `aws` | Yes | Yes | Yes | No | `AWS_SECRET_ACCESS_KEY` |
+| Google | `google` | Yes | Yes | Yes | No | `GOOGLE_API_KEY` |
+| Google Vertex | `google_vertex` | No | Yes | No | No | ADC (no key) |
+| Ollama | `ollama` | No | Yes | No | No | `OLLAMA_API_KEY` |
+| Qwen | `qwen` | No | Yes | No | No | `DASHSCOPE_API_KEY` |
+| AsyncAI | `asyncai` | No | Yes | No | No | `ASYNC_AI_API_KEY` |
+| Fish | `fish` | No | Yes | No | No | `FISH_API_KEY` |
+| Inworld | `inworld` | No | Yes | Yes | Yes | `INWORLD_API_KEY` |
+| Minimax | `minimax` | No | Yes | Yes | No | `MINIMAX_API_KEY` |
+| Moondream | `moondream` | No | Yes | No | No | `MOONDREAM_API_KEY` |
+| OpenPipe | `openpipe` | No | Yes | No | No | `OPENPIPE_API_KEY` |
+| ElevenLabs | `elevenlabs` | Yes | No | Yes | No | `ELEVENLABS_API_KEY` |
+| Sarvam | `sarvam` | Yes | No | Yes | No | `SARVAM_API_KEY` |
+| Hume | `hume` | No | No | Yes | Yes | `HUME_API_KEY` |
+| Neuphonic | `neuphonic` | No | No | Yes | No | `NEUPHONIC_API_KEY` |
+| XTTS | `xtts` | No | No | Yes | No | `XTTS_API_KEY` |
+| Whisper | `whisper` | Yes | No | No | No | `WHISPER_API_KEY` |
+| Camb | `camb` | Yes | No | No | No | `CAMB_API_KEY` |
+| Gradium | `gradium` | Yes | No | No | No | `GRADIUM_API_KEY` |
+| Soniox | `soniox` | Yes | No | No | No | `SONIOX_API_KEY` |
+
+<Info>
+AWS STT uses Amazon Transcribe. AWS LLM uses Amazon Bedrock. AWS TTS uses Amazon Polly. All three share the same `aws` config key but use different regional API surfaces; the AWS SDK credential chain (env vars, `~/.aws/credentials`, IAM role) applies independently of the `aws` entry in `api_keys`.
+</Info>
+
+---
+
+## Realtime providers in depth
+
+Three providers implement the `RealtimeSession` interface rather than separate STT/LLM/TTS services. Each maintains a single persistent WebSocket or streaming RPC to the provider.
+
+| Provider | Session type | Notes |
+|---|---|---|
+| **OpenAI Realtime** | WebSocket (`gpt-4o-realtime-*`) | Low-latency bidirectional audio and text; supports function calling mid-session. |
+| **Hume** | Streaming API | Emotion-aware voice; TTS is also available as a standalone service for non-realtime pipelines. |
+| **Inworld** | Streaming RPC | Game/character-oriented; LLM and TTS are also independently available for standard pipelines. |
+
+When `provider` is set to one of these in the config, construct sessions with `realtime.NewFromConfig(cfg, provider)` — not via the `NewLLMFromConfig`/`NewSTTFromConfig`/`NewTTSFromConfig` factories. The runner selects the realtime path automatically when a realtime provider is detected.
+
+**Request/response pipeline** (standard):
+```
+AudioIn → VAD → STTService.Transcribe() → LLMService.Chat() → TTSService.Speak() → AudioOut
+```
+
+**Realtime session pipeline**:
+```
+AudioIn → RealtimeSession.SendAudio() ──► RealtimeSession.Events() → AudioOut/TextOut
+```
+
+The realtime path eliminates two round-trip boundaries (STT result → LLM, LLM token → TTS), which is the primary source of latency reduction.

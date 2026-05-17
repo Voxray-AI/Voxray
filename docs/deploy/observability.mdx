@@ -1,0 +1,340 @@
+---
+title: "Observability"
+description: "Health endpoints, Prometheus metrics, structured logging, and alerting for Voxray in production."
+---
+
+## Health endpoints
+
+Voxray exposes two HTTP endpoints for health checking. They are unauthenticated and designed to be called directly by load balancers and orchestrators.
+
+| Endpoint | Purpose | Success | Failure condition |
+|----------|---------|---------|-------------------|
+| `GET /health` | **Liveness** — is the process alive and responsive? | `200 OK` | Process not running or HTTP server unresponsive |
+| `GET /ready` | **Readiness** — can the instance accept traffic? | `200 OK` | `503 Service Unavailable` if Redis is unreachable (when `session_store=redis`) |
+
+Use `/health` as the **liveness probe** and `/ready` as the **readiness probe**. Do not swap them: a failing Redis should remove the pod from the load balancer's rotation (`/ready`), but it should not cause Kubernetes to restart the pod (`/health`).
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 2
+  periodSeconds: 5
+  failureThreshold: 2
+```
+
+<Note>
+  In single-instance mode with the default in-memory session store, `/ready` always returns `200 OK` as long as the process is up. The `503` behavior is only active when `session_store=redis`.
+</Note>
+
+---
+
+## Prometheus metrics
+
+Voxray exposes metrics at `GET /metrics` in Prometheus text exposition format. Point a Prometheus scrape job at this endpoint.
+
+### Enabling and disabling
+
+Metrics are enabled by default. To disable:
+
+```json
+{
+  "metrics_enabled": false
+}
+```
+
+When disabled, the `/metrics` endpoint returns `404`. Re-enable by removing the key or setting it to `true`.
+
+### Prometheus scrape config
+
+```yaml
+scrape_configs:
+  - job_name: voxray
+    static_configs:
+      - targets:
+          - "voxray-host:8080"
+    metrics_path: /metrics
+    scrape_interval: 15s
+```
+
+For Kubernetes, use the Prometheus Operator `ServiceMonitor` or annotate the pod with `prometheus.io/scrape: "true"` and `prometheus.io/port: "8080"`.
+
+<Warning>
+  `/metrics` is **unauthenticated by default**. It exposes internal performance data that could reveal information about your AI providers, session volumes, and error rates. Restrict access using a firewall rule, nginx `allow`/`deny` directives, a Kubernetes `NetworkPolicy`, or a VPN. Do not expose `/metrics` directly to the public internet.
+
+  ```nginx
+  location /metrics {
+      allow 10.0.0.0/8;
+      deny  all;
+      proxy_pass http://voxray_upstream;
+  }
+  ```
+</Warning>
+
+---
+
+## Metric reference
+
+### HTTP metrics
+
+These metrics cover all HTTP traffic into Voxray, including WebSocket upgrade requests and REST endpoints.
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `http_requests_total` | Counter | `method`, `route`, `status_code` | Total HTTP requests received |
+| `http_request_duration_seconds` | Histogram | `method`, `route`, `status_code` | Request duration from receipt to response |
+| `http_active_connections` | Gauge | `route` | Current number of active HTTP connections (including open WebSocket sessions) |
+| `http_errors_total` | Counter | `method`, `route`, `error_type` | Total HTTP errors, broken down by error type |
+| `http_timeout_total` | Counter | `method`, `route` | Total requests that timed out before completion |
+
+### AI pipeline metrics
+
+Voxray instruments every stage of the STT → LLM → TTS pipeline with latency histograms and error counters. All pipeline metrics carry a `model` label so you can compare provider performance without separate dashboards.
+
+#### Speech-to-text (STT)
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `stt_time_to_first_token_seconds` | Histogram | Time from audio stream start to first transcription token |
+| `stt_transcription_latency_seconds` | Histogram | End-to-end transcription latency per utterance |
+| `stt_streaming_lag_seconds` | Histogram | Lag between audio frame arrival and transcript emission |
+| `stt_errors_total` | Counter | STT errors by `error_type` |
+| `stt_fallback_total` | Counter | Fallback invocations (e.g., primary STT failed, secondary used) |
+
+#### Large language model (LLM)
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `llm_time_to_first_token_seconds` | Histogram | Time from prompt submission to first streamed token |
+| `llm_generation_latency_seconds` | Histogram | Full LLM generation latency (first to last token) |
+| `llm_inter_token_latency_seconds` | Histogram | Latency between consecutive streamed tokens |
+| `llm_errors_total` | Counter | LLM errors by `error_type` |
+| `llm_retries_total` | Counter | Automatic retry attempts |
+| `llm_fallback_total` | Counter | Fallback invocations |
+
+#### Text-to-speech (TTS)
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `tts_time_to_first_audio_chunk_seconds` | Histogram | Time from text-in to first audio chunk delivered to the client |
+| `tts_synthesis_latency_seconds` | Histogram | Full TTS synthesis latency (text-in to final audio frame) |
+| `tts_streaming_lag_seconds` | Histogram | Lag between text input and audio output for streaming TTS |
+| `tts_errors_total` | Counter | TTS errors by `error_type` |
+| `tts_fallback_total` | Counter | Fallback invocations |
+
+### WebRTC metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `webrtc_peer_connections_total` | Counter | Total peer connections by `state` (connected, failed, closed) |
+| `webrtc_peer_connections_active` | Gauge | Current active peer connections |
+| `webrtc_bytes_sent_total` | Counter | Total bytes sent over WebRTC |
+| `webrtc_bytes_received_total` | Counter | Total bytes received over WebRTC |
+| `webrtc_connection_failures_total` | Counter | Connection failures by `reason` |
+| `webrtc_reconnection_attempts_total` | Counter | Reconnection attempts per session |
+
+### Recording metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `recording_jobs_enqueued_total` | Counter | Total recording upload jobs placed into the worker queue |
+| `recording_jobs_success_total` | Counter | Total jobs that completed successfully |
+| `recording_jobs_failed_total` | Counter | Total jobs that exhausted all retries and failed |
+| `recording_queue_depth` | Gauge | Current number of pending jobs in the upload queue |
+
+### Label cardinality
+
+<Info>
+  The `session_id` label is passed through `SampledSessionID()` before being applied to any metric. This function either SHA-256 hashes the raw ID to a fixed-length hex string, or returns the constant `"sampled_out"` when the configured sample rate causes the session to be excluded. This prevents high-cardinality session IDs from creating unbounded time-series in Prometheus. You do not need to configure this separately — it is applied automatically inside the metrics package.
+</Info>
+
+The label set across all metrics is: `session_id` (hashed/sampled), `stage`, `direction`, `status`, `model`. For HTTP metrics, `method`, `route`, and `status_code` replace the pipeline-specific labels.
+
+---
+
+## Alerting
+
+The following alerts cover the most operationally significant failure modes. Add them to your Prometheus alerting rules or import them into Grafana.
+
+| Alert | Condition | Severity | Interpretation |
+|-------|-----------|----------|----------------|
+| LLM provider degraded | `histogram_quantile(0.95, rate(llm_time_to_first_token_seconds_bucket[5m])) > 2` | Warning | p95 time-to-first-token exceeds 2 seconds — LLM provider is slow or overloaded |
+| Instance near connection limit | `http_active_connections > 80` (per instance) | Warning | Approaching capacity; scale out or investigate connection leaks |
+| S3 upload failures | `rate(recording_jobs_failed_total[5m]) > 0` | Critical | Recording uploads are failing after all retries; check S3 credentials and connectivity |
+| High 5xx error rate | `rate(http_errors_total{error_type=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.01` | Warning | More than 1% of requests are returning server errors; investigate pipeline logs |
+| Recording queue saturation | `recording_queue_depth > 28` | Warning | Queue approaching capacity (default 32); workers cannot keep up with upload volume |
+| STT provider errors | `rate(stt_errors_total[5m]) > 0.1` | Warning | STT error rate rising; may degrade transcription quality |
+
+```yaml
+# prometheus/alerts/voxray.yml
+groups:
+  - name: voxray
+    rules:
+      - alert: VoxrayLLMHighTTFT
+        expr: histogram_quantile(0.95, rate(llm_time_to_first_token_seconds_bucket[5m])) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM p95 time-to-first-token above 2s"
+          description: "LLM provider may be degraded. Current p95: {{ $value }}s"
+
+      - alert: VoxrayRecordingFailures
+        expr: rate(recording_jobs_failed_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recording upload jobs failing"
+          description: "S3 upload failures detected. Check credentials and bucket policy."
+
+      - alert: VoxrayHighErrorRate
+        expr: rate(http_errors_total[5m]) / rate(http_requests_total[5m]) > 0.01
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP error rate above 1%"
+          description: "Error rate: {{ $value | humanizePercentage }}"
+```
+
+---
+
+## Structured logging
+
+### Log format
+
+<Tabs>
+  <Tab title="Development (text)">
+    The default log format is human-readable text, suitable for local development and tailing with `docker logs` or `kubectl logs`.
+
+    ```
+    2026/05/15 12:34:56 INFO session started session_id=sess_abc123 transport=websocket
+    2026/05/15 12:34:57 INFO stt transcript received session_id=sess_abc123 text="hello"
+    ```
+  </Tab>
+  <Tab title="Production (JSON)">
+    Enable JSON logging for structured log shipping:
+
+    ```json
+    {
+      "json_logs": true,
+      "log_level": "info"
+    }
+    ```
+
+    Or via environment variables:
+
+    ```bash
+    VOXRAY_JSON_LOGS=true
+    VOXRAY_LOG_LEVEL=info
+    ```
+
+    Each log line becomes a single JSON object:
+
+    ```json
+    {"time":"2026-05-15T12:34:56Z","level":"INFO","msg":"session started","session_id":"sess_abc123","transport":"websocket"}
+    {"time":"2026-05-15T12:34:57Z","level":"INFO","msg":"stt transcript received","session_id":"sess_abc123","text":"hello"}
+    ```
+  </Tab>
+</Tabs>
+
+### Log levels
+
+| Level | Config value | Use case |
+|-------|-------------|----------|
+| Debug | `"log_level": "debug"` | Verbose frame-by-frame logging; not for production |
+| Info | `"log_level": "info"` | Session lifecycle, provider calls, errors — recommended for production |
+| Warn | `"log_level": "warn"` | Only warnings and errors |
+| Error | `"log_level": "error"` | Errors only; minimal output |
+
+Override at runtime without redeploying by setting `VOXRAY_LOG_LEVEL` in the environment. The environment variable takes precedence over the config file value.
+
+### Log shipping
+
+Voxray writes logs to stdout. Ship them from stdout to your preferred backend using any standard log collector:
+
+<Tabs>
+  <Tab title="Grafana Loki">
+    Use the Promtail agent or the Loki Docker driver to tail container stdout and push to Loki. With `json_logs: true`, Promtail can parse fields automatically using `json` pipeline stages:
+
+    ```yaml
+    # promtail pipeline stage
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            session_id: session_id
+      - labels:
+          level:
+          session_id:
+    ```
+  </Tab>
+  <Tab title="Fluentd / Fluent Bit">
+    Point Fluent Bit's `tail` input at the container log file (e.g., `/var/log/containers/voxray-*.log`) and use the `json` parser. Forward to Elasticsearch, Splunk, or any Fluentd output plugin.
+
+    ```ini
+    [INPUT]
+        Name   tail
+        Path   /var/log/containers/voxray-*.log
+        Parser json
+
+    [OUTPUT]
+        Name  es
+        Match *
+        Host  elasticsearch.internal
+        Port  9200
+        Index voxray-logs
+    ```
+  </Tab>
+  <Tab title="AWS CloudWatch">
+    Use the CloudWatch Logs agent or the `awslogs` Docker log driver:
+
+    ```json
+    {
+      "log-driver": "awslogs",
+      "log-opts": {
+        "awslogs-group": "/voxray/production",
+        "awslogs-region": "us-east-1",
+        "awslogs-stream-prefix": "voxray"
+      }
+    }
+    ```
+
+    CloudWatch Insights can then query JSON fields directly, e.g.:
+
+    ```sql
+    fields @timestamp, session_id, msg
+    | filter level = "ERROR"
+    | sort @timestamp desc
+    | limit 50
+    ```
+  </Tab>
+  <Tab title="Datadog">
+    Enable the Datadog Agent log collection and set `json_logs: true` in Voxray config. Datadog automatically parses JSON log attributes into facets for filtering and alerting.
+
+    ```yaml
+    # datadog agent log config
+    logs:
+      - type: docker
+        service: voxray
+        source: go
+        log_processing_rules:
+          - type: multi_line
+            name: new_log_start
+            pattern: '^\{'
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  Always run with `json_logs: true` and `log_level: info` in production. Text logs are harder to parse programmatically, and `debug` level generates very high log volume (one entry per audio frame in some paths).
+</Tip>

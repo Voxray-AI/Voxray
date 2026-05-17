@@ -1,6 +1,6 @@
-# github.com/Voxray-AI/Voxray System Architecture
+# Voxray-Go System Architecture
 
-System-level view of the **github.com/Voxray-AI/Voxray** real-time voice pipeline. For component details, data flow, and file layout see [ARCHITECTURE.md](./ARCHITECTURE.md).
+System-level view of the **voxray-go** real-time voice pipeline. For component details, data flow, and file layout see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ---
 
@@ -12,7 +12,7 @@ flowchart LR
         User["User\n(Voice / WebSocket / WebRTC / Telephony)"]
     end
 
-    subgraph Voxray["github.com/Voxray-AI/Voxray"]
+    subgraph Voxray["Voxray-Go"]
         Server["Real-time voice pipeline\nSTT → LLM → TTS\nWebSocket / WebRTC / Telephony"]
     end
 
@@ -35,7 +35,7 @@ flowchart LR
     Telco -->|"WSS"| Server
 ```
 
-**In words:** Users connect to github.com/Voxray-AI/Voxray via WebSocket, WebRTC, or telephony (Twilio, Telnyx, Plivo, Exotel). github.com/Voxray-AI/Voxray runs a configurable pipeline (e.g. voice: VAD → STT → LLM → TTS) and talks to external LLM, STT, and TTS providers. An optional **Realtime** path (e.g. OpenAI Realtime API) can replace the STT+LLM+TTS chain. Frames (audio, text, transcriptions) flow bidirectionally between client and server. Daily.co provides rooms and optional PSTN dial-in; telephony providers use WebSocket backhaul to the server.
+**In words:** Users connect to Voxray-Go via WebSocket, WebRTC, or telephony (Twilio, Telnyx, Plivo, Exotel). Voxray-Go runs a configurable pipeline (e.g. voice: VAD → STT → LLM → TTS) and talks to external LLM, STT, and TTS providers. An optional **Realtime** path (e.g. OpenAI Realtime API) can replace the STT+LLM+TTS chain. Frames (audio, text, transcriptions) flow bidirectionally between client and server. Daily.co provides rooms and optional PSTN dial-in; telephony providers use WebSocket backhaul to the server.
 
 ---
 
@@ -50,7 +50,7 @@ flowchart TB
         DailyClient["Daily.co Room Client"]
     end
 
-    subgraph VoxrayGo["github.com/Voxray-AI/Voxray Server"]
+    subgraph VoxrayGo["Voxray-Go Server"]
         subgraph L1["Layer 1: Entry"]
             CLI["CLI (cmd/voxray)"]
             Config["Config"]
@@ -219,7 +219,7 @@ flowchart LR
     end
 
     subgraph Host["Single host (e.g. VM / container)"]
-        subgraph Process["github.com/Voxray-AI/Voxray process"]
+        subgraph Process["voxray-go process"]
             Main["main"]
             Workers["N × Runner goroutines\n(one per connection)"]
         end
@@ -239,7 +239,7 @@ flowchart LR
     Telco -->|"WSS"| Process
 ```
 
-- **Single process:** One `github.com/Voxray-AI/Voxray` process; one goroutine per active connection (Runner).
+- **Single process:** One `voxray-go` process; one goroutine per active connection (Runner).
 - **Scaling:** **Vertical** — run one instance; use default in-memory SessionStore. **Horizontal** — run multiple instances behind a load balancer; set `session_store=redis` and `redis_url` so all instances share session state via Redis (Redis is then an external dependency).
 - **Config:** `config.json` (and env) drives providers, pipeline shape, `transport`, `runner_transport`, and optional `session_store` / `redis_url` / `session_ttl_secs` for shared sessions.
 

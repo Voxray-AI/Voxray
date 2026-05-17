@@ -1,0 +1,370 @@
+---
+title: "Local LLM with Ollama"
+description: "Run a voice agent entirely on your own hardware — no cloud APIs, no data leaves your machine. Ollama handles LLM inference locally; Groq or OpenAI handle STT and TTS."
+---
+
+This tutorial builds a complete voice pipeline where the LLM runs locally via [Ollama](https://ollama.ai). Your conversations are never sent to an LLM cloud provider. STT and TTS still use a cloud API (Groq is free with generous limits), but your actual dialogue and reasoning stay on your machine.
+
+This is the right setup for:
+
+- Privacy-sensitive applications where conversation content must not leave your infrastructure
+- Offline or air-gapped environments that need voice interaction
+- Development and experimentation with open-weight models like Llama 3.1, Mistral, and Qwen
+- Cost control when running high-volume or long-session voice agents
+
+## How it works
+
+Voxray's `llm_provider: "ollama"` connects to the Ollama HTTP API at `http://localhost:11434/v1` (OpenAI-compatible). Ollama manages model loading, quantization, and GPU/CPU inference. Voxray sends the conversation transcript to Ollama, streams tokens back, and passes them to the TTS provider for synthesis.
+
+```
+Microphone → [STT: Groq Whisper] → Transcript → [LLM: Ollama llama3.1:8b] → Text → [TTS: Groq] → Audio → Speaker
+                  (cloud, text only)                  (local, your machine)         (cloud, text only)
+```
+
+Only transcribed text and synthesized audio cross the network. The LLM inference — the part that sees your full conversation — never leaves your machine.
+
+## Hardware requirements
+
+| Model | VRAM / RAM required | Notes |
+|---|---|---|
+| `llama3.2:3b` | ~4 GB | Fast on CPU; good for testing |
+| `llama3.1:8b` | ~8 GB | Best quality-to-speed ratio for most hardware |
+| `mistral:7b` | ~8 GB | Strong instruction following; good alternative |
+| `llama3.1:70b` | ~40 GB | Near-GPT-4 quality; requires GPU with sufficient VRAM or large RAM |
+| `qwen2.5:14b` | ~14 GB | Strong multilingual support |
+
+<Note>
+Ollama automatically uses your GPU if CUDA (NVIDIA) or Metal (Apple Silicon) drivers are installed. Without GPU acceleration, inference runs on CPU — usable for development but noticeably slower for real-time voice interaction. See [GPU acceleration](#gpu-acceleration) below.
+</Note>
+
+## Prerequisites
+
+- Voxray built and working (see the [Echo Bot tutorial](/build/tutorials/echo-bot) to verify your setup)
+- A Groq API key for STT and TTS — sign up at [console.groq.com](https://console.groq.com) (free tier, no credit card required), or an OpenAI API key if you prefer
+- A machine with at least 8 GB of RAM for `llama3.1:8b` (more is better; 16 GB recommended for a comfortable experience)
+
+## Step-by-step
+
+<Steps>
+  <Step title="Install Ollama">
+    Install Ollama using the official one-line installer:
+
+    ```bash
+    curl -fsSL https://ollama.ai/install.sh | sh
+    ```
+
+    On macOS, you can also use Homebrew:
+
+    ```bash
+    brew install ollama
+    ```
+
+    On Windows, download the installer from [ollama.ai/download](https://ollama.ai/download).
+
+    After installation, start the Ollama server:
+
+    ```bash
+    ollama serve
+    ```
+
+    Verify Ollama is running:
+
+    ```bash
+    curl http://localhost:11434/api/tags
+    # → {"models":[]}  (empty model list is expected before pulling)
+    ```
+
+    <Note>
+    On macOS, Ollama runs as a background menu-bar app after installation and starts automatically. You do not need to run `ollama serve` manually — it is already listening on port 11434.
+    </Note>
+  </Step>
+
+  <Step title="Pull a model">
+    Pull `llama3.1:8b` — a well-balanced open-weight model that works well for voice agents:
+
+    ```bash
+    ollama pull llama3.1:8b
+    ```
+
+    This downloads approximately 4.7 GB. Progress is shown in the terminal. Once downloaded, the model is cached locally and subsequent startups are immediate.
+
+    Alternative models worth trying:
+
+    ```bash
+    # Smaller and faster; good for low-RAM machines or quick iteration
+    ollama pull llama3.2:3b
+
+    # Strong instruction following; roughly equivalent quality to llama3.1:8b
+    ollama pull mistral:7b
+
+    # Excellent for multilingual use cases
+    ollama pull qwen2.5:7b
+    ```
+
+    Test that the model responds correctly:
+
+    ```bash
+    ollama run llama3.1:8b "Reply in one sentence: what is the capital of France?"
+    # → The capital of France is Paris.
+    ```
+
+    If you get a response, Ollama is ready.
+  </Step>
+
+  <Step title="Choose your STT and TTS providers">
+    The LLM runs locally, but you still need STT and TTS. Two practical options:
+
+    **Option A: Groq (recommended — free with generous limits)**
+
+    Groq provides free API access to Whisper STT and its own TTS. This is the lowest-friction option: one API key, no credit card for the free tier.
+
+    - STT: `whisper-large-v3-turbo` — fast, accurate, multilingual
+    - TTS: Groq's TTS voices (English)
+    - Sign up: [console.groq.com](https://console.groq.com)
+    - Environment variable: `GROQ_API_KEY`
+
+    **Option B: OpenAI**
+
+    If you already have an OpenAI key, use OpenAI Whisper for STT and OpenAI TTS. Slightly higher latency than Groq but more voice options.
+
+    - STT: `gpt-4o-mini-transcribe` or `whisper-1`
+    - TTS: voices like `alloy`, `nova`, `shimmer`
+    - Environment variable: `OPENAI_API_KEY`
+
+    **Option C: Sarvam (Indian languages)**
+
+    If you need Hindi, Tamil, Bengali, or other Indian languages, use Sarvam for STT and TTS. The LLM (Ollama) handles multilingual generation natively for most open-weight models.
+
+    - STT model: `saarika:v2.5`, language: `hi-IN` (or other BCP-47 codes)
+    - TTS model: `bulbul:v2`, voice: `anushka`
+    - Environment variable: `SARVAM_API_KEY`
+  </Step>
+
+  <Step title="Create the config file">
+    Create `ollama-config.json`. The example below uses Groq for STT and TTS with Ollama for LLM (Option A):
+
+    ```json ollama-config.json
+    {
+      "host": "0.0.0.0",
+      "port": 3042,
+      "transport": "websocket",
+
+      "stt_provider": "groq",
+      "stt_model": "whisper-large-v3-turbo",
+
+      "llm_provider": "ollama",
+      "model": "llama3.1:8b",
+
+      "tts_provider": "groq",
+
+      "api_keys": {
+        "groq": "gsk_YOUR_GROQ_API_KEY_HERE"
+      }
+    }
+    ```
+
+    For Option B (OpenAI STT + TTS):
+
+    ```json ollama-config.json
+    {
+      "host": "0.0.0.0",
+      "port": 3042,
+      "transport": "websocket",
+
+      "stt_provider": "openai",
+      "stt_model": "gpt-4o-mini-transcribe",
+
+      "llm_provider": "ollama",
+      "model": "llama3.1:8b",
+
+      "tts_provider": "openai",
+      "tts_voice": "nova",
+
+      "api_keys": {
+        "openai": "sk_YOUR_OPENAI_API_KEY_HERE"
+      }
+    }
+    ```
+
+    You can also supply API keys as environment variables instead of putting them in the config file:
+
+    ```bash
+    export GROQ_API_KEY="gsk_..."
+    # Then remove the "api_keys" block from the config entirely
+    ```
+
+    <Warning>
+    Never commit config files containing real API keys to version control. Use environment variables or a secrets manager in shared or CI environments.
+    </Warning>
+  </Step>
+
+  <Step title="Start the server">
+    Make sure Ollama is already running (`ollama serve` or the macOS menu-bar app), then start Voxray:
+
+    ```bash
+    ./voxray -config ollama-config.json
+    ```
+
+    Expected startup output:
+
+    ```
+    INFO  voxray starting transport=websocket host=0.0.0.0 port=3042
+    INFO  stt provider=groq model=whisper-large-v3-turbo
+    INFO  llm provider=ollama model=llama3.1:8b
+    INFO  tts provider=groq
+    INFO  listening on 0.0.0.0:3042
+    ```
+
+    If the server starts without errors, all three providers initialized correctly.
+  </Step>
+
+  <Step title="Connect and test">
+    Connect using the example WebSocket client or any WebSocket tool. The simplest test is to send a text frame directly:
+
+    ```bash
+    websocat ws://localhost:3042/ws
+    ```
+
+    Type a message and press Enter. Voxray will:
+
+    1. Pass your text to Groq Whisper (or, in a voice session, transcribe your audio first)
+    2. Send the transcript to Ollama's local `llama3.1:8b`
+    3. Stream the LLM response tokens to the Groq TTS provider
+    4. Stream synthesized audio back to your client
+
+    For a full voice session, use the browser WebRTC client:
+
+    ```bash
+    cd tests/frontend && python -m http.server 3000
+    # Open http://localhost:3000/webrtc-voice.html
+    # Set Server URL to http://localhost:3042
+    # Click Start and speak
+    ```
+
+    <Note>
+    The WebRTC client requires a voice build with CGO and Opus support. If you built with `go build` (no CGO), use the WebSocket client instead. See the [installation guide](/get-started/installation) for the voice build instructions.
+    </Note>
+  </Step>
+</Steps>
+
+## GPU acceleration
+
+Ollama automatically detects and uses your GPU when the appropriate drivers are installed. You do not need to change any Voxray config — GPU acceleration is entirely managed by Ollama.
+
+**NVIDIA (CUDA):**
+
+Ollama requires CUDA 11.3 or higher. If `nvidia-smi` shows your GPU, Ollama will use it automatically.
+
+```bash
+nvidia-smi         # confirm GPU is visible
+ollama run llama3.1:8b "test"  # Ollama logs will show "using GPU"
+```
+
+**Apple Silicon (Metal):**
+
+Ollama uses Metal out of the box on M1/M2/M3/M4 Macs. No additional setup needed. The unified memory architecture means you can run larger models than discrete VRAM limits would suggest — an M2 Max with 32 GB unified memory can comfortably run `llama3.1:8b` fully in GPU memory.
+
+**CPU-only:**
+
+On CPU-only machines, inference is slower but functional. For real-time voice interaction, `llama3.2:3b` responds fast enough on modern CPUs. Expect 2–5 second response latency on a mid-range CPU for `llama3.1:8b`.
+
+## Troubleshooting
+
+**Ollama not reachable**
+
+If Voxray logs `connection refused` or `dial tcp 127.0.0.1:11434: connect: connection refused`, Ollama is not running or is listening on a different address.
+
+Check if Ollama is running:
+
+```bash
+curl http://localhost:11434/api/tags
+```
+
+If Ollama is running on a different host or port (for example, a remote GPU machine), set the `OLLAMA_BASE_URL` environment variable before starting Voxray:
+
+```bash
+export OLLAMA_BASE_URL="http://192.168.1.50:11434/v1"
+./voxray -config ollama-config.json
+```
+
+**Model not found**
+
+If Ollama returns a 404 for the model name, the model has not been pulled yet:
+
+```bash
+ollama list          # shows downloaded models
+ollama pull llama3.1:8b
+```
+
+Ensure `"model": "llama3.1:8b"` in your config exactly matches the name shown by `ollama list`.
+
+**Response latency too high**
+
+Slow responses from Ollama add directly to voice agent round-trip time. Options to improve speed:
+
+- Use a smaller model: switch from `llama3.1:8b` to `llama3.2:3b`
+- Enable GPU acceleration (see above)
+- Increase Ollama's GPU memory allocation: `OLLAMA_GPU_MEMORY_FRACTION=0.9 ollama serve`
+- Run Ollama on a remote GPU server and point `OLLAMA_BASE_URL` to it
+
+**STT transcription quality issues**
+
+If transcription is poor (wrong words, missed speech):
+
+- Lower `vad_min_volume` in your config (e.g. `"vad_min_volume": 0.2`) if quiet speech is being missed
+- Switch to `whisper-large-v3` (slightly more accurate but slower than `whisper-large-v3-turbo`)
+- Check your microphone input levels
+
+**API key errors**
+
+Groq and OpenAI errors appear in the Voxray logs with the HTTP status code from the provider. Common causes:
+
+- Key not set: add `GROQ_API_KEY` to your environment or `"groq": "gsk_..."` to `api_keys` in config
+- Invalid key: copy the key fresh from [console.groq.com](https://console.groq.com)
+- Rate limit: Groq free tier has generous limits; if you hit them, add a brief `user_idle_timeout_secs` to reduce idle connections
+
+## Complete config reference for this tutorial
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 3042,
+  "transport": "websocket",
+
+  "stt_provider": "groq",
+  "stt_model": "whisper-large-v3-turbo",
+
+  "llm_provider": "ollama",
+  "model": "llama3.1:8b",
+
+  "tts_provider": "groq",
+
+  "turn_detection": "silence",
+  "turn_stop_secs": 1.5,
+  "vad_min_volume": 0.25,
+  "allow_interruptions": true,
+
+  "api_keys": {
+    "groq": "gsk_..."
+  }
+}
+```
+
+The `turn_detection`, `turn_stop_secs`, and `vad_min_volume` fields tune how Voxray detects when you have finished speaking before passing audio to STT. The defaults work for most microphones in quiet environments.
+
+## What to do next
+
+<CardGroup cols={2}>
+  <Card title="Echo Bot" href="/build/tutorials/echo-bot">
+    If you haven't verified your base setup, start here — zero API keys required.
+  </Card>
+  <Card title="Configuration reference" href="/reference/configuration">
+    Every config field, its default value, and the environment variable that overrides it.
+  </Card>
+  <Card title="Plugins and processors" href="/build/extensions">
+    Add wake-word detection, interruption control, frame filtering, and custom processors to your pipeline.
+  </Card>
+  <Card title="WebRTC transport" href="/build/transports/webrtc">
+    Switch from WebSocket to WebRTC for browser-based voice interaction with real-time audio.
+  </Card>
+</CardGroup>

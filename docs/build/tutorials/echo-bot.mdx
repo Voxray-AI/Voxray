@@ -1,0 +1,203 @@
+---
+title: "Echo Bot"
+description: "Test your Voxray setup with zero API keys required. The echo processor reflects every text frame back as speech, letting you verify your transport, pipeline, and audio encoding end-to-end before wiring in real providers."
+---
+
+The echo bot is the simplest possible Voxray pipeline. It requires no STT, LLM, or TTS API keys — only the Go binary and a four-line config. When you connect and send a text frame, the echo processor reflects it back as an `LLMTextFrame`, which the downstream TTS stage converts to audio and streams to your client. You hear what you typed.
+
+Use this as a smoke test after installation, before you add real providers.
+
+## How the echo processor works
+
+Voxray pipelines are chains of processors. Each processor receives frames from upstream and emits frames downstream. The `echo` processor does exactly one thing: for every `TextFrame` it receives, it emits an `LLMTextFrame` with the same content.
+
+```text
+Client → [WebSocket] → TextFrame → [echo processor] → LLMTextFrame → [TTS sink] → Audio → Client
+```
+
+Because the TTS sink handles `LLMTextFrame`s, the echo text is spoken back over the same connection. With a WebSocket text-only client you will receive the echoed text frame directly; with a voice client you hear it as synthesized speech.
+
+<Note>
+The echo plugin is intentionally stateless. It does not maintain conversation history, call any API, or buffer audio. Each `TextFrame` is echoed independently.
+</Note>
+
+## What this tutorial validates
+
+Running the echo bot confirms all of the following before you spend a single API credit:
+
+- The Voxray binary builds and starts correctly on your machine
+- The WebSocket transport accepts connections on the configured port
+- The pipeline frame-passing machinery is functioning (frames flow from source to processor to sink)
+- Your client can send frames and receive frames back over the same connection
+- Audio encoding and decoding is working if you use a voice client
+
+If any of these steps fail, you have a concrete failure point to debug rather than a pile of provider errors to sort through.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Build Voxray">
+    Clone the repository and build the binary. Go 1.25+ is the only hard requirement for the WebSocket build — no CGO or C compiler needed.
+
+    ```bash
+    git clone https://github.com/your-org/voxray-ai.git
+    cd voxray-ai
+    go build -o voxray ./cmd/voxray
+    ```
+
+    Verify the binary exists:
+
+    ```bash
+    ./voxray -help
+    ```
+  </Step>
+</Steps>
+
+## Step-by-step
+
+<Steps>
+  <Step title="Create the echo bot config">
+    Create a file named `echo-config.json` in the project root with the following content. This is the minimum valid config for the echo bot — no API keys, no provider settings.
+
+    ```json echo-config.json
+    {
+      "host": "0.0.0.0",
+      "port": 3042,
+      "transport": "websocket",
+      "plugins": ["echo"]
+    }
+    ```
+
+    | Field | Value | Reason |
+    |---|---|---|
+    | `host` | `0.0.0.0` | Listen on all interfaces so you can connect from localhost |
+    | `port` | `3042` | Any free port works; 3042 is the Voxray default |
+    | `transport` | `websocket` | WebSocket only — no CGO or Opus required |
+    | `plugins` | `["echo"]` | Activates the echo processor in the pipeline |
+
+    <Note>
+    Unknown keys in the config JSON are silently ignored. You do not need `stt_provider`, `llm_provider`, `tts_provider`, or `api_keys` for the echo bot. The server starts cleanly without them.
+    </Note>
+  </Step>
+
+  <Step title="Start the server">
+    Run the binary with the echo config:
+
+    ```bash
+    ./voxray -config echo-config.json
+    ```
+
+    You should see startup logs similar to:
+
+    ```text
+    INFO  voxray starting transport=websocket host=0.0.0.0 port=3042
+    INFO  pipeline ready plugins=[echo]
+    INFO  listening on 0.0.0.0:3042
+    ```
+
+    The `/health` and `/ready` endpoints are always available:
+
+    ```bash
+    curl http://localhost:3042/health
+    # → {"status":"ok"}
+    ```
+  </Step>
+
+  <Step title="Connect with a WebSocket client">
+    Any WebSocket client works. The simplest option is `websocat`, a command-line WebSocket tool:
+
+    ```bash
+    # Install websocat (macOS)
+    brew install websocat
+
+    # Connect to the echo bot
+    websocat ws://localhost:3042/ws
+    ```
+
+    Alternatively, use the example Go client from the repository. It connects, sends a `StartFrame` to initialize the pipeline, then sends a `TTSSpeakFrame`:
+
+    ```bash
+    go run ./examples/voice/websocket_client.go
+    ```
+
+    Or connect from a browser console:
+
+    ```javascript
+    const ws = new WebSocket("ws://localhost:3042/ws");
+    ws.onmessage = (e) => console.log("received:", e.data);
+    ws.onopen = () => {
+      // Send a minimal TextFrame as JSON
+      ws.send(JSON.stringify({ type: "TextFrame", text: "hello voxray" }));
+    };
+    ```
+  </Step>
+
+  <Step title="Send a text frame">
+    With `websocat` connected, type any message and press Enter. The frame is sent as a `TextFrame` to the server:
+
+    ```text
+    hello voxray
+    ```
+
+    The echo processor receives the `TextFrame`, wraps the same text in an `LLMTextFrame`, and passes it downstream to the TTS sink, which emits the frame back to your client.
+
+    <Note>
+    In a text-only WebSocket session, you will receive the echoed text as a JSON frame. In a voice client session with a configured TTS provider, you will hear the text spoken back. The echo bot itself has no TTS provider — it only generates the `LLMTextFrame`; a real TTS provider must be configured separately if you want audio output.
+    </Note>
+  </Step>
+
+  <Step title="Observe the echo response">
+    The server logs each frame transition. With `VOXRAY_LOG_LEVEL=debug` set, you will see the full frame flow:
+
+    ```bash
+    VOXRAY_LOG_LEVEL=debug ./voxray -config echo-config.json
+    ```
+
+    Expected log output when a frame arrives:
+
+    ```text
+    DEBUG processor=echo received frame_type=TextFrame text="hello voxray"
+    DEBUG processor=echo emitting frame_type=LLMTextFrame text="hello voxray"
+    DEBUG sink sending frame_type=LLMTextFrame to client
+    ```
+
+    The `websocat` terminal will print the echoed frame as JSON:
+
+    ```json
+    {"type":"LLMTextFrame","text":"hello voxray"}
+    ```
+  </Step>
+</Steps>
+
+## Connecting Prometheus metrics
+
+The `/metrics` endpoint is available by default even on the echo bot. Scrape it to verify the pipeline is counting frames:
+
+```bash
+curl http://localhost:3042/metrics | grep voxray_frames
+```
+
+You should see counter increments for each frame that passed through the pipeline.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `bind: address already in use` | Port 3042 is taken | Change `port` in the config or stop the conflicting process |
+| Connection refused | Server didn't start cleanly | Check the startup logs for a panic or config error |
+| No echo response | Frame type mismatch | Ensure you are sending a `TextFrame`; the echo processor ignores other frame types |
+| `plugin not found: echo` | Binary built without plugin registry | Rebuild with `go build ./cmd/voxray` from the repo root |
+| Server exits immediately | Malformed config JSON | Validate JSON with `python3 -m json.tool echo-config.json` |
+
+## What to do next
+
+The echo bot confirms your Voxray installation is sound. The next step is adding real STT, LLM, and TTS providers to build a voice agent that understands and responds to natural speech.
+
+<CardGroup cols={2}>
+  <Card title="Local LLM with Ollama" href="/build/tutorials/local-llm-ollama">
+    Run a full voice pipeline with no cloud APIs. Use Ollama for LLM inference entirely on your own hardware.
+  </Card>
+  <Card title="Configuration reference" href="/reference/configuration">
+    Complete list of every config key, default value, and environment variable override.
+  </Card>
+</CardGroup>

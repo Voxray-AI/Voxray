@@ -53,7 +53,7 @@ This section describes how Voxray is **built, tested, linted, monitored, and rel
 - **Unit tests (Go `testing` + `testify`) — Intermediate**
   - **File**: `tests/README.md`.
   - **Layout**:
-    - External unit tests under `tests/pkg/**` (packages named `<pkg>_test`) that import `github.com/Voxray-AI/Voxray/pkg/...` and exercise exported APIs.
+    - External unit tests under `tests/pkg/**` (packages named `<pkg>_test`) that import `voxray-go/pkg/...` and exercise exported APIs.
     - A few internal tests remain in `pkg/**` when unexported symbols must be exercised (e.g. VAD/turn logic, STT/LLM provider specifics).
     - Build/smoke tests under `tests/cmd/**`, `tests/examples/**`, `tests/docs/**` ensure entrypoints and docs compile.
   - **Frameworks**:

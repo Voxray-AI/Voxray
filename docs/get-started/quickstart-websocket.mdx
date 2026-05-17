@@ -1,0 +1,300 @@
+---
+title: "Quickstart: WebSocket"
+description: "Run a real-time AI voice agent over WebSocket in under 5 minutes — no CGO or C compiler required."
+---
+
+<Note>
+**Prerequisites before you begin:**
+
+- **Go 1.25+** — verify with `go version`. The default WebSocket build has no other system dependencies; no C compiler or CGO needed.
+- **A provider API key** — the fastest path is a **Groq API key** (`GROQ_API_KEY`), which has a free tier and covers STT, LLM, and TTS in a single account. Get one at [console.groq.com](https://console.groq.com).
+</Note>
+
+<Steps>
+
+<Step title="Clone the repository">
+
+```bash title="Terminal"
+git clone https://github.com/Voxray-AI/Voxray.git
+cd Voxray
+```
+
+The repository includes `config.example.json`, a `web/` directory with a browser client, and a `Makefile` with common build targets.
+
+</Step>
+
+<Step title="Configure your providers">
+
+Copy the example config and open it for editing:
+
+```bash title="Terminal"
+cp config.example.json config.json
+```
+
+Then set at minimum these four fields. The example below uses Groq for all three pipeline stages — STT, LLM, and TTS — which requires only one API key:
+
+```json title="config.json"
+{
+  "host": "0.0.0.0",
+  "port": 3042,
+  "transport": "websocket",
+
+  "provider": "groq",
+  "stt_provider": "groq",
+  "llm_provider": "groq",
+  "tts_provider": "groq",
+
+  "model": "llama-3.1-8b-instant",
+
+  "turn_detection": "silence",
+  "turn_stop_secs": 3.0,
+
+  "api_keys": {
+    "groq": "gsk_YOUR_GROQ_API_KEY_HERE"
+  }
+}
+```
+
+<Tip>
+You can mix providers freely. For example, use Groq for STT and LLM but ElevenLabs for higher-quality TTS:
+
+```json title="config.json (mixed providers)"
+{
+  "stt_provider": "groq",
+  "llm_provider": "groq",
+  "tts_provider": "elevenlabs",
+  "api_keys": {
+    "groq": "gsk_...",
+    "elevenlabs": "sk_..."
+  }
+}
+```
+</Tip>
+
+**Environment variable alternative** — if you prefer not to write API keys into `config.json`, export them as environment variables instead. Voxray resolves all config values from env vars automatically:
+
+<Tabs>
+  <Tab title="macOS / Linux">
+    ```bash title="Terminal"
+    export GROQ_API_KEY=gsk_...
+    # Then leave "api_keys" empty or omit it from config.json
+    ```
+  </Tab>
+  <Tab title="Windows (PowerShell)">
+    ```powershell title="PowerShell"
+    $env:GROQ_API_KEY = "gsk_..."
+    # Then leave "api_keys" empty or omit it from config.json
+    ```
+  </Tab>
+</Tabs>
+
+You can also point Voxray at a different config file path using the `VOXRAY_CONFIG` environment variable instead of the `-config` flag.
+
+</Step>
+
+<Step title="Build and run">
+
+<Tabs>
+  <Tab title="Using Make (recommended)">
+    ```bash title="Terminal"
+    make build
+    ./voxray -config config.json
+    ```
+  </Tab>
+  <Tab title="Using go run (no build step)">
+    ```bash title="Terminal"
+    go run ./cmd/voxray -config config.json
+    ```
+  </Tab>
+  <Tab title="Manual build">
+    ```bash title="Terminal"
+    go build -o voxray ./cmd/voxray
+    ./voxray -config config.json
+    ```
+  </Tab>
+  <Tab title="Windows (PowerShell)">
+    ```powershell title="PowerShell"
+    go build -o voxray.exe ./cmd/voxray
+    .\voxray.exe -config config.json
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+**Expected startup output** — if the server starts cleanly you will see lines similar to:
+
+```
+INFO  voxray starting  transport=websocket host=0.0.0.0 port=3042
+INFO  pipeline ready   stt=groq llm=groq tts=groq
+INFO  server listening addr=0.0.0.0:3042
+```
+
+If you see an error instead, check the [Troubleshooting](#troubleshooting) section below.
+</Tip>
+
+You can also override individual config values with flags at startup without editing `config.json`:
+
+```bash title="Terminal"
+./voxray -config config.json -port 8080 -transport websocket
+```
+
+Available flags: `-config`, `-transport` (`websocket`, `smallwebrtc`, `both`, `daily`, `twilio`, `telnyx`, `plivo`, `exotel`), `-port`, `-proxy` (public hostname for telephony webhooks), `-dialin` (Daily PSTN). Use `-init` to scaffold `config.json` and directories then exit.
+
+</Step>
+
+<Step title="Connect and speak">
+
+With the server running, you have two ways to connect:
+
+**Option A — browser client (easiest)**
+
+Open `web/index.html` directly in your browser (no server required for the HTML file itself):
+
+```bash title="Terminal"
+open web/index.html        # macOS
+xdg-open web/index.html    # Linux
+start web/index.html       # Windows
+```
+
+The page will prompt your browser for microphone access. Click **Connect**, then speak. You will hear the agent respond in real time.
+
+**Option B — raw WebSocket client**
+
+Connect any WebSocket client to:
+
+```
+ws://localhost:3042/ws
+```
+
+Voxray exchanges JSON frames on this connection. Send audio as binary frames; the server sends back `TranscriptionFrame` and `AudioFrame` messages. You can also connect with `?format=protobuf` for binary frame encoding or `?rtvi=1` for RTVI protocol compatibility.
+
+**Available endpoints once running:**
+
+| Endpoint | Description |
+|---|---|
+| `GET /ws` | WebSocket transport (upgrade) |
+| `GET /health` | Liveness check — returns `200 OK` |
+| `GET /ready` | Readiness check |
+| `GET /metrics` | Prometheus metrics scrape endpoint |
+| `GET /swagger/` | Swagger UI (when built with `make swagger`) |
+
+</Step>
+
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Port already in use — address already in use: bind 0.0.0.0:3042">
+Another process is already bound to port 3042. Change the port in `config.json`:
+
+```json title="config.json"
+{
+  "port": 8080
+}
+```
+
+Or override it at startup without editing the file:
+
+```bash title="Terminal"
+./voxray -config config.json -port 8080
+```
+
+To find what is using the port:
+
+```bash title="Terminal"
+lsof -i :3042      # macOS / Linux
+netstat -ano | findstr :3042   # Windows
+```
+</Accordion>
+
+<Accordion title="Missing API key — provider returned 401 or authentication error">
+Voxray will start successfully even if an API key is missing or wrong, but STT or LLM calls will fail at runtime when a voice session begins.
+
+Set the key in `config.json`:
+
+```json title="config.json"
+{
+  "api_keys": {
+    "groq": "gsk_YOUR_KEY_HERE"
+  }
+}
+```
+
+Or export it as an environment variable before starting the server. For Groq:
+
+```bash title="Terminal"
+export GROQ_API_KEY=gsk_YOUR_KEY_HERE
+```
+
+For OpenAI use `OPENAI_API_KEY`, for ElevenLabs use `ELEVENLABS_API_KEY`, and so on. Provider env var names follow the pattern `<PROVIDER_NAME>_API_KEY` in uppercase.
+</Accordion>
+
+<Accordion title="Connection refused — browser or client cannot reach the server">
+If you are connecting from a different machine, a container, or the browser is on a different network than the server process, `localhost` in `config.json` will only accept loopback connections.
+
+Change `host` to bind on all interfaces:
+
+```json title="config.json"
+{
+  "host": "0.0.0.0"
+}
+```
+
+If browsers on a different origin are connecting, also add the origin to `cors_allowed_origins`:
+
+```json title="config.json"
+{
+  "cors_allowed_origins": ["http://localhost:3000", "https://your-app.example.com"]
+}
+```
+</Accordion>
+
+<Accordion title="No response from agent — I speak but nothing happens">
+The two most common causes are missing turn detection config and a mic volume that falls below the VAD threshold.
+
+First, make sure `turn_detection` is set to `"silence"` and `turn_stop_secs` is at least `2.0`:
+
+```json title="config.json"
+{
+  "turn_detection": "silence",
+  "turn_stop_secs": 3.0,
+  "vad_min_volume": 0.25
+}
+```
+
+Then verify:
+
+1. **Speak for at least 1–2 seconds** — the VAD needs a sustained speech segment before it triggers STT.
+2. **Check your microphone** — the browser must have microphone permission granted. Look for a camera/mic icon in the address bar.
+3. **Lower VAD volume threshold** — if your microphone is quiet, reduce `vad_min_volume` to `0.15` or `0.10` in `config.json`.
+4. **Check server logs** — if audio is arriving you will see log lines with `vad` or `stt`. If you see no log activity after speaking, the audio is not reaching the server.
+
+If you are building a custom client, ensure you are sending raw PCM audio (16-bit, 16 kHz, mono) in binary WebSocket frames, not base64-encoded or compressed.
+</Accordion>
+
+<Accordion title="WebRTC-specific error — opus encoder unavailable (build without cgo)">
+This error only appears for WebRTC TTS delivery. The default `make build` / `go build` produces a WebSocket-only binary. WebRTC audio output requires Opus, which requires CGO and a C compiler.
+
+For WebSocket-only usage (this quickstart), this error is not relevant. If you want WebRTC, follow the WebRTC quickstart and use `make build-voice` instead.
+</Accordion>
+
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/core-concepts/architecture">
+    Understand the pipeline internals: runner, transport, processors, VAD, and how frames flow between stages.
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/core-concepts">
+    Config reference, provider matrix, turn detection modes, plugin system, and recording setup.
+  </Card>
+  <Card title="WebRTC Quickstart" icon="broadcast-tower" href="/get-started/quickstart-webrtc">
+    Add WebRTC transport for browser-native audio with Opus encoding and lower latency.
+  </Card>
+  <Card title="Telephony" icon="phone" href="/core-concepts/telephony">
+    Connect Twilio, Telnyx, Plivo, or Exotel for inbound and outbound phone call agents.
+  </Card>
+</CardGroup>

@@ -1,0 +1,359 @@
+---
+title: Telephony
+description: Connect Voxray to phone networks via Twilio, Telnyx, Plivo, Exotel, Daily.co, or LiveKit. Handle inbound calls with a real-time AI voice pipeline over provider WebSocket backhaul.
+---
+
+## How telephony works
+
+Voxray handles phone calls through a two-phase handshake: an HTTP webhook that returns provider-specific XML or JSON, followed by a long-lived media WebSocket that carries the actual audio.
+
+```text
+Phone call arrives
+      │
+      ▼
+POST /          ← provider webhook; Voxray responds with XML/JSON
+      │           instructing provider to open a media stream
+      ▼
+GET /telephony/ws   ← provider opens WebSocket; audio flows both ways
+      │
+      ▼
+Transport → Runner → Pipeline (VAD → STT → LLM → TTS → Sink)
+      │
+      ▼
+TTS audio → /telephony/ws → provider → caller's earpiece
+```
+
+The full sequence for an inbound call:
+
+1. Set `runner_transport` to the provider name (e.g. `"twilio"`).
+2. Set `proxy_host` to your public domain — no protocol prefix.
+3. Configure the provider's phone number or SIP trunk to send `POST /` to `https://{proxy_host}/`.
+4. When a call arrives, the provider sends `POST /` to Voxray. Voxray responds with provider-specific XML (TwiML, TeXML, PHLO, etc.) that tells the provider to open a media WebSocket.
+5. The provider dials back on `wss://{proxy_host}/telephony/ws`.
+6. Audio flows bidirectionally: the provider streams encoded audio frames in; Voxray's pipeline transcribes them with STT, generates a response with LLM, synthesises speech with TTS, and sends audio frames back out.
+7. When the caller hangs up or the provider closes the WebSocket, the session tears down cleanly.
+
+Each call runs in an isolated goroutine — one goroutine per active connection. A single Voxray process handles many concurrent calls.
+
+---
+
+## Supported transports
+
+| Transport | Provider | `runner_transport` value | Audio format | Notes |
+|-----------|----------|--------------------------|--------------|-------|
+| Twilio | Twilio | `"twilio"` | G.711 μ-law 8 kHz | Most widely deployed; TwiML webhook response |
+| Telnyx | Telnyx | `"telnyx"` | G.711 μ-law 8 kHz | TeXML webhook; SIP trunking supported |
+| Plivo | Plivo | `"plivo"` | G.711 μ-law 8 kHz | XML webhook; requires `PLIVO_AUTH_ID` / `PLIVO_AUTH_TOKEN` |
+| Exotel | Exotel | `"exotel"` | G.711 μ-law 8 kHz | Indian telecom provider; XML webhook |
+| Daily.co | Daily | `"daily"` | Opus 48 kHz | Room-based; optional PSTN dial-in via `POST /daily-dialin-webhook` |
+| LiveKit | LiveKit | `"livekit"` | Opus 48 kHz | Room-based; requires `LIVEKIT_*` env vars |
+
+<Note>
+Twilio, Telnyx, Plivo, and Exotel all use G.711 μ-law at 8 kHz on the wire. Voxray automatically upsamples to 16 kHz for STT and downsamples + re-encodes TTS output to 8 kHz μ-law before sending it back. You do not need to configure codecs or sample rates.
+</Note>
+
+---
+
+## Base configuration
+
+The minimum `config.json` to handle inbound telephony calls:
+
+```json
+{
+  "runner_transport": "twilio",
+  "proxy_host": "your-domain.com",
+  "port": 8080,
+  "stt_provider": "groq",
+  "llm_provider": "groq",
+  "tts_provider": "groq",
+  "model": "llama-3.1-8b-instant"
+}
+```
+
+<Warning>
+`proxy_host` must be a bare hostname — no `https://`, no trailing slash. Correct: `"your-domain.com"`. Wrong: `"https://your-domain.com"`. Voxray builds webhook URLs from this value; an embedded protocol prefix will produce malformed XML and the provider will reject it.
+</Warning>
+
+`runner_transport` and `proxy_host` are the two fields that activate telephony mode. Everything else follows the same provider and model configuration as non-telephony deployments.
+
+---
+
+## Provider-specific setup
+
+<Tabs>
+  <Tab title="Twilio">
+    Twilio uses TwiML. When a call arrives, Voxray responds with a `<Connect><Stream>` directive that tells Twilio to open a media WebSocket to `/telephony/ws`.
+
+    **Twilio console setup:**
+    1. Buy or configure a Twilio phone number.
+    2. Under "Voice Configuration", set the webhook to `https://{proxy_host}/` with HTTP method `POST`.
+    3. No additional credentials are required in Voxray — Twilio signs requests with `X-Twilio-Signature`, but the webhook endpoint is intentionally unauthenticated by design (providers do not always send auth headers on media connections).
+
+    **config.json:**
+    ```json
+    {
+      "runner_transport": "twilio",
+      "proxy_host": "bot.example.com",
+      "port": 8080,
+      "stt_provider": "groq",
+      "llm_provider": "openai",
+      "tts_provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+    ```
+
+    No `DAILY_API_KEY` is needed for Twilio. The only external secret required is your STT/LLM/TTS provider API keys.
+  </Tab>
+
+  <Tab title="Telnyx">
+    Telnyx uses TeXML — the same structure as TwiML with minor differences. Voxray's Telnyx serializer handles the format automatically.
+
+    **Telnyx portal setup:**
+    1. Create a TeXML application in the Telnyx portal.
+    2. Set the "Voice URL" to `https://{proxy_host}/` with method `POST`.
+    3. Assign your Telnyx phone number to that application.
+
+    **config.json:**
+    ```json
+    {
+      "runner_transport": "telnyx",
+      "proxy_host": "bot.example.com",
+      "port": 8080,
+      "stt_provider": "groq",
+      "llm_provider": "groq",
+      "tts_provider": "groq",
+      "model": "llama-3.1-8b-instant"
+    }
+    ```
+
+    SIP trunking with Telnyx is supported — configure the SIP trunk's voice application to point at the same webhook URL.
+  </Tab>
+
+  <Tab title="Plivo">
+    Plivo authenticates API requests using `PLIVO_AUTH_ID` and `PLIVO_AUTH_TOKEN`. Supply these via the `api_keys` map in config or as environment variables.
+
+    **Plivo console setup:**
+    1. Create an application under "Voice" in the Plivo console.
+    2. Set the "Answer URL" to `https://{proxy_host}/` with method `POST`.
+    3. Assign a Plivo number to the application.
+
+    **config.json:**
+    ```json
+    {
+      "runner_transport": "plivo",
+      "proxy_host": "bot.example.com",
+      "port": 8080,
+      "api_keys": {
+        "plivo_auth_id": "MAXXXXXXXXXXXXXXXXXXXX",
+        "plivo_auth_token": "your-auth-token"
+      },
+      "stt_provider": "groq",
+      "llm_provider": "groq",
+      "tts_provider": "groq",
+      "model": "llama-3.1-8b-instant"
+    }
+    ```
+
+    Alternatively, set `PLIVO_AUTH_ID` and `PLIVO_AUTH_TOKEN` as environment variables; they take precedence over `api_keys`.
+  </Tab>
+
+  <Tab title="Daily.co">
+    Daily.co is room-based rather than phone-number-based. `GET /` creates a Daily room and redirects the caller's browser or PSTN leg into it. Audio runs over Opus at 48 kHz via WebRTC, not G.711 over WebSocket.
+
+    **Required environment variable:**
+
+    ```bash
+    export DAILY_API_KEY=your-daily-api-key
+    ```
+
+    **config.json:**
+    ```json
+    {
+      "runner_transport": "daily",
+      "proxy_host": "bot.example.com",
+      "port": 8080,
+      "stt_provider": "groq",
+      "llm_provider": "openai",
+      "tts_provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+    ```
+
+    **PSTN dial-in (optional):**
+
+    To allow callers to reach the bot by dialling a phone number into a Daily room, enable the dial-in webhook:
+
+    ```json
+    {
+      "runner_transport": "daily",
+      "proxy_host": "bot.example.com",
+      "dialin": true,
+      "daily_dialin_webhook_secret": "your-webhook-secret"
+    }
+    ```
+
+    When `dialin` is `true`, Voxray exposes `POST /daily-dialin-webhook`. Daily calls this endpoint when a PSTN leg connects, sending a `X-Webhook-Secret` header that Voxray validates against `daily_dialin_webhook_secret`. The response returns a `sessionId` that Daily uses to route the incoming call leg into the correct room.
+
+    You can set `daily_dialin_webhook_secret` via the environment variable `VOXRAY_DAILY_DIALIN_WEBHOOK_SECRET` instead of committing it to the config file.
+
+    <Warning>
+    If `daily_dialin_webhook_secret` is set and the `X-Webhook-Secret` header does not match, Voxray returns `401`. Configure the secret in the Daily dashboard to match what you set here.
+    </Warning>
+  </Tab>
+
+  <Tab title="LiveKit">
+    LiveKit uses a room model similar to Daily.co. Voxray joins a LiveKit room as a participant; your SIP trunk or client connects to the same room.
+
+    **Required environment variables:**
+
+    ```bash
+    export LIVEKIT_URL=wss://your-livekit-instance.livekit.cloud
+    export LIVEKIT_API_KEY=APIxxxxxxxxxxxxxxxxxx
+    export LIVEKIT_API_SECRET=your-api-secret
+    export LIVEKIT_ROOM_NAME=voxray-calls
+    ```
+
+    **config.json:**
+    ```json
+    {
+      "runner_transport": "livekit",
+      "proxy_host": "bot.example.com",
+      "port": 8080,
+      "stt_provider": "groq",
+      "llm_provider": "groq",
+      "tts_provider": "groq",
+      "model": "llama-3.1-8b-instant"
+    }
+    ```
+
+    `LIVEKIT_ROOM_NAME` controls which room Voxray joins. For multi-room deployments, run separate Voxray instances with different `LIVEKIT_ROOM_NAME` values, or set it per-deploy in your container environment.
+  </Tab>
+</Tabs>
+
+---
+
+## Audio processing pipeline
+
+Voxray handles codec conversion and resampling automatically. You do not need to configure audio formats.
+
+**For G.711 providers (Twilio, Telnyx, Plivo, Exotel):**
+
+```text
+Provider → G.711 μ-law 8 kHz → [Voxray upsample to 16 kHz] → STT
+                                                                ↓
+                                                               LLM
+                                                                ↓
+Provider ← G.711 μ-law 8 kHz ← [Voxray downsample + encode] ← TTS
+```
+
+**For Opus providers (Daily.co, LiveKit):**
+
+```text
+Provider → Opus 48 kHz → [Voxray decode] → STT
+                                            ↓
+                                           LLM
+                                            ↓
+Provider ← Opus 48 kHz ← [Voxray encode] ← TTS
+```
+
+STT and LLM operate at their native resolution regardless of what the provider delivers on the wire. The pipeline processors (VAD, STT, LLM, TTS, Sink) are identical across all telephony transports — only the transport layer serializer differs.
+
+---
+
+## Production deployment
+
+### TLS is required
+
+Twilio, Telnyx, Plivo, and Exotel all require HTTPS webhooks. Your Voxray server must be reachable over TLS on a public domain before you can configure a phone number to point at it.
+
+Options:
+- **Reverse proxy:** Run Nginx or Caddy in front of Voxray. Set `port` to an internal port (e.g. `8080`) and terminate TLS at the proxy.
+- **Built-in TLS:** Enable Voxray's TLS listener directly:
+
+  ```json
+  {
+    "tls_enable": true,
+    "tls_cert_file": "/etc/letsencrypt/live/bot.example.com/fullchain.pem",
+    "tls_key_file": "/etc/letsencrypt/live/bot.example.com/privkey.pem"
+  }
+  ```
+
+  Or via environment variables: `VOXRAY_TLS_ENABLE=true`, `VOXRAY_TLS_CERT_FILE`, `VOXRAY_TLS_KEY_FILE`.
+
+### API key security
+
+The telephony webhook (`POST /`) is intentionally unauthenticated — providers do not consistently forward auth headers across both the webhook and the subsequent media WebSocket. However, you should still protect the rest of the server:
+
+```json
+{
+  "server_api_key": "your-strong-random-key"
+}
+```
+
+When set, `server_api_key` enforces `Authorization: Bearer <key>` or `X-API-Key: <key>` on `/start`, `/sessions/*`, `/webrtc/offer`, and `/ws`. Set it via `VOXRAY_SERVER_API_KEY` to keep it out of the config file.
+
+<Tip>
+For additional webhook security with Twilio, validate the `X-Twilio-Signature` header in a reverse proxy or middleware before requests reach Voxray. Twilio's signature uses your auth token and the full webhook URL.
+</Tip>
+
+### Monitoring
+
+Voxray exposes Prometheus metrics at `/metrics`. For telephony deployments, watch these signals:
+
+| Metric | What to watch for |
+|--------|-------------------|
+| STT error rate | High error rates indicate codec issues or upstream STT quota exhaustion |
+| LLM latency (p95) | Spikes cause long silences between caller turn and bot response |
+| Active connections | Tracks concurrent call load; plan capacity accordingly |
+| Pipeline queue depth | When `pipeline_input_queue_cap` is reached, audio frames block — increase capacity or scale out |
+
+```json
+{
+  "metrics_enabled": true,
+  "pipeline_input_queue_cap": 512
+}
+```
+
+### Horizontal scaling
+
+For multiple concurrent calls across multiple instances, use Redis as the session store so all instances share session state:
+
+```json
+{
+  "session_store": "redis",
+  "redis_url": "redis://redis.internal:6379/0",
+  "session_ttl_secs": 3600
+}
+```
+
+Put a TCP load balancer (not HTTP round-robin) in front of your Voxray instances so that the provider's WebSocket connection to `/telephony/ws` is sticky to the instance that handled the initial `POST /` webhook for that call.
+
+---
+
+## Local development with ngrok
+
+To test telephony locally before deploying:
+
+```bash
+# Start Voxray
+./voxray --config config.json
+
+# In another terminal, expose port 8080
+ngrok http 8080
+```
+
+ngrok prints a public URL like `https://abc123.ngrok.io`. Set that as your `proxy_host` (without `https://`):
+
+```json
+{
+  "runner_transport": "twilio",
+  "proxy_host": "abc123.ngrok.io",
+  "port": 8080
+}
+```
+
+Then point your Twilio (or other provider) phone number webhook at `https://abc123.ngrok.io/`. Incoming test calls will route through ngrok to your local Voxray process.
+
+<Note>
+ngrok free tier generates a new URL on each restart. Update `proxy_host` and your provider webhook URL each time. ngrok paid plans support reserved domains.
+</Note>

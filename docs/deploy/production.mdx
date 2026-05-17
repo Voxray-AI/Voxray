@@ -1,0 +1,293 @@
+---
+title: "Production Deployment"
+description: "Checklist, TLS configuration, logging, resource limits, and graceful shutdown for running Voxray in production."
+---
+
+## Pre-launch checklist
+
+Work through every item before accepting live traffic. Each item links to the relevant section below.
+
+- [ ] TLS enabled — on-server (`tls_enable: true`) or terminated at a reverse proxy
+- [ ] `server_api_key` set — protects `/start`, `/webrtc/offer`, `/sessions/{id}/api/offer`, and `/ws`
+- [ ] `cors_allowed_origins` restricted to your front-end domain(s) — never leave it empty for browser clients
+- [ ] `max_request_body_bytes` set — 1 MiB (`1048576`) recommended; default is 256 KB
+- [ ] `log_level: "info"` — do not ship `"debug"` to production; it logs raw audio metadata and internal state
+- [ ] `json_logs: true` — required for structured log aggregation (Fluentd, Loki, CloudWatch)
+- [ ] `/metrics` endpoint firewalled or access-controlled — Prometheus text output must not be publicly reachable
+- [ ] API keys in environment variables, not in `config.json` — never commit secrets to git
+- [ ] Session store set to `"redis"` for multi-instance deployments — the default `"memory"` store is per-process
+- [ ] Health and readiness probes configured in your load balancer or Kubernetes deployment
+
+---
+
+## TLS configuration
+
+Voxray supports two TLS modes: terminating TLS directly inside the Go server, or delegating termination to a reverse proxy. Both are fully supported in production; choose whichever fits your infrastructure.
+
+<Note>
+WebRTC media (RTP/SRTP) is always peer-to-peer. TLS on the Voxray server only secures the signaling path — the HTTP(S) exchange for `POST /webrtc/offer` and `POST /sessions/{id}/api/offer`. Media encryption is handled by DTLS-SRTP inside the WebRTC stack regardless of your TLS setting.
+</Note>
+
+<Tabs>
+  <Tab title="On-server TLS">
+    Set the three TLS fields in `config.json` and point them at your certificate and private key files. The server calls `ListenAndServeTLS` internally.
+
+    ```json
+    {
+      "host": "0.0.0.0",
+      "port": 8443,
+      "tls_enable": true,
+      "tls_cert_file": "/etc/voxray/tls/server.crt",
+      "tls_key_file": "/etc/voxray/tls/server.key"
+    }
+    ```
+
+    The same three fields can be set via environment variables instead of the config file:
+
+    ```bash
+    VOXRAY_TLS_ENABLE=true
+    VOXRAY_TLS_CERT_FILE=/etc/voxray/tls/server.crt
+    VOXRAY_TLS_KEY_FILE=/etc/voxray/tls/server.key
+    ```
+
+    All three must be provided together. If `tls_enable` is `true` but either cert or key path is missing, the server will fail to start.
+
+    <Tip>
+    Mount TLS certificates as a read-only volume in Docker or as a Kubernetes Secret. Never bake certificate files into the image.
+    </Tip>
+  </Tab>
+  <Tab title="Reverse proxy (nginx)">
+    Run Voxray with TLS disabled, bound to a private address or loopback. Let nginx (or an Ingress controller / load balancer) terminate HTTPS and proxy to Voxray over plain HTTP.
+
+    In `config.json`, bind only to the internal interface:
+
+    ```json
+    {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "tls_enable": false
+    }
+    ```
+
+    nginx configuration with WebSocket upgrade headers — required for `/ws` and `/telephony/ws`:
+
+    ```nginx
+    server {
+        listen 443 ssl;
+        server_name voxray.example.com;
+
+        ssl_certificate     /etc/nginx/tls/fullchain.pem;
+        ssl_certificate_key /etc/nginx/tls/privkey.pem;
+
+        location / {
+            proxy_pass         http://voxray:8080;
+            proxy_http_version 1.1;
+            proxy_set_header   Upgrade $http_upgrade;
+            proxy_set_header   Connection "Upgrade";
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Real-IP $remote_addr;
+            proxy_read_timeout 3600s;
+        }
+    }
+    ```
+
+    The `proxy_read_timeout 3600s` is critical for long-lived WebSocket voice sessions. The default nginx read timeout (60 s) will terminate active calls.
+
+    <Warning>
+    Without the `Upgrade` and `Connection` headers, WebSocket connections will be rejected. Verify these headers are forwarded when troubleshooting connection drops.
+    </Warning>
+  </Tab>
+</Tabs>
+
+---
+
+## Logging configuration
+
+Voxray uses a structured logger whose behavior is controlled by two config keys.
+
+| Config key | Environment variable | Values | Default |
+|------------|---------------------|--------|---------|
+| `log_level` | `VOXRAY_LOG_LEVEL` | `"debug"`, `"info"`, `"warn"`, `"error"` | `"info"` |
+| `json_logs` | `VOXRAY_JSON_LOGS` | `true` / `false` (or `1` / `0`) | `false` |
+
+**Log level guidance:**
+
+- `"debug"` — logs per-audio-chunk events, pipeline state transitions, and raw frame types. Never use in production; generates extreme log volume and may expose timing metadata.
+- `"info"` — logs connection lifecycle events, session start/end, errors, and configuration summary at startup. Appropriate for production.
+- `"warn"` — logs unexpected but recoverable conditions. Use when log volume is a cost concern and you have good alerting on errors.
+- `"error"` — logs only failures. Not recommended as the default; silent on normal operation means you lose visibility into traffic patterns.
+
+**JSON log format** (`json_logs: true`) emits one JSON object per line. Each line is independently parseable — no multi-line log stitching required. Compatible out-of-the-box with:
+
+- **Fluentd** — use the `json` parser; fields map directly
+- **Grafana Loki** — use `json` pipeline stage in Promtail
+- **AWS CloudWatch Logs Insights** — JSON fields are queryable with `fields @message`
+- **Datadog** — standard JSON log ingestion with automatic field extraction
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "log_level": "info",
+  "json_logs": true
+}
+```
+
+Or via environment variables in a container:
+
+```bash
+VOXRAY_LOG_LEVEL=info
+VOXRAY_JSON_LOGS=true
+```
+
+---
+
+## Resource limits
+
+The table below gives recommended starting values. Adjust based on observed memory and CPU metrics from `/metrics` after load testing.
+
+| Concurrent sessions | Recommended memory | Recommended CPU | Notes |
+|--------------------|--------------------|-----------------|-------|
+| 1–10 | 256 MB | 0.5 vCPU | Development / low-traffic |
+| 10–50 | 1 GB | 2 vCPU | Moderate production load |
+| 50–200 | 4 GB | 4–8 vCPU | High-traffic; consider Redis for sessions |
+| 200+ | Scale horizontally | Multiple instances | See horizontal scaling below |
+
+**Key tuning knobs:**
+
+- `pipeline_input_queue_cap` (env: `VOXRAY_PIPELINE_INPUT_QUEUE_CAP`, default `256`) — buffer between transport read and pipeline. Increase under bursty input. When this queue fills, the reader blocks so Voxray does not grow unbounded memory.
+- `ws_write_coalesce_ms` (env: `VOXRAY_WS_WRITE_COALESCE_MS`, default `0`) — when non-zero, batches WebSocket writes within the window, reducing syscalls. Adds a small latency budget equal to the coalesce window. Useful under high fan-out.
+- `ws_write_coalesce_max_frames` (env: `VOXRAY_WS_WRITE_COALESCE_MAX_FRAMES`) — caps the number of frames coalesced per write window.
+
+For S3 recording uploads, `recording.worker_count` and `recording.queue_cap` control the upload worker pool. Recordings stream from temp files to S3 — no full WAV is held in memory — so memory impact is bounded by the pipeline buffer, not recording duration.
+
+---
+
+## Horizontal scaling
+
+<Tabs>
+  <Tab title="Single instance">
+    The default in-memory session store works with no extra dependencies. Sessions live in the process; a restart clears all session state.
+
+    ```json
+    {
+      "session_store": "memory"
+    }
+    ```
+
+    Suitable for development, low-traffic deployments, and stateless runner configurations (e.g. WebSocket only without `/start`).
+  </Tab>
+  <Tab title="Multiple instances (Redis)">
+    Set `session_store` to `"redis"` and provide `redis_url`. All instances share session state; any instance can serve any session.
+
+    ```json
+    {
+      "session_store": "redis",
+      "redis_url": "redis://redis:6379/0",
+      "session_ttl_secs": 3600
+    }
+    ```
+
+    Or via environment variables:
+
+    ```bash
+    VOXRAY_SESSION_STORE=redis
+    VOXRAY_REDIS_URL=redis://redis:6379/0
+    ```
+
+    The readiness probe at `GET /ready` returns `503 Service Unavailable` when Redis is unreachable, allowing your load balancer to drain the instance. Use this probe for Kubernetes readiness — not liveness.
+
+    <Warning>
+    If `session_store` is `"redis"` but `redis_url` is empty, config validation will fail and the server will not start.
+    </Warning>
+  </Tab>
+</Tabs>
+
+---
+
+## Health and readiness probes
+
+Voxray exposes two purpose-built endpoints. Use both in your load balancer or orchestrator.
+
+| Endpoint | Probe type | Returns | Behavior |
+|----------|-----------|---------|----------|
+| `GET /health` | Liveness | `200 {"status":"ok"}` | Always returns 200 when the process is running |
+| `GET /ready` | Readiness | `200` / `503` | Returns 503 if Redis is unreachable (when `session_store=redis`) |
+
+Kubernetes deployment example:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 2
+  periodSeconds: 5
+  failureThreshold: 2
+```
+
+Both endpoints are always open — they do not require an API key even when `server_api_key` is set.
+
+---
+
+## Graceful shutdown
+
+Voxray handles `SIGTERM` and drains in-flight requests before exiting. In Kubernetes, set `terminationGracePeriodSeconds` to at least as long as your longest expected voice session, or to a value that matches your SLA for call interruption.
+
+```yaml
+spec:
+  terminationGracePeriodSeconds: 60
+  containers:
+    - name: voxray
+      image: voxray:latest
+```
+
+For `preStop` hooks, a short sleep before the process exits gives the load balancer time to deregister the pod before connections are dropped:
+
+```yaml
+lifecycle:
+  preStop:
+    exec:
+      command: ["/bin/sh", "-c", "sleep 5"]
+```
+
+In Docker Compose, `docker compose stop` sends `SIGTERM` followed by `SIGKILL` after the stop grace period (default 10 s). Increase with `stop_grace_period`:
+
+```yaml
+services:
+  voxray:
+    image: voxray:latest
+    stop_grace_period: 30s
+```
+
+---
+
+## Prometheus metrics
+
+`GET /metrics` returns Prometheus text format from the shared registry. Metric names are stable across releases and safe to use in dashboards and alerts.
+
+```bash
+# scrape from localhost only — do not expose publicly
+curl http://localhost:8080/metrics
+```
+
+Key metrics exposed:
+
+- `voxray_up 1` — process health gauge
+- `voxray_http_requests_total` — request count by method, route, and status class
+- `voxray_http_request_duration_seconds` — latency histogram by route
+- `voxray_http_active_connections` — in-flight connections by route
+
+<Warning>
+The `/metrics` endpoint is unauthenticated. Firewall it or restrict access via a network policy so Prometheus can scrape it but public clients cannot reach it. Metric output includes route cardinality information that could aid reconnaissance.
+</Warning>
+
+To disable metrics collection entirely, set `metrics_enabled: false` in config. The `/metrics` endpoint will remain but return an empty registry.

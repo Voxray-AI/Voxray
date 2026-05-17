@@ -1,0 +1,123 @@
+---
+title: "Anthropic"
+description: "Claude LLM provider for Voxray. Supports the full Claude 3 and Claude 4 model families as the LLM stage of the STT → LLM → TTS pipeline."
+---
+
+import { CardGroup, Card, Tabs, Tab, Warning, Note } from "@mintlify/components";
+
+## Capabilities
+
+<CardGroup cols={4}>
+  <Card title="STT" icon="microphone" color="#6b7280">
+    Not supported
+  </Card>
+  <Card title="LLM" icon="brain" color="#22c55e">
+    Full Claude model family via the Messages API
+  </Card>
+  <Card title="TTS" icon="volume-high" color="#6b7280">
+    Not supported
+  </Card>
+  <Card title="Realtime" icon="bolt" color="#6b7280">
+    Not supported
+  </Card>
+</CardGroup>
+
+Anthropic currently provides LLM capability only. Pair it with a supported STT provider (e.g. `"groq"` or `"openai"`) and TTS provider (e.g. `"elevenlabs"` or `"openai"`) to build a complete voice pipeline.
+
+## API Key
+
+Set `ANTHROPIC_API_KEY` as an environment variable or pass it inline under `api_keys` in `config.json`.
+
+Get your key at [console.anthropic.com](https://console.anthropic.com).
+
+## Quick Config
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "stt_provider": "groq",
+      "llm_provider": "anthropic",
+      "tts_provider": "elevenlabs",
+      "model": "claude-haiku-4-5-20251001",
+      "api_keys": {
+        "anthropic": "sk-ant-...",
+        "groq": "gsk_...",
+        "elevenlabs": "..."
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment variable">
+    ```bash
+    export ANTHROPIC_API_KEY="sk-ant-..."
+    export GROQ_API_KEY="gsk_..."
+    export ELEVENLABS_API_KEY="..."
+    ```
+
+    Then in `config.json`:
+
+    ```json
+    {
+      "stt_provider": "groq",
+      "llm_provider": "anthropic",
+      "tts_provider": "elevenlabs",
+      "model": "claude-haiku-4-5-20251001"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Available Models
+
+| Model | Speed | Cost | Best For |
+|-------|-------|------|----------|
+| `claude-haiku-4-5-20251001` | Fastest | Lowest | High-throughput voice agents, short-answer tasks, latency-sensitive workflows |
+| `claude-sonnet-4-6` | Balanced | Medium | General-purpose voice agents, customer support, nuanced reasoning |
+| `claude-opus-4-6` | Slowest | Highest | Complex multi-step reasoning, analysis tasks where accuracy outweighs latency |
+
+The default model when `model` is empty is `claude-3-sonnet-20240229` (defined as `DefaultLLMModel` in `pkg/services/anthropic/llm.go`).
+
+## API Details
+
+| Property | Value |
+|----------|-------|
+| Endpoint | `https://api.anthropic.com/v1/messages` |
+| Version header | `anthropic-version: 2023-06-01` |
+| Auth header | `x-api-key: <your-key>` |
+| Timeout | 60 seconds per request |
+| Max tokens | 1024 per response (hardcoded default) |
+| Transport | Shared `http.Transport` with 10 idle connections per host, 90 s idle timeout |
+
+## Configuration Reference
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `llm_provider` | string | Set to `"anthropic"` |
+| `model` | string | Claude model ID (e.g. `"claude-haiku-4-5-20251001"`); defaults to `"claude-3-sonnet-20240229"` |
+| `api_keys.anthropic` | string | Anthropic API key (falls back to `ANTHROPIC_API_KEY`) |
+| `stt_provider` | string | Required — Anthropic does not provide STT; use `"groq"`, `"openai"`, etc. |
+| `tts_provider` | string | Required — Anthropic does not provide TTS; use `"elevenlabs"`, `"openai"`, etc. |
+
+## Latency Consideration
+
+<Warning>
+The Anthropic provider returns **full responses**, not streaming tokens. The implementation sets `"stream": false` in the API request and delivers the complete text as a single `LLMTextFrame` when the response arrives. This means TTS does not receive text incrementally — the first audio chunk has materially higher latency than streaming providers like OpenAI or Groq.
+
+To mitigate this:
+- Use shorter system prompts.
+- Prefer `claude-haiku-4-5-20251001` over larger models for faster time-to-first-token.
+- Consider sentence-level TTS batching if your pipeline supports it.
+- For latency-critical agents, evaluate `"llm_provider": "groq"` or `"llm_provider": "openai"`, both of which stream tokens as they are produced.
+</Warning>
+
+## Tool Calling
+
+The Anthropic provider does **not** implement `LLMServiceWithTools`. MCP tool integration is not available with this provider. To use MCP tools, switch `llm_provider` to `"openai"` (the other provider that implements the tools interface).
+
+## Notes and Limitations
+
+- System messages in the conversation are concatenated and sent as the top-level `system` field in the Anthropic request; they are not included in the `messages` array.
+- Messages with empty `content` are silently dropped before the request is sent.
+- The `max_tokens` limit is hardcoded to 1024. Very long model outputs will be truncated. If your use case requires longer responses, this requires a code-level change in `pkg/services/anthropic/llm.go`.
+- Only `"user"` and `"assistant"` roles are forwarded to Anthropic. Any message with a role other than `"system"` or `"assistant"` is treated as a user message.

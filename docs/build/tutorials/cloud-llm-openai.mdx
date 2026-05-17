@@ -1,0 +1,199 @@
+---
+title: "Full Cloud Voice Agent with OpenAI"
+description: "Run a complete voice pipeline using OpenAI Whisper for transcription, GPT-4o for reasoning, and OpenAI TTS for speech — all from a single API key."
+---
+
+## What you'll build
+
+A Voxray server that handles end-to-end voice conversations entirely through OpenAI's APIs:
+
+- **STT:** OpenAI Whisper (`gpt-4o-mini-transcribe`) — streaming transcription
+- **LLM:** GPT-4o Mini — fast, capable chat completions with streaming
+- **TTS:** OpenAI TTS (`nova` voice) — natural-sounding speech synthesis
+
+Expected latency from end of user speech to first audio byte: **~1.1 seconds** (STT ~300ms + LLM first token ~500ms + TTS ~300ms).
+
+## Prerequisites
+
+- Voxray binary built (`go build -o voxray ./cmd/voxray`) or downloaded
+- An OpenAI API key with active billing credits ([platform.openai.com/api-keys](https://platform.openai.com/api-keys))
+- No other accounts or keys required
+
+---
+
+## Steps
+
+<Steps>
+
+### Set your API key
+
+Voxray reads the OpenAI key from `config.json` or from the environment variable `OPENAI_API_KEY`. Using the environment variable keeps secrets out of your config file:
+
+<Tabs>
+  <Tab title="Environment variable (recommended)">
+    ```bash
+    export OPENAI_API_KEY="sk-..."
+    ```
+
+    When `OPENAI_API_KEY` is set, you can omit `api_keys.openai` from `config.json` entirely.
+  </Tab>
+  <Tab title="config.json">
+    Place the key directly in your config (see the next step). Suitable for local development; do not commit this file to source control.
+  </Tab>
+</Tabs>
+
+### Write your config
+
+Create `config.json` in your working directory:
+
+```json config.json
+{
+  "host": "localhost",
+  "port": 8080,
+  "transport": "websocket",
+  "stt_provider": "openai",
+  "llm_provider": "openai",
+  "tts_provider": "openai",
+  "model": "gpt-4o-mini",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "tts_voice": "nova",
+  "api_keys": {
+    "openai": "sk-..."
+  }
+}
+```
+
+<Note>
+If you exported `OPENAI_API_KEY` in the previous step you can remove the `api_keys` block. Voxray checks the environment before the config file.
+</Note>
+
+**Key fields explained:**
+
+| Field | Value | Purpose |
+|-------|-------|---------|
+| `stt_provider` | `"openai"` | Routes audio through OpenAI's transcription endpoint |
+| `llm_provider` | `"openai"` | Routes transcripts to OpenAI chat completions |
+| `tts_provider` | `"openai"` | Synthesises LLM output via OpenAI TTS |
+| `model` | `"gpt-4o-mini"` | LLM model for chat completions |
+| `stt_model` | `"gpt-4o-mini-transcribe"` | Whisper model variant for transcription |
+| `tts_voice` | `"nova"` | Voice character for synthesised speech |
+| `transport` | `"websocket"` | Enables the `/ws` WebSocket endpoint |
+
+### Start Voxray
+
+```bash
+./voxray -config config.json
+```
+
+You should see output like:
+
+```
+Voxray listening on localhost:8080
+transport: websocket  stt: openai  llm: openai  tts: openai
+```
+
+### Connect a client
+
+Open a WebSocket connection to `ws://localhost:8080/ws`. Any client that sends raw PCM audio frames (16-bit, 16kHz, mono) and receives audio frames back will work.
+
+<Tabs>
+  <Tab title="Voxray web client">
+    Open `http://localhost:8080` in your browser if you have the bundled web client enabled. Click **Connect**, then **Start speaking**.
+  </Tab>
+  <Tab title="wscat (quick test)">
+    ```bash
+    npm install -g wscat
+    wscat -c ws://localhost:8080/ws
+    ```
+
+    The server will respond with JSON frames for transcriptions and text, and binary frames for audio.
+  </Tab>
+  <Tab title="RTVI client">
+    Connect with `?rtvi=1` query parameter to use the RTVI protocol:
+
+    ```
+    ws://localhost:8080/ws?rtvi=1
+    ```
+
+    Compatible with any RTVI-spec client SDK.
+  </Tab>
+</Tabs>
+
+### Test the pipeline
+
+Speak a sentence. You should observe:
+
+1. A `TranscriptionFrame` JSON message appears within ~300ms of you finishing speaking (Whisper STT)
+2. A `TextFrame` starts streaming back within ~500ms of the transcript arriving (GPT-4o Mini)
+3. Audio bytes begin arriving within ~300ms of the first text token (OpenAI TTS)
+
+Total time from silence to first audio: **~1.1 seconds** under normal network conditions.
+
+</Steps>
+
+---
+
+## Available models
+
+Use the tables below to tune the trade-off between cost, speed, and quality.
+
+### LLM models (`model`)
+
+| Model | Speed | Quality | Best for |
+|-------|-------|---------|----------|
+| `gpt-4o-mini` | Fast | High | Default; best cost/quality ratio |
+| `gpt-4o` | Medium | Highest | Complex reasoning, nuanced conversations |
+| `gpt-4.1-mini` | Fast | High | Latest mini-class, improved instruction following |
+| `gpt-4.1` | Medium | Highest | Latest full model, strong tool use |
+
+### STT models (`stt_model`)
+
+| Model | Latency | Notes |
+|-------|---------|-------|
+| `gpt-4o-mini-transcribe` | ~300ms | Recommended; good accuracy, low cost |
+| `whisper-1` | ~400ms | Classic Whisper; higher cost, similar accuracy |
+
+### TTS voices (`tts_voice`)
+
+| Voice | Character |
+|-------|-----------|
+| `nova` | Warm, conversational (recommended default) |
+| `alloy` | Neutral, balanced |
+| `echo` | Measured, authoritative |
+| `fable` | British, expressive |
+| `onyx` | Deep, confident |
+| `shimmer` | Clear, optimistic |
+
+---
+
+## Cost estimate
+
+<Tip>
+Rough cost for **one hour of continuous conversation** (OpenAI list prices as of May 2026):
+
+- **STT (gpt-4o-mini-transcribe):** ~$0.003/min × 60 = **~$0.18/hour**
+- **LLM (gpt-4o-mini):** depends heavily on conversation length; typical voice session ~2k tokens/min → **~$0.12–0.30/hour**
+- **TTS:** ~$0.015/1k chars × ~300 chars/min × 60 = **~$0.27/hour**
+
+**Total estimate: $0.57–0.75 per hour of conversation.** Switch to `gpt-4o` for best quality at roughly 5–8× the LLM cost. These are rough estimates; check [platform.openai.com/pricing](https://platform.openai.com/pricing) for current rates.
+</Tip>
+
+---
+
+## Upgrading to GPT-4o Realtime
+
+OpenAI's Realtime API replaces the separate STT → LLM → TTS chain with a single WebSocket, cutting latency significantly (typically under 500ms TTFR) at a higher per-minute cost.
+
+Voxray supports it via `runner_transport` + the realtime integration. See [OpenAI Realtime integration](/build/integrations/openai-realtime) for setup instructions.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| `401 Unauthorized` from OpenAI | Invalid or missing API key | Verify `OPENAI_API_KEY` is set and the key is active |
+| No transcription appearing | Audio not reaching STT | Confirm your client is sending 16kHz PCM audio |
+| Long pauses before LLM responds | Turn detection holding | Lower `turn_stop_secs` in config (default 3.0s); try `1.5` |
+| TTS audio choppy | Network jitter | Check your connection; TTS streams in chunks and may buffer |
+| `insufficient_quota` error | OpenAI account has no credits | Add billing at [platform.openai.com/settings/billing](https://platform.openai.com/settings/billing) |

@@ -1,0 +1,229 @@
+---
+title: "Phone Calls with Twilio"
+description: "Connect a real phone number to your Voxray agent. Callers dial in over PSTN, Twilio bridges the call to your server via WebSocket, and your agent answers in real time."
+---
+
+## What you'll build
+
+A Voxray server that accepts inbound phone calls routed through Twilio. When someone dials your Twilio number:
+
+1. Twilio receives the PSTN call and sends a **POST webhook** to your server's `/` endpoint
+2. Voxray responds with **TwiML XML** that points Twilio to `/telephony/ws`
+3. Twilio opens a **WebSocket** to `/telephony/ws` for bidirectional audio
+4. Audio flows through the **STT → LLM → TTS pipeline** in real time
+5. Voxray streams synthesised speech back; Twilio plays it to the caller
+
+Audio format: Twilio sends **G.711 μ-law at 8kHz**. Voxray automatically upsamples to 16kHz before passing audio to the STT provider — no manual resampling needed.
+
+## Prerequisites
+
+- Voxray binary built or downloaded
+- A [Twilio account](https://www.twilio.com/) with an active phone number and Voice capabilities enabled
+- An AI provider account with API keys (this tutorial uses Groq — fast, free tier available)
+- [ngrok](https://ngrok.com/) for local tunnelling (production deployments use a real public domain)
+
+---
+
+## Steps
+
+<Steps>
+
+### Install ngrok
+
+ngrok creates a public HTTPS tunnel to your local machine so Twilio's webhook can reach Voxray during development.
+
+<Tabs>
+  <Tab title="macOS (Homebrew)">
+    ```bash
+    brew install ngrok/ngrok/ngrok
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```bash
+    curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+      | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+    echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+      | sudo tee /etc/apt/sources.list.d/ngrok.list
+    sudo apt update && sudo apt install ngrok
+    ```
+  </Tab>
+  <Tab title="Manual download">
+    Download the binary for your OS from [ngrok.com/download](https://ngrok.com/download), unzip it, and place `ngrok` on your `PATH`.
+  </Tab>
+</Tabs>
+
+Authenticate ngrok with your account token (one-time setup):
+
+```bash
+ngrok config add-authtoken <YOUR_NGROK_AUTHTOKEN>
+```
+
+Your authtoken is at [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken).
+
+### Start your ngrok tunnel
+
+In a separate terminal, expose port 8080:
+
+```bash
+ngrok http 8080
+```
+
+ngrok prints output like:
+
+```
+Forwarding  https://abc123.ngrok.io -> http://localhost:8080
+```
+
+Note your **HTTPS forwarding URL** (e.g. `https://abc123.ngrok.io`). You will use the hostname (`abc123.ngrok.io`) in the next step and the full URL when configuring Twilio.
+
+<Warning>
+ngrok free-tier URLs change every time you restart ngrok. If you restart ngrok you must update the Twilio webhook URL to match the new hostname and also update `proxy_host` in your config.
+</Warning>
+
+### Configure Voxray
+
+Create `config.json` in your working directory. Replace `abc123.ngrok.io` with your actual ngrok hostname:
+
+```json config.json
+{
+  "host": "localhost",
+  "port": 8080,
+  "runner_transport": "twilio",
+  "proxy_host": "abc123.ngrok.io",
+  "stt_provider": "groq",
+  "llm_provider": "groq",
+  "tts_provider": "groq",
+  "model": "llama-3.1-8b-instant",
+  "api_keys": {
+    "groq": "gsk_..."
+  }
+}
+```
+
+**Key fields explained:**
+
+| Field | Value | Purpose |
+|-------|-------|---------|
+| `runner_transport` | `"twilio"` | Activates the telephony endpoints (`POST /` and `GET /telephony/ws`) and selects the Twilio serializer |
+| `proxy_host` | `"abc123.ngrok.io"` | Hostname Voxray embeds in TwiML responses so Twilio can open the WebSocket. Must NOT include `https://` — bare hostname only |
+| `stt_provider` | `"groq"` | Routes audio to Groq's transcription service |
+| `llm_provider` | `"groq"` | Routes transcripts to Groq's chat completions |
+| `tts_provider` | `"groq"` | Synthesises responses via Groq TTS |
+| `model` | `"llama-3.1-8b-instant"` | Groq LLM model — very low latency |
+
+<Warning>
+`proxy_host` must be the bare hostname with no protocol prefix and no trailing slash. Correct: `abc123.ngrok.io`. Incorrect: `https://abc123.ngrok.io` or `abc123.ngrok.io/`.
+</Warning>
+
+You can use any STT/LLM/TTS provider combination. Groq is shown here because it has a generous free tier and very low latency. To use OpenAI instead:
+
+```json
+{
+  "runner_transport": "twilio",
+  "proxy_host": "abc123.ngrok.io",
+  "stt_provider": "openai",
+  "llm_provider": "openai",
+  "tts_provider": "openai",
+  "model": "gpt-4o-mini",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "tts_voice": "nova",
+  "api_keys": { "openai": "sk-..." }
+}
+```
+
+### Start Voxray
+
+```bash
+./voxray -config config.json
+```
+
+Expected output:
+
+```
+Voxray listening on localhost:8080
+runner_transport: twilio  proxy_host: abc123.ngrok.io
+stt: groq  llm: groq  tts: groq
+```
+
+Voxray is now serving:
+- `POST /` — webhook endpoint that returns TwiML XML to Twilio
+- `GET /telephony/ws` — WebSocket endpoint for bidirectional media
+
+### Configure your Twilio phone number
+
+1. Log in to the [Twilio Console](https://console.twilio.com/)
+2. Navigate to **Phone Numbers → Manage → Active Numbers**
+3. Click your phone number
+4. Under **Voice & Fax → A call comes in**, set:
+   - **Webhook:** `https://abc123.ngrok.io` (your full ngrok HTTPS URL, no trailing slash)
+   - **HTTP Method:** `POST`
+5. Click **Save configuration**
+
+Also verify **Voice Geographic Permissions** allow calls from the regions you expect (Console → Voice → Settings → Geographic Permissions). Without the right permissions enabled, Twilio will reject incoming calls silently.
+
+### Call your number and talk to your agent
+
+Dial your Twilio phone number from any phone. The call flow is:
+
+1. Twilio receives your call and POSTs to `https://abc123.ngrok.io`
+2. Voxray returns TwiML that streams media to `wss://abc123.ngrok.io/telephony/ws`
+3. Twilio opens the WebSocket; Voxray starts the pipeline
+4. Your voice → Groq STT → Groq LLM → Groq TTS → your earpiece
+
+You should hear the agent respond within 1–2 seconds of finishing a sentence.
+
+</Steps>
+
+---
+
+## Audio characteristics and resampling
+
+Twilio's media stream delivers audio as **G.711 μ-law encoded at 8kHz**, which is the standard PSTN codec. Most STT providers expect 16kHz PCM.
+
+Voxray's Twilio serializer handles this automatically:
+
+- Decodes μ-law bytes to 16-bit linear PCM
+- Upsamples from 8kHz to 16kHz using linear interpolation
+- Passes 16kHz PCM frames to the STT processor
+
+No configuration is required. The upsampling is transparent; you will notice slightly reduced audio fidelity compared to a WebSocket client sending native 16kHz audio, which is inherent to the PSTN codec.
+
+---
+
+## Production deployment
+
+For production, replace ngrok with a server that has a stable public hostname and a valid TLS certificate.
+
+**Minimum production checklist:**
+
+1. Deploy Voxray on a VM or container with a public IP (or behind a load balancer)
+2. Obtain a TLS certificate (e.g. via Let's Encrypt / Certbot, or terminate TLS at your load balancer)
+3. Point a domain name (e.g. `voice.example.com`) at your server
+4. Set `proxy_host` in `config.json` to your domain:
+
+```json
+{
+  "runner_transport": "twilio",
+  "proxy_host": "voice.example.com",
+  ...
+}
+```
+
+5. Update your Twilio phone number webhook to `https://voice.example.com`
+6. Optionally set `server_api_key` in config and use Twilio's request validation to verify webhook authenticity
+
+Twilio requires the webhook endpoint to respond in under 15 seconds. Voxray responds immediately with TwiML (well under 1 second) so this limit is not a concern in practice.
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Twilio error **11200** (HTTP retrieval failure) | Webhook returned non-XML or timed out | Check Voxray is running and `proxy_host` matches your ngrok URL exactly; Twilio must receive `text/xml` |
+| **404** when Twilio POSTs to your URL | `proxy_host` has wrong value or includes `https://` | Set `proxy_host` to the bare hostname only: `abc123.ngrok.io` |
+| Caller hears nothing / one-way audio | STT or TTS provider error | Check Voxray logs for provider errors; verify the API key is correct and has credits |
+| Call connects but agent never speaks | LLM not responding | Confirm the `model` name is valid for the chosen provider; check for timeout errors in logs |
+| `connection refused` in ngrok terminal | Voxray not running on port 8080 | Start Voxray before placing a test call; verify `port` in config matches the ngrok tunnel port |
+| ngrok tunnel URL changed | Restarted ngrok on free plan | Update `proxy_host` in config, restart Voxray, and update the Twilio webhook URL |
+| Twilio error **13225** (no geographic permission) | Outbound or inbound region not enabled | Enable the caller's region in Twilio Console → Voice → Settings → Geographic Permissions |

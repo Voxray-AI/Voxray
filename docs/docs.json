@@ -1,0 +1,151 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Voxray",
+  "colors": {
+    "primary": "#0066FF",
+    "light": "#3385FF",
+    "dark": "#0044CC"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "anchors": [
+      {
+        "anchor": "Documentation",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "get-started/introduction",
+              "get-started/quickstart-websocket",
+              "get-started/quickstart-webrtc",
+              "get-started/installation",
+              "get-started/first-voice-agent"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/architecture",
+              "core-concepts/pipeline-processors",
+              "core-concepts/transport-layer",
+              "core-concepts/audio-vad",
+              "core-concepts/providers-services",
+              "core-concepts/configuration"
+            ]
+          },
+          {
+            "group": "Build",
+            "pages": [
+              {
+                "group": "Tutorials",
+                "pages": [
+                  "build/tutorials/overview",
+                  "build/tutorials/echo-bot",
+                  "build/tutorials/local-llm-ollama",
+                  "build/tutorials/cloud-llm-openai",
+                  "build/tutorials/telephony-twilio",
+                  "build/tutorials/production-pipeline"
+                ]
+              },
+              {
+                "group": "Integrations",
+                "pages": [
+                  "build/integrations/overview",
+                  "build/integrations/openai",
+                  "build/integrations/anthropic",
+                  "build/integrations/groq",
+                  "build/integrations/ollama",
+                  "build/integrations/elevenlabs",
+                  "build/integrations/sarvam",
+                  "build/integrations/aws"
+                ]
+              },
+              "build/plugin-system",
+              "build/mcp-tools",
+              "build/extensions"
+            ]
+          },
+          {
+            "group": "Deploy",
+            "pages": [
+              "deploy/docker",
+              "deploy/docker-compose",
+              "deploy/production",
+              "deploy/scaling",
+              "deploy/telephony",
+              "deploy/observability",
+              "deploy/security"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/api-reference",
+              "reference/configuration-reference",
+              "reference/provider-matrix",
+              "reference/faq",
+              "reference/glossary"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "contributing/guide",
+              "contributing/adding-providers",
+              "contributing/testing"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/Voxray-AI/Voxray",
+          "icon": "github"
+        },
+        {
+          "anchor": "Discord",
+          "href": "https://discord.gg/voxray",
+          "icon": "discord"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "api": {
+    "openapi": [
+      "swagger.json"
+    ]
+  },
+  "background": {
+    "color": {
+      "dark": "#0A0A0F"
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/Voxray-AI/Voxray"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "/get-started/introduction"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Voxray-AI/Voxray",
+      "discord": "https://discord.gg/voxray"
+    }
+  }
+}

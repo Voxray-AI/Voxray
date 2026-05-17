@@ -1,0 +1,512 @@
+---
+title: "API Reference"
+description: "Complete HTTP and WebSocket API reference for the Voxray voice pipeline server."
+---
+
+## Overview
+
+The Voxray server exposes a JSON/HTTP REST API for health, WebRTC signaling, session management, and Prometheus metrics, plus WebSocket and telephony transports for real-time voice pipelines. All JSON endpoints follow a consistent success and error envelope.
+
+The interactive OpenAPI specification is available at `/swagger/` when the server is running. The spec file (`swagger.json`) is located in the `docs/` folder; Mintlify renders it automatically when configured in `mint.json`.
+
+### Base URL
+
+The default bind address is `localhost` on port `3042`. Override both with configuration or environment variables.
+
+```
+http://localhost:3042
+```
+
+| Config Key | Env Variable | Default | Effect |
+|------------|--------------|---------|--------|
+| `host` | `HOST` / `VOXRAY_HOST` | `localhost` | Server bind address |
+| `port` | `PORT` / `VOXRAY_PORT` | `3042` | Server listen port |
+| `tls_enable` | `VOXRAY_TLS_ENABLE` | `false` | Switches to HTTPS when true |
+
+When `tls_enable` is true, the server calls `ListenAndServeTLS` and the base URL becomes `https://`.
+
+### Versioned paths
+
+All core routes are available at both a versioned prefix and a legacy path:
+
+| Versioned | Legacy |
+|-----------|--------|
+| `GET /api/v1/health` | `GET /health` |
+| `GET /api/v1/ready` | `GET /ready` |
+| `POST /api/v1/webrtc/offer` | `POST /webrtc/offer` |
+| `POST /api/v1/start` | `POST /start` |
+| `POST /api/v1/sessions/{id}/offer` | `POST /sessions/{id}/api/offer` |
+| `PATCH /api/v1/sessions/{id}/offer` | `PATCH /sessions/{id}/api/offer` |
+
+Prefer the versioned paths for all new integrations. Legacy paths remain supported but are not guaranteed in future major versions.
+
+---
+
+## Authentication
+
+Authentication is **optional** and controlled entirely by the `server_api_key` configuration value (or the `VOXRAY_SERVER_API_KEY` environment variable). When this key is not set, all endpoints are open.
+
+When a key is configured, protected endpoints require one of the following request headers:
+
+```http
+Authorization: Bearer <key>
+```
+
+```http
+X-API-Key: <key>
+```
+
+Both header forms are accepted interchangeably. The key is static — there is no login, token exchange, expiry, or refresh flow.
+
+**On failure:** `401 Unauthorized` with error code `UNAUTHORIZED`.
+
+### Protected vs open endpoints
+
+| Endpoint | Auth Required |
+|----------|--------------|
+| `GET /health`, `GET /ready` | No |
+| `GET /metrics` | No |
+| `GET /swagger/` | No |
+| `POST /webrtc/offer` | Yes (when key configured) |
+| `POST /start` | Yes (when key configured) |
+| `POST /sessions/{id}/api/offer` | Yes (when key configured) |
+| `PATCH /sessions/{id}/api/offer` | Yes (when key configured) |
+| `GET /ws` | Yes (when key configured) |
+| `POST /` (telephony webhook) | No |
+| `GET /telephony/ws` | No |
+| `POST /daily-dialin-webhook` | Optional `X-Webhook-Secret` |
+
+<Note>
+  The `/daily-dialin-webhook` endpoint uses a separate secret (`daily_dialin_webhook_secret` / `VOXRAY_DAILY_DIALIN_WEBHOOK_SECRET`) validated via the `X-Webhook-Secret` header, not the server API key.
+</Note>
+
+---
+
+## Request and Response Format
+
+All JSON endpoints consume and produce `application/json`. Clients may send `X-Request-ID`; the server echoes it in response `meta.requestId`.
+
+**Body size limit:** Request bodies are capped at `max_request_body_bytes` (default 256 KB). Configure via `VOXRAY_MAX_BODY_BYTES`.
+
+### Success envelope
+
+```json
+{
+  "data": { "<payload fields>" },
+  "meta": { "requestId": "550e8400-e29b-41d4-a716-446655440000" }
+}
+```
+
+Always read the response payload from `body.data`. The `meta` object is present on all successful responses.
+
+### Error envelope
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Missing or empty offer",
+    "requestId": "550e8400-e29b-41d4-a716-446655440000",
+    "details": [
+      { "field": "offer", "message": "required" }
+    ]
+  }
+}
+```
+
+`details` is included only for validation errors and contains per-field information.
+
+### HTTP status codes
+
+| Status | Error Code | Meaning |
+|--------|------------|---------|
+| 200 | — | Success |
+| 201 | — | Resource created |
+| 204 | — | No content (PATCH ICE ack, metrics disabled) |
+| 400 | `BAD_REQUEST` | Invalid JSON, malformed request, or method not allowed |
+| 401 | `UNAUTHORIZED` | Missing or invalid API key / webhook secret |
+| 404 | `NOT_FOUND` | Route or session not found |
+| 422 | `VALIDATION_ERROR` | Required field missing or empty |
+| 500 | `INTERNAL_ERROR` | Unrecovered server error |
+| 503 | `SERVICE_UNAVAILABLE` | Dependency unavailable (Redis, Opus encoder) |
+
+### All error codes
+
+| Code | Description |
+|------|-------------|
+| `BAD_REQUEST` | Malformed or invalid request; also returned for 405 Method Not Allowed |
+| `UNAUTHORIZED` | API key required or invalid |
+| `FORBIDDEN` | Reserved |
+| `VALIDATION_ERROR` | Field validation failed; includes `details` array |
+| `NOT_FOUND` | Resource or route not found |
+| `CONFLICT` | Reserved |
+| `SERVICE_UNAVAILABLE` | Required dependency unavailable |
+| `INTERNAL_ERROR` | Internal server error (panic recovered or unhandled) |
+| `RATE_LIMIT_EXCEEDED` | Reserved (rate limiting not implemented) |
+| `UNPROCESSABLE_ENTITY` | Reserved (validation uses `VALIDATION_ERROR`) |
+
+---
+
+## Endpoints Overview
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/health` | No | Liveness probe |
+| `GET` | `/ready` | No | Readiness probe; 503 if Redis unreachable |
+| `GET` | `/metrics` | No | Prometheus metrics text; 204 if disabled |
+| `GET` | `/swagger/` | No | Swagger UI |
+| `POST` | `/webrtc/offer` | Yes* | WebRTC SDP offer/answer |
+| `POST` | `/start` | Yes* | Create runner session |
+| `POST` | `/sessions/{id}/api/offer` | Yes* | Session WebRTC SDP offer |
+| `PATCH` | `/sessions/{id}/api/offer` | Yes* | ICE trickle acknowledgment |
+| `GET` | `/ws` | Yes* | WebSocket upgrade for voice pipeline |
+| `POST` | `/` | No | Telephony provider webhook |
+| `GET` | `/telephony/ws` | No | Telephony media WebSocket |
+| `POST` | `/daily-dialin-webhook` | Secret† | Daily PSTN dial-in webhook |
+
+\* When `server_api_key` is configured. † Uses `X-Webhook-Secret` when `daily_dialin_webhook_secret` is set.
+
+---
+
+## Endpoint Details
+
+### GET /health
+
+Liveness probe. Returns 200 when the server process is running regardless of dependency state.
+
+```bash
+curl http://localhost:3042/api/v1/health
+```
+
+```json
+{
+  "data": { "status": "ok" },
+  "meta": { "requestId": "550e8400-e29b-41d4-a716-446655440000" }
+}
+```
+
+---
+
+### GET /ready
+
+Readiness probe. When `session_store` is `redis`, pings Redis before responding. Use this endpoint for load balancer readiness checks.
+
+```bash
+curl http://localhost:3042/api/v1/ready
+```
+
+**503 response (Redis unreachable):**
+
+```json
+{
+  "error": {
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "session store unavailable",
+    "requestId": "..."
+  }
+}
+```
+
+---
+
+### GET /metrics
+
+Returns Prometheus metrics in text exposition format. When `metrics_enabled` is `false`, returns `204 No Content`.
+
+```bash
+curl http://localhost:3042/metrics
+```
+
+<Warning>
+  Restrict access to `/metrics` in production using a network policy or firewall rule. The endpoint has no built-in authentication.
+</Warning>
+
+---
+
+### GET /swagger/
+
+Serves the Swagger UI. The OpenAPI definition file is `docs/swagger.json`. Append `doc.json` for the raw spec: `GET /swagger/doc.json`.
+
+---
+
+### POST /webrtc/offer
+
+Submit a WebRTC SDP offer. The server returns an SDP answer and wires the new transport into the voice pipeline. Available when `transport` is `smallwebrtc` or `both`.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `offer` | string | Yes | SDP offer string (typically stringified `RTCSessionDescription`) |
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:3042/api/v1/webrtc/offer \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"offer":"v=0\r\n..."}'
+```
+
+**Success (200):**
+
+```json
+{
+  "data": { "answer": "v=0\r\n..." },
+  "meta": { "requestId": "550e8400-e29b-41d4-a716-446655440000" }
+}
+```
+
+| Status | Code | Condition |
+|--------|------|-----------|
+| 200 | — | SDP answer returned |
+| 401 | `UNAUTHORIZED` | Missing or invalid API key |
+| 422 | `VALIDATION_ERROR` | `offer` field missing or empty |
+| 503 | `SERVICE_UNAVAILABLE` | Opus encoder unavailable |
+| 500 | `INTERNAL_ERROR` | Transport start failed |
+
+---
+
+### POST /start
+
+Create a runner session. Returns a `sessionId` plus optional ICE config or Daily room details. Supports idempotency via the `Idempotency-Key` header.
+
+**Headers:**
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Idempotency-Key` | No | Opaque string; same key returns cached 201 for 24 hours |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `createDailyRoom` | boolean | No | Create a Daily.co room and return room URL and token |
+| `enableDefaultIceServers` | boolean | No | Include default STUN server in `iceConfig` |
+| `body` | object | No | Arbitrary payload stored with the session; merged into `request_data` on session offer |
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:3042/api/v1/start \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -H "Idempotency-Key: client-request-abc123" \
+  -d '{"enableDefaultIceServers":true,"body":{"userId":"u-1"}}'
+```
+
+**Success (201):**
+
+```json
+{
+  "data": {
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+    "iceConfig": {
+      "iceServers": [{ "urls": ["stun:stun.l.google.com:19302"] }]
+    }
+  },
+  "meta": { "requestId": "660e8400-e29b-41d4-a716-446655440001" }
+}
+```
+
+When `createDailyRoom` is true, `data` also contains `dailyRoom` (room URL) and `dailyToken`.
+
+| Status | Code | Condition |
+|--------|------|-----------|
+| 201 | — | Session created |
+| 401 | `UNAUTHORIZED` | Missing or invalid API key |
+| 500 | `INTERNAL_ERROR` | Session store or Daily configuration error |
+
+---
+
+### POST /sessions/{id}/api/offer
+
+Submit a WebRTC SDP offer for an existing session. The `id` path parameter must be a valid UUID obtained from `POST /start`.
+
+**Path parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | UUID string | Session ID from `POST /start` |
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sdp` | string | Yes | SDP offer string |
+| `type` | string | No | SDP type hint |
+| `pc_id` | string | No | Peer connection identifier |
+| `restart_pc` | boolean | No | Force peer connection restart |
+| `request_data` | object | No | Overrides session body for this request |
+| `requestData` | object | No | Alias for `request_data` |
+
+**Example:**
+
+```bash
+curl -X POST \
+  http://localhost:3042/api/v1/sessions/550e8400-e29b-41d4-a716-446655440000/offer \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"sdp":"v=0\r\n..."}'
+```
+
+**Success (200):**
+
+```json
+{
+  "data": { "answer": "v=0\r\n...", "type": "answer" },
+  "meta": { "requestId": "660e8400-e29b-41d4-a716-446655440001" }
+}
+```
+
+| Status | Code | Condition |
+|--------|------|-----------|
+| 200 | — | SDP answer returned |
+| 400 | `BAD_REQUEST` | `id` is not a valid UUID |
+| 401 | `UNAUTHORIZED` | Missing or invalid API key |
+| 404 | `NOT_FOUND` | Session not found |
+| 422 | `VALIDATION_ERROR` | `sdp` field missing or empty |
+| 503 | `SERVICE_UNAVAILABLE` | Transport HandleOffer failed |
+
+---
+
+### PATCH /sessions/{id}/api/offer
+
+ICE trickle acknowledgment. Fire-and-forget — returns 204 with no body.
+
+```bash
+curl -X PATCH \
+  http://localhost:3042/api/v1/sessions/550e8400-e29b-41d4-a716-446655440000/offer \
+  -H "X-API-Key: your-api-key"
+```
+
+Returns `204 No Content` on success. Same 400/401/404 errors as POST apply.
+
+---
+
+### GET /ws
+
+WebSocket upgrade for the real-time voice pipeline. One connection equals one session. The API key check (when configured) is performed before the protocol upgrade — a 401 JSON response is returned if it fails.
+
+**Query parameters:**
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `rtvi` | `1` | Use RTVI protocol framing |
+| `format` | `protobuf` | Binary protobuf frames instead of JSON |
+
+**Browser example:**
+
+```javascript
+const ws = new WebSocket(`ws://localhost:3042/ws`);
+// To send the API key, use a backend proxy that injects the Authorization header,
+// or pass it as a query parameter if your server build supports it.
+```
+
+**Go example:**
+
+```go
+import "voxray-go/pkg/transport/websocket"
+
+transport := websocket.NewClientTransport("ws://localhost:3042/ws", nil)
+if err := transport.Start(ctx); err != nil {
+    log.Fatal(err)
+}
+// Read/write frames via transport.Input() and transport.Output()
+```
+
+---
+
+### POST / (Telephony webhook)
+
+Accepts webhook callbacks from Twilio, Telnyx, Plivo, and Exotel when `runner_transport` is set to one of those providers. Response format depends on the provider.
+
+<Tabs>
+  <Tab title="Twilio / Telnyx / Plivo">
+    Returns `200 OK` with `Content-Type: application/xml`:
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Response>
+      <Connect>
+        <Stream url="wss://your-host/telephony/ws"/>
+      </Connect>
+    </Response>
+    ```
+  </Tab>
+  <Tab title="Exotel">
+    Returns `200 OK` with JSON containing `websocketUrl` and informational `error`/`note` fields. The `error` key is informational, not a failure indicator.
+
+    ```json
+    { "websocketUrl": "wss://your-host/telephony/ws", "note": "..." }
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+### GET /telephony/ws
+
+WebSocket endpoint for telephony media streams. The provider is detected automatically from the first frames received. Available when `runner_transport` is `twilio`, `telnyx`, `plivo`, or `exotel`. No authentication required.
+
+---
+
+### POST /daily-dialin-webhook
+
+Handles incoming Daily PSTN dial-in events. Available when `runner_transport=daily` and `dialin=true`.
+
+When `daily_dialin_webhook_secret` is set, the request must include `X-Webhook-Secret: <secret>`.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `test` | boolean | No | If true, server replies OK without creating a room |
+| `From` | string | Yes (non-test) | Caller number |
+| `To` | string | Yes (non-test) | Dialed number |
+| `callId` | string | Yes (non-test) | Unique call identifier |
+| `callDomain` | string | Yes (non-test) | Daily call domain |
+
+**Success (201, non-test):**
+
+```json
+{
+  "data": {
+    "dailyRoom": "https://example.daily.co/room-name",
+    "dailyToken": "eyJ...",
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "meta": { "requestId": "..." }
+}
+```
+
+---
+
+## Middleware
+
+Middleware is applied in the following order for every request:
+
+| Order | Middleware | Behavior |
+|-------|------------|---------|
+| 1 | Recovery | Wraps the entire mux; catches panics, logs error and stack trace, returns `500 INTERNAL_ERROR` |
+| 2 | Metrics | Per-route (when `metrics_enabled` is true); records request count, duration, HTTP status, and active connections in Prometheus |
+| 3 | CORS | Applied inside handlers for `/webrtc/offer`, `/start`, and `/sessions/`; sets `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key` |
+
+Auth is enforced per-handler via `requireAPIKey`, not as global middleware.
+
+---
+
+## Idempotency
+
+`POST /start` supports the `Idempotency-Key` request header. Submitting the same key within 24 hours returns the cached `201 Created` response body without creating a new session. The cache is in-memory and does not survive process restarts.
+
+```http
+POST /api/v1/start
+Idempotency-Key: my-unique-client-key-123
+```
+
+---
+
+## Interactive API Docs
+
+The full interactive Swagger UI is served at `/swagger/` when the server is running. The raw OpenAPI 2.0 spec is at `/swagger/doc.json` and is also available as `docs/swagger.json` in the repository.

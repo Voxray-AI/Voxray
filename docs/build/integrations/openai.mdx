@@ -1,0 +1,159 @@
+---
+title: "OpenAI"
+description: "Full-stack voice provider for Voxray: STT, LLM, TTS, and Realtime. The default provider when no explicit provider is set."
+---
+
+import { CardGroup, Card, Tabs, Tab, Warning, Note } from "@mintlify/components";
+
+## Capabilities
+
+<CardGroup cols={4}>
+  <Card title="STT" icon="microphone" color="#22c55e">
+    Whisper and GPT-4o transcription models
+  </Card>
+  <Card title="LLM" icon="brain" color="#22c55e">
+    GPT-4o, GPT-4.1, and GPT-3.5 family with full tool-calling support
+  </Card>
+  <Card title="TTS" icon="volume-high" color="#22c55e">
+    Six neural voices via the OpenAI audio API
+  </Card>
+  <Card title="Realtime" icon="bolt" color="#22c55e">
+    Bidirectional audio session via `gpt-4o-realtime-preview`
+  </Card>
+</CardGroup>
+
+## API Key
+
+Set `OPENAI_API_KEY` as an environment variable or pass it inline under `api_keys` in `config.json`.
+
+Get your key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+
+## Quick Config
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "stt_provider": "openai",
+      "stt_model": "gpt-4o-mini-transcribe",
+      "llm_provider": "openai",
+      "model": "gpt-4o-mini",
+      "tts_provider": "openai",
+      "tts_voice": "nova",
+      "api_keys": {
+        "openai": "sk-..."
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment variable">
+    ```bash
+    export OPENAI_API_KEY="sk-..."
+    ```
+
+    Then in `config.json` omit the `api_keys` block entirely:
+
+    ```json
+    {
+      "stt_provider": "openai",
+      "stt_model": "gpt-4o-mini-transcribe",
+      "llm_provider": "openai",
+      "model": "gpt-4o-mini",
+      "tts_provider": "openai",
+      "tts_voice": "nova"
+    }
+    ```
+
+    Voxray reads `OPENAI_API_KEY` automatically when no inline key is present.
+  </Tab>
+</Tabs>
+
+## Available LLM Models
+
+| Model | Context | Description |
+|-------|---------|-------------|
+| `gpt-4o` | 128k | Flagship multimodal model; highest reasoning quality in the GPT-4o family |
+| `gpt-4o-mini` | 128k | Fast and cost-efficient; recommended default for most voice agent workloads |
+| `gpt-4.1` | 1M | Long-context reasoning model with improved instruction following |
+| `gpt-4.1-mini` | 1M | Smaller variant of GPT-4.1; better throughput than `gpt-4.1` at lower cost |
+| `gpt-4.1-nano` | 1M | Ultra-light; optimized for latency-sensitive tasks with simple instructions |
+
+The factory default when `model` is empty and `llm_provider` is `"openai"` is `gpt-3.5-turbo`.
+
+## Available STT Models
+
+| Model | Description |
+|-------|-------------|
+| `whisper-1` | Original Whisper model hosted by OpenAI; broad language support |
+| `gpt-4o-mini-transcribe` | GPT-4o Mini transcription; faster and cheaper than `gpt-4o-transcribe` — recommended default |
+| `gpt-4o-transcribe` | Highest accuracy transcription; use when word-error-rate matters more than latency |
+
+Set via `stt_model` in config. The default STT service (`stt.NewOpenAI`) uses `whisper-1` when `stt_model` is not specified.
+
+## TTS Voices
+
+| Voice | Character |
+|-------|-----------|
+| `alloy` | Neutral, balanced; works well for informational agents |
+| `echo` | Deep and resonant; suits formal or authoritative personas |
+| `fable` | Warm and expressive; good for storytelling or friendly agents |
+| `onyx` | Clear and confident; popular for customer-service workloads |
+| `nova` | Bright and energetic; recommended default for most voice agents |
+| `shimmer` | Soft and calm; suits wellness, meditation, or low-stress contexts |
+
+Set via `tts_voice` in config. The TTS model (e.g. `tts-1`, `tts-1-hd`) can be set via `tts_model`.
+
+## Tool Calling (MCP)
+
+OpenAI is one of two providers in Voxray that implement `LLMServiceWithTools`. When an MCP server is configured (`mcp.command` in config), Voxray registers discovered tools with the OpenAI service, and the model can invoke them during a turn.
+
+Tool calls are streamed, accumulated across chunks, executed in index order, and the results are appended to the conversation before a recursive `Chat` call completes the response. This is fully transparent to the rest of the pipeline.
+
+```json
+{
+  "llm_provider": "openai",
+  "model": "gpt-4o-mini",
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-everything"],
+    "tools_filter": ["read_file", "list_directory"]
+  }
+}
+```
+
+## Realtime Mode
+
+OpenAI Realtime runs a persistent bidirectional audio session using `gpt-4o-realtime-preview`. Instead of the STT → LLM → TTS pipeline, audio is streamed directly to OpenAI and responses arrive as audio — significantly reducing first-audio latency.
+
+```json
+{
+  "provider": "openai",
+  "model": "gpt-4o-realtime-preview",
+  "api_keys": {
+    "openai": "sk-..."
+  }
+}
+```
+
+Use `realtime.NewFromConfig(cfg, "openai")` in code; avoid importing the realtime package directly from services to prevent an import cycle. Realtime mode requires a voice-enabled build (`CGO_ENABLED=1`) when using WebRTC transport.
+
+## Configuration Reference
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `stt_provider` | string | Set to `"openai"` |
+| `stt_model` | string | STT model (e.g. `"gpt-4o-mini-transcribe"`) |
+| `llm_provider` | string | Set to `"openai"` |
+| `model` | string | LLM chat model (e.g. `"gpt-4o-mini"`) |
+| `tts_provider` | string | Set to `"openai"` |
+| `tts_voice` | string | TTS voice name (e.g. `"nova"`) |
+| `tts_model` | string | TTS model (e.g. `"tts-1"` or `"tts-1-hd"`) |
+| `api_keys.openai` | string | OpenAI API key (falls back to `OPENAI_API_KEY`) |
+| `provider` | string | Set to `"openai"` for Realtime mode (replaces `llm_provider`) |
+
+## Notes and Limitations
+
+- The factory treats `"openai"` as the default LLM and STT provider. If `provider`, `stt_provider`, `llm_provider`, and `tts_provider` are all unset, Voxray falls back to OpenAI for all three stages.
+- `tts-1-hd` produces higher-quality audio at the cost of higher latency; `tts-1` is recommended for real-time voice.
+- Tool calling requires `llm_provider: "openai"` — it is not available when using the Realtime session path.
+- Realtime mode and the STT→LLM→TTS pipeline are mutually exclusive per session. Choose one via config.

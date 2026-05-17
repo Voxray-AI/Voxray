@@ -1,6 +1,6 @@
-# github.com/Voxray-AI/Voxray Documentation
+# Voxray-Go Documentation
 
-Documentation for the github.com/Voxray-AI/Voxray real-time voice pipeline server.
+Documentation for the Voxray-Go real-time voice pipeline server.
 
 ---
 

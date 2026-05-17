@@ -1,6 +1,6 @@
 ## 1. Core Stack
 
-This section maps the concrete **languages, runtimes, and non‑AI libraries** used in github.com/Voxray-AI/Voxray to the skills a new contributor needs. Proficiency levels are for someone contributing to production code.
+This section maps the concrete **languages, runtimes, and non‑AI libraries** used in Voxray-Go to the skills a new contributor needs. Proficiency levels are for someone contributing to production code.
 
 ---
 

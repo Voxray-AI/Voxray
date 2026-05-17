@@ -1,0 +1,284 @@
+---
+title: "Production Voice Agent Pipeline"
+description: "Build a production-grade voice agent using Groq STT, Anthropic Claude, and ElevenLabs TTS — with interruptions, VAD tuning, session recording, and transcript persistence."
+---
+
+## Overview
+
+This tutorial walks through standing up a production-quality voice agent with the best available providers for each pipeline stage:
+
+| Stage | Provider | Model | Why |
+|-------|----------|-------|-----|
+| Speech-to-Text | Groq | `whisper-large-v3-turbo` | Lowest latency STT on the market; generous free tier |
+| Language Model | Anthropic | `claude-haiku-4-5-20251001` | Best reasoning quality; fast enough for real-time interaction |
+| Text-to-Speech | ElevenLabs | Custom voice ID | Most natural, expressive voice synthesis available |
+
+The pipeline is configured entirely through `config.json`. No code changes are required to switch providers or tune VAD parameters.
+
+---
+
+## Prerequisites
+
+<Steps>
+
+<Step title="Install Voxray">
+  Build and install the binary from the repository root:
+
+  ```bash
+  go build -o voxray ./cmd/voxray
+  ```
+</Step>
+
+<Step title="Collect your API keys">
+  You need three API keys before proceeding:
+
+  - **Groq**: [console.groq.com](https://console.groq.com) — create an API key (`gsk_...`)
+  - **Anthropic**: [console.anthropic.com](https://console.anthropic.com) — create an API key (`sk-ant-...`)
+  - **ElevenLabs**: [elevenlabs.io](https://elevenlabs.io) — create an API key and note a Voice ID from your voice library
+
+  Voxray resolves API keys from `api_keys` in config first, then falls back to environment variables (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`). Using environment variables is recommended for production deployments.
+</Step>
+
+<Step title="Provision backing services">
+  The production config requires:
+
+  - **Redis** (for session storage): `redis://localhost:6379/0` or a managed instance
+  - **PostgreSQL** (for transcript persistence): any Postgres 14+ instance reachable from the server
+  - **S3-compatible bucket** (for audio recording): AWS S3, R2, or MinIO
+</Step>
+
+</Steps>
+
+---
+
+## Full Production Config
+
+Create `config.json` at the repository root (or pass `--config /path/to/config.json`). The file below is the complete production configuration with all relevant fields:
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "transport": "both",
+  "stt_provider": "groq",
+  "llm_provider": "anthropic",
+  "tts_provider": "elevenlabs",
+  "model": "claude-haiku-4-5-20251001",
+  "stt_model": "whisper-large-v3-turbo",
+  "tts_voice": "<elevenlabs-voice-id>",
+  "api_keys": {
+    "groq": "gsk_...",
+    "anthropic": "sk-ant-...",
+    "elevenlabs": "..."
+  },
+  "allow_interruptions": true,
+  "interruption_strategy": "min_words",
+  "min_words": 3,
+  "turn_detection": "silence",
+  "turn_stop_secs": 2.5,
+  "vad_min_volume": 0.25,
+  "vad_confidence": 0.75,
+  "server_api_key": "your-secret-key",
+  "cors_allowed_origins": ["https://yourapp.com"],
+  "json_logs": true,
+  "log_level": "info",
+  "session_store": "redis",
+  "redis_url": "redis://localhost:6379/0",
+  "recording": {
+    "enable": true,
+    "bucket": "your-s3-bucket",
+    "base_path": "recordings/",
+    "format": "wav",
+    "worker_count": 4
+  },
+  "transcripts": {
+    "enable": true,
+    "driver": "postgres",
+    "dsn": "postgres://user:pass@db:5432/voxray?sslmode=require"
+  }
+}
+```
+
+Replace `<elevenlabs-voice-id>` with the ID from your ElevenLabs voice library (e.g. `21m00Tcm4TlvDq8ikWAM`). In production, move all secret values out of config and into environment variables or a secrets manager.
+
+---
+
+## Configuration Deep Dive
+
+### Provider Strategy
+
+```json
+"stt_provider": "groq",
+"llm_provider": "anthropic",
+"tts_provider": "elevenlabs",
+"model": "claude-haiku-4-5-20251001",
+"stt_model": "whisper-large-v3-turbo"
+```
+
+Voxray separates STT, LLM, and TTS provider selection so you can mix and match independently. `model` sets the LLM model; `stt_model` sets the STT model. The TTS voice is set by `tts_voice`.
+
+<Note>
+  To switch to Claude Sonnet for higher reasoning quality at the cost of slightly more latency, change `"model"` to `"claude-sonnet-4-5-20251022"`. No other config changes are required.
+</Note>
+
+### Interruptions
+
+```json
+"allow_interruptions": true,
+"interruption_strategy": "min_words",
+"min_words": 3
+```
+
+When `allow_interruptions` is `true`, the user can barge in while the bot is speaking. The `interruption_strategy` controls when an interruption is declared:
+
+| Strategy | Behaviour |
+|----------|-----------|
+| `min_words` | User must say at least `min_words` words before the interruption fires |
+| `keyword` | Interruption fires only when a specific keyword is detected |
+
+`min_words: 3` is the recommended production value. It prevents transient background noise or brief vocalizations ("uh", "mm") from cutting off the bot mid-sentence. The user must produce a coherent multi-word utterance before Voxray cancels the current TTS and routes the new transcription to the LLM.
+
+<Warning>
+  Setting `min_words` too high (e.g. 6+) makes interruptions feel sluggish. Setting it to 1 or 0 causes noise-triggered barge-ins in environments with background activity.
+</Warning>
+
+### Turn Detection and VAD Tuning
+
+```json
+"turn_detection": "silence",
+"turn_stop_secs": 2.5,
+"vad_min_volume": 0.25,
+"vad_confidence": 0.75
+```
+
+Voxray uses energy-based VAD (Voice Activity Detection) to detect when the user starts and stops speaking. The key parameters:
+
+| Parameter | Production Value | Effect |
+|-----------|-----------------|--------|
+| `turn_detection` | `"silence"` | Full utterance is collected before LLM is invoked |
+| `turn_stop_secs` | `2.5` | Silence of 2.5 s after speech ends the turn |
+| `vad_min_volume` | `0.25` | Minimum RMS volume to treat audio as speech |
+| `vad_confidence` | `0.75` | VAD model confidence threshold |
+
+**Tuning guide:**
+
+- **Noisy environments** (open offices, call centres): raise `vad_min_volume` to `0.3` and `vad_confidence` to `0.8`. This makes the VAD more conservative and prevents HVAC, keyboard clicks, or adjacent conversations from triggering false speech starts.
+- **Quiet environments** (headsets, recording booths): lower `vad_min_volume` to `0.15`–`0.2` so soft-spoken users are not missed.
+- **Responsive feel**: lower `turn_stop_secs` to `1.5`–`2.0` to reduce perceived latency between the user stopping and the bot responding. Trade-off: users who pause mid-sentence may get cut off.
+- **Deliberate speakers**: raise `turn_stop_secs` to `3.0`–`4.0` to give more room for natural pauses.
+
+<Tip>
+  If VAD misses a second utterance (user speaks again immediately after the bot responds), lower `vad_min_volume` to `0.2`. The bot's own TTS audio can elevate the ambient RMS enough to suppress the VAD threshold momentarily.
+</Tip>
+
+### Session Store
+
+```json
+"session_store": "redis",
+"redis_url": "redis://localhost:6379/0"
+```
+
+Redis session storage is required for multi-replica deployments and for WebRTC runner sessions (where `/start` creates a session and `/sessions/{id}/api/offer` retrieves it). For single-instance development, omit `session_store` to use the in-memory store.
+
+### Recording
+
+```json
+"recording": {
+  "enable": true,
+  "bucket": "your-s3-bucket",
+  "base_path": "recordings/",
+  "format": "wav",
+  "worker_count": 4
+}
+```
+
+When `recording.enable` is `true`, Voxray writes each session's audio to a temporary file and uploads it to the configured S3-compatible bucket after the session ends. Key details:
+
+- `worker_count` controls the upload worker pool. With 4 workers, up to 4 concurrent uploads proceed simultaneously. Tune upward on high-traffic instances.
+- Workers stream from the temp file to S3 — the full WAV is never held in memory during upload.
+- S3 uploads retry with exponential backoff. The temp file is deleted only after a successful upload.
+- Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION` (or equivalent) in the environment; Voxray uses the AWS SDK default credential chain.
+
+### Transcripts
+
+```json
+"transcripts": {
+  "enable": true,
+  "driver": "postgres",
+  "dsn": "postgres://user:pass@db:5432/voxray?sslmode=require"
+}
+```
+
+Transcript persistence writes the full conversation (user transcriptions and bot responses) to Postgres after each session. Use `sslmode=require` in production. The `dsn` supports the standard libpq connection string format.
+
+### Security
+
+```json
+"server_api_key": "your-secret-key",
+"cors_allowed_origins": ["https://yourapp.com"]
+```
+
+`server_api_key` requires all HTTP requests to include the key in `Authorization: Bearer <key>`. Set this to a long random string in production.
+
+`cors_allowed_origins` restricts which browser origins can connect. Pass an exact list of your frontend origins; wildcard `["*"]` is not recommended for production.
+
+---
+
+## Starting the Server
+
+```bash
+./voxray --config config.json
+```
+
+With `json_logs: true` and `log_level: "info"`, Voxray emits structured JSON to stdout — compatible with any log aggregation stack (Datadog, Loki, CloudWatch):
+
+```json
+{"time":"2026-05-15T10:00:00Z","level":"INFO","msg":"server started","host":"0.0.0.0","port":8080,"transport":"both"}
+```
+
+---
+
+## Connecting a Client
+
+**WebSocket:**
+```
+ws://yourapp.com:8080/ws
+```
+
+**WebRTC (SmallWebRTC):**
+```bash
+POST /webrtc/offer
+Content-Type: application/json
+
+{ "sdp": "<offer SDP>", "type": "offer" }
+```
+
+For RTVI-compatible frontends (e.g. Pipecat JS), append `?rtvi=1` to the WebSocket URL and add `"rtvi"` to `plugins`. See the [Plugin System](/build/plugin-system) reference for details.
+
+---
+
+## Production Checklist
+
+<Steps>
+
+<Step title="Secrets out of config">
+  Move all values under `api_keys`, `server_api_key`, and `transcripts.dsn` to environment variables or a secrets manager (AWS Secrets Manager, Vault, Doppler). The config file should contain only non-secret settings.
+</Step>
+
+<Step title="TLS termination">
+  Run Voxray behind a reverse proxy (nginx, Caddy, AWS ALB) that handles TLS. WebRTC and WebSocket both require HTTPS/WSS in production browsers.
+</Step>
+
+<Step title="Redis persistence">
+  Enable Redis persistence (`appendonly yes`) so session state survives Redis restarts. Use Redis Sentinel or Cluster for HA.
+</Step>
+
+<Step title="Horizontal scaling">
+  Multiple Voxray replicas can run behind a load balancer as long as they share the same Redis instance. Each replica builds its own pipeline per transport connection — no shared in-process state.
+</Step>
+
+<Step title="Observability">
+  Set `json_logs: true` and ship logs to your aggregation stack. Voxray emits per-frame latency metrics and pipeline lifecycle events. Use the `log_level: "debug"` temporarily to inspect frame routing during development.
+</Step>
+
+</Steps>

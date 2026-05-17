@@ -1,0 +1,289 @@
+---
+title: "Sarvam"
+description: "Sarvam STT and TTS integration for Indian language voice agents"
+---
+
+<CardGroup cols={3}>
+  <Card title="LLM" icon="brain" color="#94a3b8">
+    Not supported
+  </Card>
+  <Card title="STT" icon="microphone" color="#22c55e">
+    Supported — `saarika:v2.5` and higher
+  </Card>
+  <Card title="TTS" icon="volume-high" color="#22c55e">
+    Supported — `bulbul:v2` with multiple Indian voices
+  </Card>
+</CardGroup>
+
+Sarvam AI is an Indian AI company specializing in models built for Indian languages. Voxray supports Sarvam for both speech-to-text (`"stt_provider": "sarvam"`) and text-to-speech (`"tts_provider": "sarvam"`). You can use one or both independently — for example, pair Sarvam STT with Sarvam TTS for a fully Indian-language pipeline, or mix Sarvam TTS with Groq LLM for a low-latency Hindi voice agent.
+
+Sarvam does not provide LLM functionality. You must pair it with a supported LLM provider such as `openai`, `anthropic`, `groq`, or `ollama`.
+
+---
+
+## API Key
+
+Get your API key from the [Sarvam AI dashboard](https://dashboard.sarvam.ai) under your account settings.
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "api_keys": {
+        "sarvam": "your_sarvam_api_key"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    export SARVAM_API_KEY=your_sarvam_api_key
+    ```
+
+    Voxray reads `SARVAM_API_KEY` automatically when no inline key is present under `api_keys.sarvam`.
+  </Tab>
+</Tabs>
+
+<Warning>
+  Never commit your Sarvam API key to source control. Use the `SARVAM_API_KEY` environment variable in production and CI, and keep inline keys in `config.json` only for local development.
+</Warning>
+
+---
+
+## Quick Start Config
+
+The example below mirrors the defaults in `config.example.json` — a Hindi voice agent using Sarvam for both STT and TTS with Groq for LLM inference.
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "stt_provider": "sarvam",
+      "llm_provider": "groq",
+      "tts_provider": "sarvam",
+
+      "model": "llama-3.1-8b-instant",
+      "stt_model": "saarika:v2.5",
+      "stt_language": "hi-IN",
+      "tts_model": "bulbul:v2",
+      "tts_voice": "anushka",
+
+      "api_keys": {
+        "sarvam": "your_sarvam_api_key",
+        "groq": "gsk_..."
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment Variables">
+    ```bash
+    export SARVAM_API_KEY=your_sarvam_api_key
+    export GROQ_API_KEY=gsk_...
+    ```
+
+    With a minimal `config.json`:
+
+    ```json
+    {
+      "stt_provider": "sarvam",
+      "llm_provider": "groq",
+      "tts_provider": "sarvam",
+      "model": "llama-3.1-8b-instant",
+      "stt_model": "saarika:v2.5",
+      "stt_language": "hi-IN",
+      "tts_model": "bulbul:v2",
+      "tts_voice": "anushka"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Sarvam does not support LLM. The `llm_provider` above is set to `"groq"` — swap in any other supported LLM provider (`openai`, `anthropic`, `ollama`, etc.) based on your needs.
+</Note>
+
+---
+
+## Speech-to-Text
+
+Sarvam's STT engine (`saarika`) is purpose-built for Indian languages and handles code-switching (mixing Hindi and English in the same utterance) better than general-purpose English-first models.
+
+### STT Models
+
+| Model | Description |
+|-------|-------------|
+| `saarika:v2.5` | Default. Recommended for most Indian language workloads. Accurate across all supported languages. |
+| `saaras:v3` | Higher-accuracy variant; larger model with slightly higher latency. Suitable when word-error-rate is more important than speed. |
+
+Set the model via `"stt_model"` in your config. When omitted, Voxray uses `saarika:v2.5`.
+
+### Language Detection
+
+Set `"stt_language"` to a BCP-47 language code to pin the transcription language. When the field is empty or omitted, Sarvam performs automatic language detection.
+
+| Config Value | Language |
+|---|---|
+| `hi-IN` | Hindi (India) — default in `config.example.json` |
+| `en-IN` | English (India) |
+| `ta-IN` | Tamil |
+| `te-IN` | Telugu |
+| `kn-IN` | Kannada |
+| `ml-IN` | Malayalam |
+| `mr-IN` | Marathi |
+| `gu-IN` | Gujarati |
+| `bn-IN` | Bengali |
+| `od-IN` | Odia |
+| `pa-IN` | Punjabi |
+| *(omit or empty)* | Auto-detect |
+
+<Tip>
+  For the best accuracy, always set `stt_language` explicitly when you know the user's language. Auto-detect adds a small amount of latency and may misidentify short utterances in closely related languages (e.g. Hindi vs Maithili).
+</Tip>
+
+### Streaming STT
+
+Sarvam implements Voxray's `STTStreamingService` interface via a WebSocket-based streaming endpoint. When turn detection is active, audio chunks are streamed to Sarvam's API in real time and partial transcripts are surfaced as they arrive, reducing the latency between end-of-speech and LLM handoff.
+
+---
+
+## Text-to-Speech
+
+Sarvam's TTS engine (`bulbul`) produces natural-sounding speech for Indian languages. It returns audio as base64-encoded WAV, which Voxray decodes and strips of WAV headers before routing raw PCM into the pipeline.
+
+### TTS Models
+
+| Model | Sample Rate | Description |
+|-------|------------|-------------|
+| `bulbul:v2` | 22050 Hz | Default. Stable production model; good naturalness across all supported voices. |
+| `bulbul:v3` | 24000 Hz | Higher-quality variant at 24 kHz. |
+| `bulbul:v3-beta` | 24000 Hz | Beta channel for `bulbul:v3`; may change without notice. |
+
+Set via `"tts_model"`. When omitted, Voxray defaults to `bulbul:v2`.
+
+### Available Voices
+
+| Voice | Gender | Character |
+|-------|--------|-----------|
+| `anushka` | Female | Default. Clear, professional Hindi voice. |
+| `manisha` | Female | Warm, conversational tone. |
+| `vidya` | Female | Formal, news-reader style. |
+| `arjun` | Male | Natural male voice with neutral accent. |
+| `abhilash` | Male | Expressive, energetic delivery. |
+| `karun` | Male | Deep, authoritative tone. |
+| `hitesh` | Male | Youthful, casual delivery. |
+
+Set via `"tts_voice"`. When omitted, Voxray defaults to `anushka`.
+
+<Tip>
+  Voice quality and available voices may expand as Sarvam releases new model versions. Check the [Sarvam API documentation](https://docs.sarvam.ai) for the current voice catalog for each model generation.
+</Tip>
+
+### Streaming TTS
+
+Sarvam TTS implements Voxray's `TTSStreamingService` interface via a WebSocket streaming API. Audio chunks are delivered to the pipeline as they are synthesized, allowing TTS output to begin playing before the full text response has been generated by the LLM.
+
+---
+
+## Full Pipeline Examples
+
+### Hindi Voice Agent (Sarvam STT + Groq LLM + Sarvam TTS)
+
+```json
+{
+  "transport": "both",
+  "host": "0.0.0.0",
+  "port": 8080,
+
+  "stt_provider": "sarvam",
+  "stt_model": "saarika:v2.5",
+  "stt_language": "hi-IN",
+
+  "llm_provider": "groq",
+  "model": "llama-3.1-8b-instant",
+
+  "tts_provider": "sarvam",
+  "tts_model": "bulbul:v2",
+  "tts_voice": "anushka",
+
+  "api_keys": {
+    "sarvam": "your_sarvam_api_key",
+    "groq": "gsk_..."
+  },
+
+  "webrtc_ice_servers": [
+    "stun:stun.l.google.com:19302"
+  ],
+
+  "turn_detection": "silence",
+  "turn_stop_secs": 3.0
+}
+```
+
+### Sarvam TTS with OpenAI STT and LLM (mixed providers)
+
+```json
+{
+  "stt_provider": "openai",
+
+  "llm_provider": "openai",
+  "model": "gpt-4.1-mini",
+
+  "tts_provider": "sarvam",
+  "tts_model": "bulbul:v2",
+  "tts_voice": "arjun",
+
+  "api_keys": {
+    "openai": "sk-...",
+    "sarvam": "your_sarvam_api_key"
+  }
+}
+```
+
+### Auto-Detect Language (multilingual support)
+
+```json
+{
+  "stt_provider": "sarvam",
+  "stt_model": "saarika:v2.5",
+
+  "llm_provider": "anthropic",
+  "model": "claude-3-5-haiku-20241022",
+
+  "tts_provider": "sarvam",
+  "tts_model": "bulbul:v2",
+  "tts_voice": "manisha",
+
+  "api_keys": {
+    "sarvam": "your_sarvam_api_key",
+    "anthropic": "sk-ant-..."
+  }
+}
+```
+
+When `stt_language` is omitted, Sarvam auto-detects the spoken language. This is useful for deployments that serve callers in multiple Indian languages from a single agent instance.
+
+---
+
+## Configuration Reference
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `stt_provider` | string | — | Set to `"sarvam"` to use Sarvam STT |
+| `stt_model` | string | `"saarika:v2.5"` | Sarvam STT model identifier |
+| `stt_language` | string | *(auto-detect)* | BCP-47 language code, e.g. `"hi-IN"`. Empty means auto-detect. |
+| `tts_provider` | string | — | Set to `"sarvam"` to use Sarvam TTS |
+| `tts_model` | string | `"bulbul:v2"` | Sarvam TTS model identifier |
+| `tts_voice` | string | `"anushka"` | Speaker voice name |
+| `api_keys.sarvam` | string | — | Sarvam API key (falls back to `SARVAM_API_KEY`) |
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| `401 Unauthorized` from Sarvam | Invalid or missing API key | Verify `SARVAM_API_KEY` or `api_keys.sarvam` |
+| Poor transcription accuracy | Wrong language code set | Set `stt_language` to the correct BCP-47 code, or omit for auto-detect |
+| No audio returned from TTS | Empty text input or network error | Check server logs; confirm `SARVAM_API_KEY` is set and valid |
+| TTS audio sounds distorted | Sample rate mismatch | Ensure the client handles 22050 Hz (`bulbul:v2`) or 24000 Hz (`bulbul:v3`) audio |
+| Code-switched utterances not transcribed | Model version | Upgrade to `saaras:v3` for better handling of Hindi-English code-switching |

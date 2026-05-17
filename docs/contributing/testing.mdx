@@ -1,0 +1,265 @@
+---
+title: "Testing"
+description: "Test structure, how to run tests, and testing conventions for Voxray contributors"
+---
+
+Voxray's test suite spans three layers — unit tests inside `pkg/`, package-level tests under `tests/pkg/`, and integration and end-to-end tests under `tests/integration/` and `tests/e2e/`. All layers are discoverable by a single `go test ./...` invocation, so there is no separate test runner to learn.
+
+## Test Categories
+
+| Category | Location | Requirements | Run command |
+|---|---|---|---|
+| **Unit** | `pkg/**/*_test.go` and `tests/pkg/...` | None — fully offline | `go test ./pkg/... ./tests/pkg/...` |
+| **Integration** | `tests/integration/...` | Docker services (DB, Redis) running; real API keys for provider tests | `go test ./tests/integration/...` |
+| **End-to-end** | `tests/e2e/...` | Full stack running (server + external services) | `go test ./tests/e2e/...` |
+| **Evals** | `cmd/evals/` | Real API keys; runs against live providers | `make evals` |
+
+<Note>
+Provider-specific tests (e.g. Sarvam, Groq, ElevenLabs) are automatically skipped when the corresponding `*_API_KEY` environment variable is not set. You do not need to comment them out locally.
+</Note>
+
+---
+
+## Running Tests
+
+### All tests
+
+```bash
+go test ./...
+# or
+make test
+```
+
+This is the canonical pre-commit check. Run it before every push.
+
+### Unit tests only
+
+```bash
+go test ./pkg/...
+go test ./tests/pkg/...
+```
+
+These are offline and fast (typically under 30 seconds). Prefer writing tests here for new processors, audio utilities, and service logic.
+
+### Integration tests
+
+```bash
+docker-compose up -d
+
+VOXRAY_CONFIG=./configs/test.json \
+go test ./tests/integration/...
+```
+
+Integration tests depend on external services. Start Docker Compose first so Postgres, MySQL, and Redis are available. Set provider API keys for any provider suites you want to exercise.
+
+### End-to-end tests
+
+```bash
+VOXRAY_CONFIG=./configs/test.json \
+go test ./tests/e2e/... -run TestE2E
+```
+
+E2E tests run against a live Voxray server. Consult `tests/README.md` for which services and config keys each suite requires.
+
+### Evals
+
+```bash
+make evals
+```
+
+Evals measure pipeline quality (transcription accuracy, LLM response quality, TTS fidelity) against real provider APIs. They require all relevant API keys to be set and produce a structured report under `cmd/evals/`.
+
+---
+
+## Race Detection
+
+Always run the suite with `-race` before opening a pull request. The Voxray pipeline is heavily concurrent and race conditions are easy to introduce in new processors or service clients:
+
+```bash
+go test -race -timeout 5m ./...
+```
+
+The `-timeout 5m` guard prevents a goroutine leak or deadlock from hanging CI indefinitely.
+
+<Warning>
+A PR that introduces a data race will be rejected regardless of whether other tests pass. The `-race` flag is non-negotiable for anything touching shared state, channels, or goroutine lifecycles.
+</Warning>
+
+---
+
+## Integration Test Requirements
+
+Provider integration tests in `tests/pkg/services/<provider>/` follow a uniform skip pattern:
+
+```go
+func TestSarvamSTT_Integration(t *testing.T) {
+    apiKey := os.Getenv("SARVAM_API_KEY")
+    if apiKey == "" {
+        t.Skip("SARVAM_API_KEY not set; skipping integration test")
+    }
+    // ...
+}
+```
+
+The required environment variable for each provider follows the pattern `<PROVIDER>_API_KEY`. Exceptions (AWS, Google Vertex, Qwen) are documented in `CONTRIBUTING.md`.
+
+For full provider coverage in a local integration run, set the keys for the providers you want to test:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export GROQ_API_KEY="gsk_..."
+export SARVAM_API_KEY="..."
+export ELEVENLABS_API_KEY="..."
+
+go test ./tests/pkg/services/... -v
+```
+
+Tests that need Docker services (Postgres/MySQL for transcript storage, Redis for session store) will fail with a connection error if those services are not running. Use `docker-compose up -d` to start them.
+
+---
+
+## Test Discovery and File Conventions
+
+- Test files use the `_test.go` suffix and live either alongside the code (`pkg/audio/audio_test.go`) or in the centralized `tests/pkg/` tree mirroring the `pkg/` layout (e.g. `tests/pkg/pipeline/pipeline_test.go` for `pkg/pipeline`).
+- External test packages (e.g. `package pipeline_test`) are preferred over internal (`package pipeline`) for tests in `tests/pkg/` — they test the public API as a consumer would.
+- Shared test fixtures and golden files go under `tests/testdata/`.
+- Because `tests/` is part of the Go module tree, `go test ./...` automatically discovers everything. No build tags or manual registration is needed.
+
+---
+
+## Writing Good Tests
+
+### Testing processors
+
+Processors are the most common thing contributors add or modify. The key pattern is to construct a minimal processor chain, push a frame into it, and assert on the frames that emerge at the sink end.
+
+```go
+package myprocessor_test
+
+import (
+    "context"
+    "testing"
+
+    "voxray-go/pkg/frames"
+    "voxray-go/pkg/processors/myprocessor"
+    "voxray-go/pkg/processors"
+)
+
+// captureSink is a minimal sink that records every downstream frame.
+type captureSink struct {
+    processors.BaseProcessor
+    received []frames.Frame
+}
+
+func (s *captureSink) ProcessFrame(_ context.Context, f frames.Frame, dir processors.Direction) error {
+    if dir == processors.Downstream {
+        s.received = append(s.received, f)
+    }
+    return nil
+}
+
+func TestMyProcessor_PassesAudioFrameDownstream(t *testing.T) {
+    ctx := context.Background()
+    sink := &captureSink{}
+    proc := myprocessor.New()
+    proc.SetNext(sink)
+
+    audioFrame := &frames.AudioRawFrame{Data: make([]byte, 320)}
+    if err := proc.ProcessFrame(ctx, audioFrame, processors.Downstream); err != nil {
+        t.Fatalf("ProcessFrame returned error: %v", err)
+    }
+
+    if len(sink.received) != 1 {
+        t.Fatalf("expected 1 frame at sink, got %d", len(sink.received))
+    }
+}
+```
+
+**Mock frames.** Use the concrete frame structs from `pkg/frames/` directly — they are lightweight value types and safe to construct in tests without any mocking library.
+
+**Test frame routing.** Verify that error frames travel upstream and data frames travel downstream. A common bug is accidentally reversing the direction when forwarding from a base processor.
+
+**Context cancellation.** For processors that own goroutines (e.g. streaming STT or TTS), cancel the context and assert that the goroutine exits (e.g. by waiting on a done channel or checking that the output channel is closed).
+
+### Testing services (STT, LLM, TTS)
+
+Use `net/http/httptest` to mock provider HTTP endpoints. This keeps tests offline and deterministic:
+
+```go
+func TestLLMService_Chat_StreamsTokens(t *testing.T) {
+    srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "text/event-stream")
+        // Write SSE deltas that mimic the provider's streaming format.
+        fmt.Fprintln(w, `data: {"choices":[{"delta":{"content":"hello"}}]}`)
+        fmt.Fprintln(w, `data: {"choices":[{"delta":{"content":" world"}}]}`)
+        fmt.Fprintln(w, `data: [DONE]`)
+    }))
+    defer srv.Close()
+
+    svc := myprovider.NewLLMServiceWithBaseURL(srv.URL, "fake-key", "test-model")
+    var tokens []string
+    err := svc.Chat(context.Background(), []map[string]any{
+        {"role": "user", "content": "hi"},
+    }, func(f *frames.LLMTextFrame) {
+        tokens = append(tokens, f.Text)
+    })
+
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if got := strings.Join(tokens, ""); got != "hello world" {
+        t.Errorf("expected 'hello world', got %q", got)
+    }
+}
+```
+
+### Table-driven tests
+
+Prefer table-driven tests for anything with multiple input/output combinations:
+
+```go
+tests := []struct {
+    name     string
+    input    []byte
+    wantText string
+    wantErr  bool
+}{
+    {"valid pcm", validPCM, "hello", false},
+    {"empty audio", []byte{}, "", true},
+    {"nil audio", nil, "", true},
+}
+
+for _, tc := range tests {
+    t.Run(tc.name, func(t *testing.T) {
+        // ...
+    })
+}
+```
+
+---
+
+## Makefile Targets
+
+| Target | Command | Description |
+|---|---|---|
+| `make test` | `go test ./...` | Run all tests (unit + integration + e2e) |
+| `make build` | `go build -o voxray ./cmd/voxray` | Build the main binary |
+| `make evals` | `go run ./cmd/evals` | Run provider quality evaluations |
+
+<Note>
+The `Makefile` does not yet have separate `test-unit`, `test-integration`, and `test-e2e` targets, but you can run those scopes directly with `go test` as shown in the commands above. Contributions that add these focused targets are welcome.
+</Note>
+
+---
+
+## CI
+
+The CI workflow runs `go test ./...` on every push and pull request. A failing test in any package blocks merge. The race detector (`-race`) is strongly recommended locally but may not be enabled in all CI configurations — check the workflow file for the current state and feel free to propose enabling it.
+
+```yaml
+# .github/workflows/ci.yml (conceptual)
+- run: go mod tidy
+- run: go test ./...
+```
+
+Provider integration tests are skipped in CI unless the corresponding secrets are configured in the repository's GitHub Actions secrets. Contact a maintainer if you need a new secret added.

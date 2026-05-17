@@ -1,0 +1,193 @@
+---
+title: MCP Tools
+description: Connect Voxray voice agents to external tools and services via the Model Context Protocol (MCP).
+---
+
+## What is MCP?
+
+The **Model Context Protocol (MCP)** is an open standard for connecting large language models to external tools, APIs, and data sources. An MCP server exposes a catalogue of callable tools — each with a name, description, and JSON Schema for its parameters — and the LLM decides at runtime which tool to call and with what arguments.
+
+MCP servers run as **stdio subprocesses**: the client spawns the server binary, communicates over stdin/stdout, and tears it down when the session ends. This model keeps servers lightweight and language-agnostic — you can use `npx`-hosted community servers or ship your own binary.
+
+## How Voxray uses MCP
+
+At pipeline startup, Voxray's MCP client connects to the configured server subprocess, calls `ListTools` to enumerate available tools, and converts each MCP tool schema into a `FunctionSchema` that the LLM service understands. Those schemas are registered on the LLM provider before the first user turn.
+
+During a conversation, when the LLM decides to call a tool, it produces a structured tool-call that Voxray's `ToolHandler` intercepts. The handler opens a fresh subprocess session, calls `session.CallTool()` with the LLM-supplied arguments, extracts the text content from the result, optionally applies a per-tool output transform, and returns the result string back to the LLM — which then continues the conversation with that context.
+
+```text
+Pipeline.Setup()
+    └── MCP Client.RegisterTools(ctx, llm)
+            ├── connect → MCP subprocess
+            ├── ListTools → [tool1, tool2, ...]
+            ├── filter by ToolsFilter (if set)
+            ├── convert to FunctionSchema
+            └── llm.RegisterTool(schema, handler)
+
+User speaks → STT → LLM thinks → tool call
+    └── ToolHandler
+            ├── connect → MCP subprocess
+            ├── CallTool(name, arguments)
+            ├── extract text content
+            ├── apply ToolsOutputFilter (optional)
+            └── return result → LLM continues
+
+Pipeline.Cleanup()
+    └── MCP subprocess exits
+```
+
+## Configuration
+
+Add an `mcp` block to your `config.json`:
+
+```json
+{
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/path"],
+    "tools_filter": ["read_file", "list_directory"]
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `command` | string | yes | Executable to launch as the MCP server (e.g. `npx`, `go`, `python3`). |
+| `args` | string[] | no | Arguments forwarded to the server executable. |
+| `tools_filter` | string[] | no | Whitelist of tool names to register. When empty or omitted, all tools from the server are registered. |
+
+<Note>
+  `tools_filter` is a whitelist, not a blacklist. If you specify any entries, only those exact tool names are registered — all others are silently skipped. Leave it empty to expose every tool the server advertises.
+</Note>
+
+## Tool discovery
+
+`Client.GetToolsSchema(ctx)` handles discovery:
+
+1. Spawns the MCP server via `mcp.CommandTransport{Command: ...}`.
+2. Calls `session.ListTools()` to retrieve the full tool catalogue.
+3. Iterates each tool, skipping any not present in `ToolsFilter` (when set).
+4. Converts MCP's `InputSchema` (a JSON Schema object) into Voxray's `FunctionSchema`, preserving `properties` and `required` arrays.
+5. Returns a `ToolsSchema` with all accepted tools.
+
+`RegisterTools` calls `GetToolsSchema` and then calls `llm.RegisterTool(schema, handler)` for each result, binding a `ToolHandler` closure that knows which tool name to forward to the subprocess.
+
+## Tool execution
+
+Each tool handler is a closure over the tool name. When invoked:
+
+```go
+// Simplified from pkg/mcp/client.go
+func (c *Client) toolWrapper(toolName string) llmapi.ToolHandler {
+    return func(ctx context.Context, name string, arguments map[string]any) (string, error) {
+        session, _ := client.Connect(ctx, transport, nil)
+        defer session.Close()
+
+        res, _ := session.CallTool(ctx, &mcp.CallToolParams{
+            Name:      name,
+            Arguments: arguments,
+        })
+        response := extractTextFromResult(res)
+        if fn := c.ToolsOutputFilters[name]; fn != nil {
+            response = toString(fn(response))
+        }
+        return response, nil
+    }
+}
+```
+
+Each tool call opens its own subprocess connection. This is intentional: MCP stdio servers are stateless per invocation, and sharing a single long-lived session across concurrent tool calls would require additional synchronization.
+
+## Output filters
+
+`ToolsOutputFilters` is a `map[string]func(any) any` set directly on the `Client` struct in Go code (not configurable via JSON). Use it when the raw MCP tool output needs to be trimmed, reformatted, or redacted before the LLM sees it:
+
+```go
+client := mcp.NewClient(params, filter, map[string]func(any) any{
+    "read_file": func(raw any) any {
+        // Truncate large files so the LLM context stays within limits.
+        if s, ok := raw.(string); ok && len(s) > 4000 {
+            return s[:4000] + "\n[truncated]"
+        }
+        return raw
+    },
+})
+```
+
+<Tip>
+  Output filters run in the tool handler goroutine and block the LLM response. Keep them fast. For heavy processing (parsing, summarisation), consider a background worker with a channel.
+</Tip>
+
+## LLM provider compatibility
+
+MCP tool integration requires the LLM service to implement the `LLMServiceWithTools` interface. Currently supported providers:
+
+| Provider | Tools Supported |
+|---|---|
+| OpenAI (GPT-4o, GPT-4 Turbo, etc.) | Yes |
+| Google (Gemini) | Yes |
+| Anthropic (Claude) | Not yet |
+| Groq | Not yet |
+
+<Warning>
+  If you configure `mcp` but your `llm_provider` does not implement `LLMServiceWithTools`, tool registration is silently skipped and the agent will run without tools. Check startup logs for `mcp:` entries to confirm tools were registered.
+</Warning>
+
+## Common MCP servers
+
+| MCP Server | Package | Use Case |
+|---|---|---|
+| Filesystem | `@modelcontextprotocol/server-filesystem` | Read and write files within an allowed directory tree |
+| Brave Search | `@modelcontextprotocol/server-brave-search` | Real-time web search during calls |
+| SQLite | `@modelcontextprotocol/server-sqlite` | Query a local SQLite database |
+| Custom server | (your binary) | Internal APIs, CRM lookups, ticketing systems |
+
+### Filesystem server example
+
+```json
+{
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/var/data/knowledge-base"],
+    "tools_filter": ["read_file", "list_directory", "search_files"]
+  }
+}
+```
+
+### Brave Search example
+
+```json
+{
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+    "tools_filter": ["brave_web_search"]
+  }
+}
+```
+
+Set `BRAVE_API_KEY` in your environment before starting Voxray.
+
+### Custom Go MCP server
+
+```json
+{
+  "mcp": {
+    "command": "go",
+    "args": ["run", "./cmd/my-mcp-server"],
+    "tools_filter": ["lookup_customer", "create_ticket"]
+  }
+}
+```
+
+## Lifecycle
+
+| Event | What happens |
+|---|---|
+| `Pipeline.Setup()` | MCP client connects to subprocess, discovers tools, registers them with the LLM provider. |
+| During conversation | Each tool call spawns a short-lived subprocess session, executes, and closes. |
+| `Pipeline.Cleanup()` | The MCP subprocess exits. No explicit teardown is needed for individual tool sessions. |
+
+<Note>
+  Tool discovery at `Pipeline.Setup()` adds a round-trip to the MCP server before the first call is answered. For latency-sensitive deployments, pre-warm pipelines or use `tools_filter` to limit the number of tools that need to be introspected.
+</Note>

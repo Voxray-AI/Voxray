@@ -1,0 +1,345 @@
+---
+title: "FAQ"
+description: "Frequently asked questions about Voxray"
+---
+
+<AccordionGroup>
+
+<Accordion title="Do I need CGO to run Voxray?">
+
+It depends on which transports you need.
+
+**No CGO required — WebSocket only:**
+
+```bash
+make build
+# or: go build -o voxray-go ./cmd/...
+```
+
+The default build (`CGO_ENABLED=0`) produces a fully static binary and supports WebSocket (`/ws`) and HTTP transports. This is the right choice for most deployments and Docker images.
+
+**CGO required — WebRTC with Opus audio:**
+
+```bash
+make build-voice
+# or: CGO_ENABLED=1 go build -o voxray-go ./cmd/...
+```
+
+WebRTC TTS output requires the Opus encoder, which is a CGO dependency. If you use `transport: "smallwebrtc"` or `transport: "both"` and need TTS audio over WebRTC, build with CGO enabled. You will need `gcc` in `PATH`.
+
+<Note>
+The Docker image in the repo uses a multi-stage build. If you need WebRTC + TTS, extend the Dockerfile with `CGO_ENABLED=1` and a GCC layer, or use `make build-voice` for local development.
+</Note>
+</Accordion>
+
+<Accordion title="Can I use different providers for STT, LLM, and TTS?">
+
+Yes. STT, LLM, and TTS providers are resolved independently. You can freely mix any combination of supported providers.
+
+```json
+{
+  "stt_provider": "groq",
+  "llm_provider": "anthropic",
+  "tts_provider": "elevenlabs",
+  "model": "claude-3-5-sonnet-20241022",
+  "stt_model": "whisper-large-v3",
+  "tts_voice": "<your-elevenlabs-voice-id>",
+  "api_keys": {
+    "groq": "...",
+    "anthropic": "...",
+    "elevenlabs": "..."
+  }
+}
+```
+
+The resolution order is:
+
+1. `stt_provider` / `llm_provider` / `tts_provider` — task-specific overrides
+2. `provider` — global fallback for any unset task provider
+3. `"openai"` — final default when nothing is set
+
+See the [Provider Matrix](/reference/provider-matrix) for the full list of supported providers and which capabilities each one covers.
+</Accordion>
+
+<Accordion title="How do I add a system prompt or persona?">
+
+System prompts and personas are **not** set in `config.json`. They live in the conversation context that your client sends to the server with each session start or LLM call.
+
+When your client connects via WebSocket or WebRTC, include a `system` message at the top of the `messages` array in the LLM context payload:
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are Aria, a friendly hotel concierge. Keep responses short and conversational."
+    }
+  ]
+}
+```
+
+This approach keeps persona logic in your application layer, where it belongs — it lets you dynamically swap personas per session without restarting the server or changing config.
+
+<Tip>
+For per-call personas in telephony deployments, populate the system message in the `/start` request body using the `context` field, so each inbound call can have a different persona based on the dialed number or caller ID.
+</Tip>
+</Accordion>
+
+<Accordion title="My voice agent isn't responding — troubleshooting checklist">
+
+Work through this checklist in order:
+
+**1. VAD thresholds**
+
+The default VAD (`vad_type: "energy"`) uses RMS energy detection. If your microphone is quiet or noisy, the agent may not detect speech.
+
+- Increase sensitivity: lower `vad_threshold` (default `0.02`) — try `0.01`.
+- Check `turn_stop_secs` (default `3`): if it's too long, the agent waits for a long pause before transcribing.
+- Try `vad_type: "silero"` for more robust voice activity detection at the cost of higher CPU.
+
+**2. Microphone permissions**
+
+Ensure the browser or app has been granted microphone access. Check the browser console for `NotAllowedError` or `NotFoundError` from the WebRTC or WebSocket audio capture.
+
+**3. PCM audio format**
+
+Voxray expects **16-bit signed PCM, mono channel, 16 kHz** from the client. Non-standard sample rates or channel counts will cause STT to fail silently or produce garbled transcripts.
+
+**4. API key validity**
+
+Confirm the relevant API keys are set and not expired:
+
+```bash
+# Example: test Groq key directly
+curl -s https://api.groq.com/openai/v1/models \
+  -H "Authorization: Bearer $GROQ_API_KEY" | jq '.data[0].id'
+```
+
+Check server logs (`VOXRAY_LOG_LEVEL=debug`) for authentication errors from provider clients.
+
+**5. Network connectivity**
+
+Ensure the Voxray server can reach the configured provider API endpoints. In firewalled or air-gapped environments, outbound HTTPS to provider domains must be allowed.
+
+<Warning>
+For WebRTC sessions, ICE connectivity failures (no audio reaching the server) are a common cause of silent agents. Check browser console for ICE errors, and ensure your STUN/TURN servers in `webrtc_ice_servers` are reachable.
+</Warning>
+</Accordion>
+
+<Accordion title="How do I scale Voxray horizontally?">
+
+Voxray supports horizontal scaling via a shared Redis session store.
+
+**Single instance (default):**
+
+No extra setup required. The in-memory session store keeps all session state in the process. Suitable for vertical scaling and single-server deployments.
+
+**Multiple instances behind a load balancer:**
+
+1. Set `session_store: "redis"` in config.
+2. Set `redis_url` to your Redis connection string, e.g. `redis://redis:6379/0`.
+3. Optionally tune `session_ttl_secs` (default `3600`).
+
+```json
+{
+  "session_store": "redis",
+  "redis_url": "redis://redis:6379/0",
+  "session_ttl_secs": 3600
+}
+```
+
+When the session store is Redis, the `/ready` endpoint returns `503` if Redis is unreachable — use this as your load balancer readiness probe.
+
+**Load balancer requirements:**
+
+WebSocket connections are long-lived. Configure your load balancer to:
+- Enable **WebSocket upgrade** support (most modern LBs do this automatically).
+- Use **sticky sessions** (IP hash or cookie affinity) if your LB does not forward session IDs in headers, or ensure all session API calls (`/sessions/{id}/...`) are routed by session ID to any instance (Redis makes this possible since state is shared).
+
+<Note>
+The `GET /health` endpoint is a pure liveness check with no dependencies. The `GET /ready` endpoint checks Redis connectivity when Redis is configured. Wire them to separate liveness and readiness probes in Kubernetes.
+</Note>
+</Accordion>
+
+<Accordion title="Can I run Voxray fully locally without any cloud services?">
+
+Yes. You can run a fully local, offline-capable voice agent using:
+
+| Task | Local Provider | Notes |
+|------|---------------|-------|
+| LLM | `ollama` | Run `ollama serve` and `ollama pull llama3.2` first |
+| STT | `sarvam` or `whisper` | Sarvam has a cloud API; for fully offline STT use a local Whisper server (`whisper` provider + `WHISPER_BASE_URL`) |
+| TTS | `xtts` | Run a local Coqui XTTS server and set `XTTS_BASE_URL` |
+
+```json
+{
+  "llm_provider": "ollama",
+  "stt_provider": "whisper",
+  "tts_provider": "xtts",
+  "model": "llama3.2"
+}
+```
+
+Set the base URL environment variables to point to your local services:
+
+```bash
+export WHISPER_BASE_URL=http://localhost:9000
+export XTTS_BASE_URL=http://localhost:8020
+```
+
+<Tip>
+For the easiest local setup, start with Ollama for LLM (it has the most polished local server) and use OpenAI-compatible STT and TTS endpoints served by community tools like `faster-whisper-server` and `xtts-api-server`.
+</Tip>
+</Accordion>
+
+<Accordion title="What audio format does Voxray expect from the client?">
+
+Voxray expects raw audio from the client in the following format:
+
+| Property | Value |
+|----------|-------|
+| Encoding | 16-bit signed PCM (little-endian) |
+| Channels | Mono (1 channel) |
+| Sample rate | 16,000 Hz (16 kHz) |
+| Container | None — raw bytes, no WAV/MP3 header |
+
+Send audio as binary WebSocket frames (or the equivalent for your transport) containing consecutive raw PCM samples. The pipeline's VAD and turn detection operate directly on this byte stream.
+
+**Common mistakes:**
+
+- Sending float32 PCM instead of int16 — causes extremely loud or silent audio.
+- Sending stereo (2-channel) audio — channel mixing is not performed; STT accuracy degrades significantly.
+- Sending at 44.1 kHz or 48 kHz without resampling — the pipeline does not resample; STT providers expect 16 kHz input.
+
+<Note>
+Some telephony adapters (Twilio, Telnyx, Vonage) send audio in their own codec (e.g. µ-law 8 kHz). Voxray includes serialization helpers for these formats under `pkg/frames/serialize/`; the pipeline converts automatically when the correct transport adapter is used.
+</Note>
+</Accordion>
+
+<Accordion title="How do I reduce latency?">
+
+Voice agent latency is the sum of STT time + LLM time to first token + TTS time to first audio chunk. Each leg can be independently optimized.
+
+**STT latency**
+
+Use `groq` as your STT provider. Groq's hardware accelerates Whisper large-v3 to typically under 300 ms on short utterances.
+
+```json
+{ "stt_provider": "groq", "stt_model": "whisper-large-v3" }
+```
+
+**LLM latency**
+
+- `groq` with `llama-3.1-8b-instant` delivers the lowest time-to-first-token (~50–150 ms).
+- `cerebras` with `llama3.1-8b` is an alternative with competitive latency.
+- Avoid large models (70B+) in latency-sensitive paths unless you have dedicated infrastructure.
+
+```json
+{ "llm_provider": "groq", "model": "llama-3.1-8b-instant" }
+```
+
+**TTS latency**
+
+- `elevenlabs` with `eleven_turbo_v2` or `eleven_flash_v2_5` models minimizes streaming TTS latency.
+- `openai` with `tts-1` (not `tts-1-hd`) is faster at the cost of some audio quality.
+
+```json
+{ "tts_provider": "elevenlabs", "tts_model": "eleven_turbo_v2" }
+```
+
+**Infrastructure**
+
+- Co-locate your Voxray server in the same cloud region as your provider APIs.
+- Enable WebSocket write coalescing (`ws_write_coalesce_ms`) carefully — it reduces syscalls but adds a small fixed latency budget per flush window. Only enable it if you are syscall-bound.
+- For the absolute lowest end-to-end latency, use the OpenAI Realtime API (`realtime` provider) which eliminates the STT → LLM → TTS pipeline altogether in favor of a single real-time model.
+
+<Tip>
+Use `VOXRAY_LOG_LEVEL=debug` to see per-stage timing in server logs. Look for STT duration, LLM first-token, and TTS chunk timing to identify your bottleneck before tuning.
+</Tip>
+</Accordion>
+
+<Accordion title="Does Voxray support recording calls?">
+
+Yes. Voxray has built-in support for recording conversations and logging transcripts.
+
+**Audio recording to S3:**
+
+Enable recording in `config.json`:
+
+```json
+{
+  "recording": {
+    "enable": true,
+    "bucket": "my-recordings-bucket",
+    "base_path": "recordings/",
+    "format": "wav",
+    "worker_count": 4,
+    "queue_cap": 32,
+    "max_retries": 3
+  }
+}
+```
+
+Or use environment variables:
+
+```bash
+VOXRAY_RECORDING_ENABLE=true
+VOXRAY_RECORDING_BUCKET=my-recordings-bucket
+VOXRAY_RECORDING_BASE_PATH=recordings/
+VOXRAY_RECORDING_FORMAT=wav
+```
+
+Recordings are streamed asynchronously to S3 from temp files (no full WAV in memory) via a worker pool. Failed uploads are retried with exponential backoff up to `max_retries` times.
+
+**Transcript logging to a database:**
+
+```json
+{
+  "transcripts": {
+    "enable": true,
+    "driver": "postgres",
+    "dsn": "postgresql://user:pass@localhost/voxray",
+    "table_name": "call_transcripts"
+  }
+}
+```
+
+Or via environment variables:
+
+```bash
+VOXRAY_TRANSCRIPTS_ENABLE=true
+VOXRAY_TRANSCRIPTS_DRIVER=postgres
+VOXRAY_TRANSCRIPTS_DSN=postgresql://user:pass@localhost/voxray
+VOXRAY_TRANSCRIPTS_TABLE=call_transcripts
+```
+
+Both features can be enabled simultaneously. Recording and transcript logging are independent.
+
+<Warning>
+Ensure your S3 bucket and database are in the same region as your Voxray deployment to avoid high cross-region egress costs and latency on uploads.
+</Warning>
+</Accordion>
+
+<Accordion title="How do I add a new provider?">
+
+Adding a new STT, LLM, or TTS provider involves four steps:
+
+1. **Create a package** under `pkg/services/<provider>/` implementing the relevant interface(s) from `pkg/services/interfaces.go` (`LLMService`, `STTService`, or `TTSService`).
+
+2. **Add a provider constant** in `pkg/services/factory.go`:
+   ```go
+   ProviderMyProvider = "myprovider"
+   ```
+
+3. **Register the provider** in the appropriate `Supported*Providers` slice and add a case to `apiKeyForProvider`, `NewLLMFromConfig`, `NewSTTFromConfig`, or `NewTTSFromConfig` in `factory.go`.
+
+4. **Add tests** under `tests/pkg/` covering the new service.
+
+For a detailed walkthrough including interface contracts, streaming requirements, and test patterns, see the [Contributing: Adding Providers](/contributing/adding-providers) guide.
+
+<Note>
+When opening a PR for a new provider, include at least one integration test and document the required environment variables and config keys.
+</Note>
+</Accordion>
+
+</AccordionGroup>

@@ -1,0 +1,218 @@
+---
+title: "Docker"
+description: "Build and run Voxray as a Docker container — single binary, minimal Alpine runtime, two build variants."
+---
+
+Voxray ships as a statically linked Go binary that fits cleanly into a minimal Alpine image. The default build produces a WebSocket-only server with no C dependencies. A separate multi-stage build adds Opus/WebRTC support via CGO and a gcc toolchain.
+
+## Dockerfile walkthrough
+
+The repository Dockerfile uses a two-stage build: a full Go toolchain for compilation, then a stripped Alpine image for the runtime.
+
+```dockerfile title="Dockerfile"
+# Multi-stage build for Voxray-Go server
+# Build stage
+FROM golang:1.25-alpine AS builder
+WORKDIR /app
+
+# Copy module files first for better layer caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /voxray ./cmd/voxray
+
+# Run stage: minimal image
+FROM alpine:3.20
+RUN adduser -D -g "" voxray
+USER voxray
+WORKDIR /app
+
+# Config can be mounted or provided via VOXRAY_CONFIG env
+ENV VOXRAY_CONFIG=/app/config.json
+
+COPY --from=builder /voxray /voxray
+
+EXPOSE 8080
+
+ENTRYPOINT ["/voxray"]
+CMD ["-config", "/app/config.json"]
+```
+
+### Builder stage
+
+| Step | What it does |
+|------|--------------|
+| `FROM golang:1.25-alpine AS builder` | Uses the official Go 1.25 Alpine image as the compilation environment. Alpine keeps the builder image small and avoids glibc. |
+| `COPY go.mod go.sum ./` then `RUN go mod download` | Copies module metadata first so Docker can cache the dependency download layer. Subsequent builds that only change source code skip the `go mod download` step entirely. |
+| `COPY . .` | Copies the full source tree after the dependency layer is warm. Changes to `.go` files only invalidate this layer and the compile step, not the module download. |
+| `CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s"` | Produces a fully static binary. `-w` strips DWARF debug info; `-s` strips the symbol table. The result is typically 10–15 MB. The output is written to `/voxray` in the builder filesystem. |
+
+### Runtime stage
+
+| Step | What it does |
+|------|--------------|
+| `FROM alpine:3.20` | Minimal base — ca-certificates, libc, and not much else. No Go toolchain in the final image. |
+| `adduser -D -g "" voxray` then `USER voxray` | Runs the process as a non-root user. The `-D` flag creates a system user with no password; `-g ""` sets an empty GECOS field. |
+| `ENV VOXRAY_CONFIG=/app/config.json` | Default config path; overridable at `docker run` time via `-e VOXRAY_CONFIG=...`. |
+| `COPY --from=builder /voxray /voxray` | Pulls only the compiled binary from the builder stage. Nothing else crosses the stage boundary. |
+| `EXPOSE 8080` | Documents the default port. The actual binding is controlled by config or the `PORT` / `VOXRAY_PORT` environment variables. |
+| `CMD ["-config", "/app/config.json"]` | Default argument passed to the `ENTRYPOINT`. Mount your config at `/app/config.json` or override this CMD to point elsewhere. |
+
+## Build variants
+
+| Variant | CGO | Transport | Build command |
+|---------|-----|-----------|---------------|
+| Default | Disabled | WebSocket only | `docker build -t voxray .` |
+| WebRTC + Opus | Enabled | WebSocket + WebRTC | Custom Dockerfile with gcc stage (see below) |
+
+<Warning>
+The default Dockerfile sets `CGO_ENABLED=0`, which produces a fully static binary but disables Opus codec support. If your pipeline uses WebRTC with Opus audio (e.g. browser-to-server via DTLS/SRTP), you must use the WebRTC variant below. WebSocket-based deployments — including those connecting from Pipecat, LiveKit agents, or Daily — do not require CGO.
+</Warning>
+
+### WebRTC + Opus Dockerfile
+
+To enable Opus you need CGO, which means a C compiler in the builder stage and musl-compatible shared libs in the runtime image (or static linking via musl-cross).
+
+```dockerfile title="Dockerfile.webrtc"
+# Builder with gcc for CGO/Opus
+FROM golang:1.25-alpine AS builder
+RUN apk add --no-cache gcc musl-dev opus-dev pkgconfig
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-w -s" -o /voxray ./cmd/voxray
+
+# Runtime needs libopus
+FROM alpine:3.20
+RUN apk add --no-cache opus && adduser -D -g "" voxray
+USER voxray
+WORKDIR /app
+
+ENV VOXRAY_CONFIG=/app/config.json
+COPY --from=builder /voxray /voxray
+EXPOSE 8080
+ENTRYPOINT ["/voxray"]
+CMD ["-config", "/app/config.json"]
+```
+
+Build it with:
+
+```bash
+docker build -f Dockerfile.webrtc -t voxray-webrtc .
+```
+
+## Building the default image
+
+```bash
+docker build -t voxray .
+```
+
+Docker will pull `golang:1.25-alpine` on first run, compile the binary, and assemble the runtime layer. Subsequent builds reuse the module cache layer unless `go.mod` or `go.sum` changed.
+
+## Running the container
+
+### Basic run
+
+Mount your `config.json` from the host. The file is mounted read-only (`:ro`) so the container cannot modify it.
+
+```bash
+docker run -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  voxray
+```
+
+### With environment variable overrides
+
+All `config.json` fields can be overridden at runtime via environment variables. Provider API keys should always be passed as env vars rather than embedded in the config file.
+
+```bash
+docker run -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -e GROQ_API_KEY=gsk_... \
+  -e OPENAI_API_KEY=sk-... \
+  -e VOXRAY_LOG_LEVEL=debug \
+  -e VOXRAY_JSON_LOGS=true \
+  voxray
+```
+
+### Detached with automatic restart
+
+```bash
+docker run -d --restart unless-stopped \
+  -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  -e GROQ_API_KEY=gsk_... \
+  --name voxray \
+  voxray
+```
+
+## Port configuration
+
+The default port is `8080`, set via `EXPOSE 8080` in the Dockerfile and the default config. Override it in order of precedence:
+
+1. `VOXRAY_PORT` environment variable
+2. `PORT` environment variable
+3. `port` field in `config.json`
+
+When changing the port, update both the env var and the host-side `-p` flag:
+
+```bash
+docker run -p 9090:9090 \
+  -e VOXRAY_PORT=9090 \
+  -v $(pwd)/config.json:/app/config.json:ro \
+  voxray
+```
+
+## Health check
+
+Add a `HEALTHCHECK` instruction to your Dockerfile (or pass it at `docker run`) so Docker can restart unhealthy containers automatically.
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost:8080/health || exit 1
+```
+
+Voxray exposes two health endpoints:
+
+| Endpoint | Purpose | Returns |
+|----------|---------|---------|
+| `GET /health` | Liveness — process is up | `200 OK` always |
+| `GET /ready` | Readiness — ready for traffic | `200 OK` or `503` if Redis unreachable |
+
+Use `/health` for Docker's `HEALTHCHECK`. Use `/ready` for load balancer health checks and Kubernetes readiness probes so traffic is not routed to an instance whose session store is not yet reachable.
+
+## Useful environment variables
+
+The table below covers variables most relevant to containerized deployments. See [Deployment](/deploy/overview) for the full reference.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VOXRAY_CONFIG` | `/app/config.json` | Path to the config file loaded at startup |
+| `PORT` or `VOXRAY_PORT` | `8080` | Listening port |
+| `HOST` or `VOXRAY_HOST` | `0.0.0.0` | Bind address |
+| `VOXRAY_LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `error` |
+| `VOXRAY_JSON_LOGS` | `false` | Set `true` for structured JSON log output |
+| `VOXRAY_SERVER_API_KEY` | unset | Require `Authorization: Bearer <key>` on protected endpoints |
+| `VOXRAY_CORS_ORIGINS` | unset | Comma-separated allowed origins |
+| `VOXRAY_TLS_ENABLE` | `false` | Enable on-server TLS (alternative: terminate at a proxy) |
+
+<Tip>
+In containerized environments, prefer JSON logs (`VOXRAY_JSON_LOGS=true`) so your log aggregator (Datadog, Loki, CloudWatch) can parse fields without regex extraction.
+</Tip>
+
+## Image size
+
+The final image is approximately 20–25 MB (uncompressed): ~5 MB for Alpine base, ~15 MB for the stripped Voxray binary. No Go runtime, no build tools, no shell utilities beyond what Alpine includes by default.
+
+<Note>
+The `voxray` user created in the Dockerfile has no home directory write permissions outside `/app`. If your config references file paths for TLS certificates or recording temp files, ensure those paths are writable by UID `voxray` or mount them as volumes.
+</Note>
+
+## Next steps
+
+- [Docker Compose](/deploy/docker-compose) — multi-service local setup with optional Redis
+- [Deployment overview](/deploy/overview) — environment variables, TLS, and security checklist

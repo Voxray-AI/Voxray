@@ -1,6 +1,6 @@
 # What Can Connect to a Deployed Voxray Server
 
-When you deploy github.com/Voxray-AI/Voxray, **other applications** and **voice streams** connect over the transports you enable in config. Each connection is isolated (one goroutine per connection) and runs the same pipeline (e.g. voice: VAD → STT → LLM → TTS).
+When you deploy voxray-go, **other applications** and **voice streams** connect over the transports you enable in config. Each connection is isolated (one goroutine per connection) and runs the same pipeline (e.g. voice: VAD → STT → LLM → TTS).
 
 ---
 

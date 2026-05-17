@@ -1,0 +1,362 @@
+---
+title: "WebRTC Quickstart"
+description: "Build Voxray with Opus audio support and connect a browser client via WebRTC for real-time bidirectional voice."
+---
+
+<Warning>
+  WebRTC requires CGO (a C compiler) for the Opus audio codec encoder. The default `make build` command produces a **WebSocket-only binary** with CGO explicitly disabled — this binary cannot encode TTS audio for WebRTC output. Use `make build-voice` to produce a binary with WebRTC support. If you run the CGO-disabled binary and a client attempts a WebRTC connection, the server returns **HTTP 503** and logs `opus encoder unavailable (build without cgo)`.
+</Warning>
+
+## Why CGO?
+
+Voxray uses the [`gopus`](https://github.com/hraban/opus) Go binding to encode raw PCM audio into Opus frames for delivery over WebRTC data channels and tracks. `gopus` wraps `libopus`, a C library, which means the Go toolchain must invoke a C compiler during the build — this is what CGO enables.
+
+Without CGO:
+
+- The server can **receive** WebRTC connections and decode inbound audio (speech from the user).
+- The server **cannot encode** TTS audio into Opus frames, so it has no way to send synthesized speech back to the browser over the peer connection.
+- The server returns 503 on `/webrtc/offer` to prevent silent audio failures.
+
+With CGO (`make build-voice`):
+
+- The Opus encoder is compiled into the binary.
+- TTS audio is encoded in real time and delivered as Opus RTP over the WebRTC peer connection.
+- Full duplex voice works: the browser sends microphone audio, the pipeline runs STT → LLM → TTS, and synthesized speech arrives back in the browser.
+
+---
+
+## Step 1: Install the CGO Toolchain
+
+You need a C compiler on your PATH before building. Choose your OS:
+
+<Tabs>
+  <Tab title="macOS">
+    macOS ships Clang as part of Xcode Command Line Tools. Install or confirm:
+
+    ```bash
+    xcode-select --install
+    ```
+
+    If the tools are already installed, this exits immediately. Verify the compiler is accessible:
+
+    ```bash
+    clang --version
+    # Expected: Apple clang version 15.x.x (or later)
+    ```
+
+    No additional packages are needed — Clang satisfies CGO's C compiler requirement.
+  </Tab>
+  <Tab title="Linux">
+    **Debian / Ubuntu:**
+
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y build-essential
+    ```
+
+    `build-essential` installs `gcc`, `make`, and related headers in one step.
+
+    **Fedora / RHEL / CentOS:**
+
+    ```bash
+    sudo dnf install gcc make
+    ```
+
+    Verify:
+
+    ```bash
+    gcc --version
+    # Expected: gcc (GCC) 13.x.x or later
+    ```
+  </Tab>
+  <Tab title="Windows">
+    CGO requires `gcc` on your PATH. Two supported approaches:
+
+    **Option 1 — WinLibs (recommended, via winget):**
+
+    ```powershell
+    winget install BrechtSanders.WinLibs.POSIX.UCRT --accept-package-agreements
+    ```
+
+    Restart your terminal, then verify:
+
+    ```powershell
+    gcc --version
+    ```
+
+    **Option 2 — MSYS2:**
+
+    1. Download and install [MSYS2](https://www.msys2.org/).
+    2. Open the **MSYS2 UCRT64** terminal:
+
+    ```bash
+    pacman -S mingw-w64-ucrt-x86_64-toolchain
+    ```
+
+    3. Add `C:\msys64\ucrt64\bin` to your Windows PATH environment variable.
+    4. Verify in a new PowerShell window:
+
+    ```powershell
+    gcc --version
+    ```
+
+    <Tip>
+      WSL2 (Windows Subsystem for Linux) is the recommended path for Windows development. Install WSL2 with Ubuntu and follow the Linux tab instructions — you get a native Linux environment where `build-essential` works without any PATH configuration.
+    </Tip>
+  </Tab>
+</Tabs>
+
+---
+
+## Step 2: Clone the Repository
+
+If you have not cloned the repository yet:
+
+```bash
+git clone https://github.com/voxray-ai/voxray-ai.git
+cd voxray-ai
+```
+
+Install Go module dependencies:
+
+```bash
+go mod tidy
+```
+
+---
+
+## Step 3: Configure for WebRTC
+
+Copy the example config and open it for editing:
+
+```bash
+cp config.example.json config.json
+```
+
+Set `transport` to `"smallwebrtc"` to enable WebRTC only, or `"both"` to enable WebSocket and WebRTC simultaneously. Add at least one STUN server under `webrtc_ice_servers` so ICE candidates can be gathered:
+
+```json
+{
+  "transport": "both",
+  "host": "0.0.0.0",
+  "port": 8080,
+  "metrics_enabled": true,
+
+  "stt_provider": "openai",
+  "stt_model": "gpt-4o-mini-transcribe",
+
+  "llm_provider": "openai",
+  "model": "gpt-4.1-mini",
+
+  "tts_provider": "openai",
+  "tts_voice": "alloy",
+
+  "api_keys": {
+    "openai": "YOUR_OPENAI_API_KEY"
+  },
+
+  "webrtc_ice_servers": [
+    "stun:stun.l.google.com:19302"
+  ]
+}
+```
+
+<Note>
+  `"transport": "smallwebrtc"` enables only the `/webrtc/offer` endpoint. `"transport": "both"` activates both `/ws` (WebSocket) and `/webrtc/offer` (WebRTC) simultaneously, which is useful during development to support both client types.
+</Note>
+
+**ICE server configuration options:**
+
+For clients behind NAT or firewalls, add a TURN server alongside the STUN server:
+
+```json
+"webrtc_ice_servers": [
+  "stun:stun.l.google.com:19302",
+  "turn:your-turn-server.example.com:3478?username=user&credential=pass"
+]
+```
+
+---
+
+## Step 4: Build with Voice Support
+
+Run the voice build target, which enables CGO and compiles the Opus encoder into the binary:
+
+```bash
+make build-voice
+```
+
+This executes `CGO_ENABLED=1 go build -o voxray ./cmd/voxray`. Confirm the build succeeded:
+
+```bash
+ls -lh voxray
+# Expected: -rwxr-xr-x ... ~20M ... voxray
+```
+
+**Windows (PowerShell):**
+
+```powershell
+.\scripts\build-voice.ps1
+```
+
+---
+
+## Step 5: Run the Server
+
+```bash
+./voxray -config config.json
+```
+
+**Windows:**
+
+```powershell
+.\voxray.exe -config config.json
+```
+
+Expected startup output:
+
+```
+INFO  voxray starting  transport=both host=0.0.0.0 port=8080
+INFO  pipeline ready   stt=openai llm=openai tts=openai
+INFO  webrtc ready     opus=enabled ice_servers=1
+INFO  server listening addr=0.0.0.0:8080
+```
+
+Confirm the server is up:
+
+```bash
+curl http://localhost:8080/health
+# 200 OK
+```
+
+---
+
+## Step 6: Connect via Browser
+
+Voxray ships a browser test client under `tests/frontend/`. Serve it locally with Python's built-in HTTP server:
+
+```bash
+cd tests/frontend && python -m http.server 3000
+```
+
+Open [http://localhost:3000/webrtc-voice.html](http://localhost:3000/webrtc-voice.html) in your browser.
+
+1. In the **Server URL** field, enter `http://localhost:8080`.
+2. Click **Start** (or the microphone button).
+3. Accept the browser microphone permission prompt.
+4. Speak — the pipeline runs STT → LLM → TTS and plays synthesized speech back through the WebRTC peer connection.
+
+<Tip>
+  Chrome and Firefox both support WebRTC. Safari requires macOS 13+ or iOS 16+ for full WebRTC audio support. If you are testing on a remote server (not localhost), you must serve the frontend over HTTPS and use a WSS/HTTPS Voxray URL — browsers require secure origins for microphone access outside of localhost.
+</Tip>
+
+---
+
+## SDP Signaling for Non-Browser Clients
+
+For native apps, CLIs, or server-to-server integrations, use the `/webrtc/offer` REST endpoint directly.
+
+**Send an SDP offer:**
+
+```bash
+curl -X POST http://localhost:8080/webrtc/offer \
+  -H "Content-Type: application/json" \
+  -d '{"offer": "<your-sdp-offer-string>"}'
+```
+
+**Request body:**
+
+```json
+{
+  "offer": "v=0\r\no=- 461234567 2 IN IP4 127.0.0.1\r\n..."
+}
+```
+
+**Response body:**
+
+```json
+{
+  "data": {
+    "answer": "v=0\r\no=- 987654321 2 IN IP4 0.0.0.0\r\n..."
+  }
+}
+```
+
+The `answer` field contains the SDP answer string. Set this as the remote description on your peer connection to complete the offer/answer exchange, then proceed with ICE candidate exchange.
+
+For runner-style clients (which create a named session before offering SDP), use the two-step flow:
+
+```bash
+# 1. Create a session
+curl -X POST http://localhost:8080/start
+
+# 2. Send the SDP offer to that session
+curl -X POST http://localhost:8080/sessions/{session-id}/api/offer \
+  -H "Content-Type: application/json" \
+  -d '{"offer": "<sdp-string>"}'
+```
+
+---
+
+## Troubleshooting
+
+### `cgo: C compiler ... not found`
+
+The build fails because no C compiler is on your PATH.
+
+```
+cgo: C compiler "gcc" not found: exec: "gcc": executable file not found in $PATH
+```
+
+**Fix:** Install the C toolchain for your OS (see Step 1 above), open a new terminal, and verify `gcc --version` or `clang --version` returns output before re-running `make build-voice`.
+
+---
+
+### ICE connection fails — no audio after signaling completes
+
+The SDP exchange succeeds (you receive an answer) but the WebRTC peer connection never transitions to `connected` and no audio flows.
+
+**Common causes and fixes:**
+
+- **Missing or unreachable STUN server:** Confirm `webrtc_ice_servers` is set in `config.json` and that `stun.l.google.com:19302` is reachable from your network. Try `nc -u stun.l.google.com 19302` to verify UDP connectivity.
+- **Symmetric NAT / firewall blocking UDP:** STUN alone cannot traverse all NAT types. Add a TURN relay server to `webrtc_ice_servers`.
+- **Server behind a non-public IP:** If Voxray is on a private network and the browser is on a different network, ICE candidates advertised by the server are non-routable. Use a TURN server or place the server on a public IP.
+
+---
+
+### `opus encode error` or `opus encoder unavailable (build without cgo)`
+
+The server binary was built without CGO. The Opus encoder is not compiled in.
+
+```
+ERROR webrtc/offer opus encoder unavailable (build without cgo) status=503
+```
+
+**Fix:** Rebuild using `make build-voice` (not `make build`). After rebuilding, restart the server and retry the WebRTC connection.
+
+---
+
+### Browser says "Permission denied" for microphone
+
+The page is served over plain HTTP from a non-localhost origin. Browsers restrict microphone access to secure origins (HTTPS or localhost).
+
+**Fix:** Either run everything locally (`localhost`) for development, or serve the frontend over HTTPS and configure Voxray behind a TLS-terminating reverse proxy (nginx, Caddy, etc.) with a valid certificate.
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/get-started/installation">
+    Full installation guide including OS-specific Go setup and Docker.
+  </Card>
+  <Card title="Configuration Reference" icon="gear" href="/reference/configuration">
+    All config fields for transports, ICE servers, providers, and more.
+  </Card>
+  <Card title="Connectivity Guide" icon="network-wired" href="/deploy/connectivity">
+    Understand all entry points: WebSocket, WebRTC, runner, Daily.co, and telephony.
+  </Card>
+  <Card title="Supported Providers" icon="grid" href="/reference/providers">
+    Switch STT, LLM, or TTS provider with a single config change.
+  </Card>
+</CardGroup>

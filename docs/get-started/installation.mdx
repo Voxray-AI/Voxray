@@ -1,0 +1,326 @@
+---
+title: "Installation"
+description: "Install Voxray, set up your Go environment, and choose the right build for your transport needs."
+---
+
+## Prerequisites
+
+Before installing Voxray, confirm the following tools are available on your machine.
+
+| Requirement | Command | Notes |
+|-------------|---------|-------|
+| Go 1.25+ | `go version` | Required for all builds |
+| Git | `git --version` | Required to clone the repository |
+| C compiler (gcc or clang) | `gcc --version` | Required only for WebRTC builds with Opus audio |
+
+<Note>
+  The default WebSocket-only build has no C compiler dependency. You only need a C compiler if you plan to use WebRTC transport with TTS audio output via Opus encoding.
+</Note>
+
+---
+
+## Install Go and System Dependencies
+
+<Tabs>
+  <Tab title="macOS">
+    Install Go using Homebrew:
+
+    ```bash
+    brew install go
+    ```
+
+    Verify the installation:
+
+    ```bash
+    go version
+    # Expected: go version go1.25.x darwin/arm64 (or amd64)
+    ```
+
+    The CGO toolchain (Clang) ships with Xcode Command Line Tools. Install or confirm it is present:
+
+    ```bash
+    xcode-select --install
+    ```
+
+    If already installed, this command exits immediately. Verify:
+
+    ```bash
+    clang --version
+    # Expected: Apple clang version 15.x.x
+    ```
+  </Tab>
+  <Tab title="Linux">
+    **Debian / Ubuntu — system Go package:**
+
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y golang-go build-essential
+    ```
+
+    <Warning>
+      The `golang-go` package in Debian/Ubuntu repositories often lags behind the upstream release. For Go 1.25+, download directly from [golang.org/dl](https://golang.org/dl/):
+
+      ```bash
+      wget https://go.dev/dl/go1.25.linux-amd64.tar.gz
+      sudo rm -rf /usr/local/go
+      sudo tar -C /usr/local -xzf go1.25.linux-amd64.tar.gz
+      export PATH=$PATH:/usr/local/go/bin
+      echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+      ```
+    </Warning>
+
+    **Fedora / RHEL / CentOS:**
+
+    ```bash
+    sudo dnf install golang gcc make
+    ```
+
+    Verify both tools:
+
+    ```bash
+    go version
+    gcc --version
+    ```
+  </Tab>
+  <Tab title="Windows">
+    **Go installer:**
+
+    Download and run the MSI installer from [golang.org/dl](https://golang.org/dl/). The installer adds Go to your PATH automatically.
+
+    Verify in PowerShell:
+
+    ```powershell
+    go version
+    ```
+
+    **CGO toolchain (required for WebRTC builds only):**
+
+    Voxray WebRTC support requires `gcc` on your PATH. Two options:
+
+    **Option 1 — WinLibs (via winget):**
+
+    ```powershell
+    winget install BrechtSanders.WinLibs.POSIX.UCRT --accept-package-agreements
+    ```
+
+    Restart your terminal, then verify:
+
+    ```powershell
+    gcc --version
+    ```
+
+    **Option 2 — MSYS2:**
+
+    1. Download and install [MSYS2](https://www.msys2.org/).
+    2. Open the **MSYS2 UCRT64** terminal and run:
+
+    ```bash
+    pacman -S mingw-w64-ucrt-x86_64-toolchain
+    ```
+
+    3. Add `C:\msys64\ucrt64\bin` to your Windows PATH environment variable and verify with `gcc --version`.
+
+    <Tip>
+      WSL2 (Windows Subsystem for Linux) provides the smoothest development experience on Windows. Install WSL2 with Ubuntu and follow the Linux instructions above for full compatibility with all build targets.
+    </Tip>
+  </Tab>
+</Tabs>
+
+---
+
+## Clone the Repository
+
+```bash
+git clone https://github.com/voxray-ai/voxray-ai.git
+cd voxray-ai
+```
+
+Download Go module dependencies:
+
+```bash
+go mod tidy
+```
+
+---
+
+## Build Variants
+
+Voxray ships two primary build targets. Choose based on which transport you need.
+
+| Command | CGO | Transport Support | Binary Size |
+|---------|-----|-------------------|-------------|
+| `make build` | Disabled | WebSocket only | ~15 MB |
+| `make build-voice` | Enabled | WebSocket + WebRTC (Opus) | ~20 MB |
+
+### Default build — WebSocket only
+
+No C compiler required. CGO is explicitly disabled so the binary is fully static and portable.
+
+```bash
+make build
+# Equivalent to: go build -o voxray ./cmd/voxray
+```
+
+### Voice build — WebSocket and WebRTC with Opus
+
+Requires `gcc` or `clang` on your PATH. Enables the Opus encoder so the server can deliver TTS audio over WebRTC peer connections.
+
+**Linux / macOS:**
+
+```bash
+make build-voice
+# Equivalent to: CGO_ENABLED=1 go build -o voxray ./cmd/voxray
+```
+
+**Windows (PowerShell):**
+
+```powershell
+.\scripts\build-voice.ps1
+```
+
+**Manual — any OS:**
+
+```bash
+CGO_ENABLED=1 go build -o voxray ./cmd/voxray
+```
+
+<Warning>
+  If you run a binary built without CGO and a client connects via WebRTC, the server returns HTTP 503 and logs `opus encoder unavailable (build without cgo)`. Use `make build-voice` if WebRTC transport is required.
+</Warning>
+
+---
+
+## Docker
+
+Voxray ships a production-ready multi-stage Dockerfile. The default Docker build produces a WebSocket-only binary (CGO disabled, static binary on Alpine).
+
+**Build the image:**
+
+```bash
+docker build -t voxray .
+```
+
+**Run with a config file mounted:**
+
+```bash
+docker run -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json \
+  voxray
+```
+
+**Pass a config path via environment variable:**
+
+```bash
+docker run -p 8080:8080 \
+  -e VOXRAY_CONFIG=/app/config.json \
+  -v $(pwd)/config.json:/app/config.json \
+  voxray
+```
+
+<Note>
+  The Docker image exposes port 8080 by default. The `VOXRAY_CONFIG` environment variable is pre-set to `/app/config.json` in the image. Mount your config at that path or override `VOXRAY_CONFIG` to point elsewhere.
+</Note>
+
+---
+
+## Environment Setup
+
+### Create your config file
+
+Copy the example config and open it in your editor:
+
+```bash
+cp config.example.json config.json
+```
+
+### Four fields you must configure before first run
+
+Every config file requires at minimum these four top-level settings before the server can start a voice pipeline:
+
+| Field | Type | Description | Example |
+|-------|------|-------------|---------|
+| `stt_provider` | string | Speech-to-text provider name | `"openai"` |
+| `llm_provider` | string | Language model provider name | `"openai"` |
+| `tts_provider` | string | Text-to-speech provider name | `"openai"` |
+| `api_keys` | object | Map of provider name to API key | `{"openai": "sk-..."}` |
+
+A minimal working config looks like:
+
+```json
+{
+  "transport": "websocket",
+  "host": "0.0.0.0",
+  "port": 8080,
+
+  "stt_provider": "openai",
+  "stt_model": "gpt-4o-mini-transcribe",
+
+  "llm_provider": "openai",
+  "model": "gpt-4.1-mini",
+
+  "tts_provider": "openai",
+  "tts_voice": "alloy",
+
+  "api_keys": {
+    "openai": "YOUR_OPENAI_API_KEY"
+  }
+}
+```
+
+Replace `YOUR_OPENAI_API_KEY` with your actual key. API keys can also be supplied via environment variables (for example, `OPENAI_API_KEY`) — they do not need to be embedded in the config file.
+
+<Tip>
+  Set `"transport": "both"` and add `"webrtc_ice_servers": ["stun:stun.l.google.com:19302"]` if you want both WebSocket and WebRTC active at the same time. See the [WebRTC quickstart](/get-started/quickstart-webrtc) for the full configuration.
+</Tip>
+
+---
+
+## Verify the Installation
+
+Start the server:
+
+```bash
+./voxray -config config.json
+# Windows: .\voxray.exe -config config.json
+```
+
+You should see startup log lines similar to:
+
+```
+INFO  voxray starting  transport=websocket host=0.0.0.0 port=8080
+INFO  pipeline ready   stt=openai llm=openai tts=openai
+INFO  server listening addr=0.0.0.0:8080
+```
+
+Confirm the health endpoint responds:
+
+```bash
+curl http://localhost:8080/health
+# Expected: 200 OK
+```
+
+Confirm the readiness endpoint:
+
+```bash
+curl http://localhost:8080/ready
+# Expected: 200 OK
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="WebSocket Quickstart" icon="plug" href="/get-started/quickstart-websocket">
+    Connect a client to the WebSocket endpoint and make your first voice call.
+  </Card>
+  <Card title="WebRTC Quickstart" icon="microphone" href="/get-started/quickstart-webrtc">
+    Build with CGO and connect a browser client via WebRTC for real-time audio.
+  </Card>
+  <Card title="Configuration Reference" icon="gear" href="/reference/configuration">
+    Explore all config fields: transports, providers, recording, transcripts, and more.
+  </Card>
+  <Card title="Supported Providers" icon="grid" href="/reference/providers">
+    See the full matrix of STT, LLM, and TTS providers and their config keys.
+  </Card>
+</CardGroup>

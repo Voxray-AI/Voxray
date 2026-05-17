@@ -1,0 +1,256 @@
+---
+title: "AWS"
+description: "Use Amazon Transcribe (STT), Amazon Bedrock (LLM), and Amazon Polly (TTS) with Voxray. All three services are covered by the standard AWS SDK v2 credential chain — no separate API key is required."
+---
+
+<CardGroup cols={3}>
+  <Card title="STT" icon="microphone">
+    Amazon Transcribe — real-time streaming transcription
+  </Card>
+  <Card title="LLM" icon="brain">
+    Amazon Bedrock — Claude, Titan, Llama, and more
+  </Card>
+  <Card title="TTS" icon="volume-high">
+    Amazon Polly — neural voices in 30+ languages
+  </Card>
+</CardGroup>
+
+## Overview
+
+AWS is unique among Voxray providers: it uses the **AWS SDK v2 credential chain** rather than a single bearer token. All three pipeline stages — speech recognition, language model inference, and speech synthesis — resolve credentials the same way and share a single region setting.
+
+Set `"stt_provider"`, `"llm_provider"`, and `"tts_provider"` to `"aws"` in your config to activate all three, or mix AWS with other providers as needed.
+
+## Authentication
+
+<Tabs>
+  <Tab title="Environment Variables">
+    The simplest method for local development and CI pipelines. Set the following before starting Voxray:
+
+    ```bash
+    export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+    export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+    # Optional — required for temporary credentials from STS
+    export AWS_SESSION_TOKEN=AQoDYXdzEJr...
+    ```
+
+    The SDK picks these up automatically; no config change is needed.
+  </Tab>
+  <Tab title="~/.aws/credentials">
+    The shared credentials file is the standard method for developer machines. Run `aws configure` or edit the file directly:
+
+    ```ini
+    [default]
+    aws_access_key_id     = AKIAIOSFODNN7EXAMPLE
+    aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+    ```
+
+    To use a named profile, set `AWS_PROFILE=my-profile` before starting Voxray. The SDK reads `~/.aws/credentials` and `~/.aws/config` automatically.
+  </Tab>
+  <Tab title="IAM Role (Recommended for Production)">
+    When Voxray runs on EC2, ECS, Lambda, or any service that supports instance metadata, the SDK fetches credentials from the **Instance Metadata Service (IMDS)** with no configuration required.
+
+    Attach an IAM role to your compute resource with the permissions listed in the [Required IAM Permissions](#required-iam-permissions) section below. The SDK refreshes temporary credentials before they expire.
+
+    This is the recommended approach for production because no long-lived secrets need to be stored or rotated manually.
+  </Tab>
+</Tabs>
+
+## Region Configuration
+
+All AWS services require a region. Voxray resolves the region in this order:
+
+1. `aws_region` key inside `api_keys` in your config file
+2. `AWS_REGION` environment variable
+3. Default: `us-east-1`
+
+**Via config file:**
+
+```json
+{
+  "api_keys": {
+    "aws_region": "us-west-2"
+  }
+}
+```
+
+**Via environment variable:**
+
+```bash
+export AWS_REGION=eu-west-1
+```
+
+Choose a region where all three services — Transcribe, Bedrock, and Polly — are available and where you have enabled the Bedrock models you intend to use.
+
+## Quick Start Config
+
+The minimal configuration to run a fully AWS-native voice pipeline:
+
+```json
+{
+  "stt_provider": "aws",
+  "llm_provider": "aws",
+  "tts_provider": "aws",
+  "model": "anthropic.claude-3-haiku-20240307-v1:0",
+  "api_keys": {
+    "aws_region": "us-east-1"
+  }
+}
+```
+
+No `aws` key is needed inside `api_keys` — credentials come from the SDK credential chain described above. The `aws` key in `api_keys` is accepted for legacy compatibility but is not used for authentication.
+
+## Amazon Bedrock (LLM)
+
+Amazon Bedrock provides access to foundation models from Anthropic, Amazon, Meta, and others via a unified API. You must **enable model access** in the [Bedrock console](https://console.aws.amazon.com/bedrock/home#/modelaccess) for each model ID you use; models are not accessible by default.
+
+### Supported Models
+
+| Model ID | Family | Notes |
+|----------|--------|-------|
+| `anthropic.claude-3-haiku-20240307-v1:0` | Anthropic Claude 3 | Fastest Claude 3; lowest latency |
+| `anthropic.claude-3-sonnet-20240229-v1:0` | Anthropic Claude 3 | Balanced quality and speed |
+| `anthropic.claude-3-5-sonnet-20240620-v1:0` | Anthropic Claude 3.5 | Highest quality Claude on Bedrock |
+| `amazon.titan-text-express-v1` | Amazon Titan | Amazon's own foundation model |
+| `meta.llama3-8b-instruct-v1:0` | Meta Llama 3 | Open-weight 8B instruction model |
+| `meta.llama3-70b-instruct-v1:0` | Meta Llama 3 | Open-weight 70B instruction model |
+
+Set the model in your config:
+
+```json
+{
+  "llm_provider": "aws",
+  "model": "anthropic.claude-3-haiku-20240307-v1:0"
+}
+```
+
+<Note>
+  Model availability varies by region. Check the Bedrock console in your target region to confirm a model is available and request access before deploying.
+</Note>
+
+## Amazon Transcribe (STT)
+
+Amazon Transcribe streams audio in real time and returns partial and final transcription results. Voxray uses the `StartStreamTranscription` API over a bidirectional WebSocket — no intermediate file uploads are required.
+
+**Key characteristics:**
+- Real-time streaming transcription with incremental results
+- Supports 30+ languages including en-US, en-GB, es-US, fr-FR, de-DE, ja-JP, hi-IN, pt-BR, and more
+- Automatic punctuation and number normalization
+- No per-request cold start once the stream is open
+
+To activate:
+
+```json
+{
+  "stt_provider": "aws"
+}
+```
+
+The language is inferred from the audio stream. To pin a specific language, use the `stt_language` config key (e.g. `"en-US"`).
+
+## Amazon Polly (TTS)
+
+Amazon Polly synthesizes text to speech using neural voices. Voxray streams the audio output directly into the pipeline without buffering the full response.
+
+**Key characteristics:**
+- Neural TTS engine with natural-sounding voices
+- 30+ languages and 60+ voices
+- Low-latency synthesis suitable for real-time voice agents
+
+### Voice Selection
+
+Set the voice ID via `tts_voice` in your config. If no voice is set, Voxray defaults to `Joanna`.
+
+```json
+{
+  "tts_provider": "aws",
+  "tts_voice": "Matthew"
+}
+```
+
+### Common Voice IDs
+
+| Voice ID | Language | Gender |
+|----------|----------|--------|
+| `Joanna` | en-US | Female |
+| `Matthew` | en-US | Male |
+| `Amy` | en-GB | Female |
+| `Brian` | en-GB | Male |
+| `Celine` | fr-FR | Female |
+| `Vicki` | de-DE | Female |
+| `Mizuki` | ja-JP | Female |
+| `Lucia` | es-ES | Female |
+| `Camila` | pt-BR | Female |
+
+For a full list, see the [Amazon Polly documentation](https://docs.aws.amazon.com/polly/latest/dg/voicelist.html).
+
+## Required IAM Permissions
+
+Attach these permissions to the IAM role or user that Voxray runs as. The principle of least privilege is applied — only the specific actions each service requires are listed.
+
+| Permission | Service | Purpose |
+|------------|---------|---------|
+| `transcribe:StartStreamTranscription` | Amazon Transcribe | Open a real-time transcription stream |
+| `bedrock:InvokeModelWithResponseStream` | Amazon Bedrock | Streaming LLM inference |
+| `polly:SynthesizeSpeech` | Amazon Polly | Neural TTS synthesis |
+
+Minimal IAM policy document:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VoxrayTranscribe",
+      "Effect": "Allow",
+      "Action": ["transcribe:StartStreamTranscription"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "VoxrayBedrock",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModelWithResponseStream"],
+      "Resource": "arn:aws:bedrock:*::foundation-model/*"
+    },
+    {
+      "Sid": "VoxrayPolly",
+      "Effect": "Allow",
+      "Action": ["polly:SynthesizeSpeech"],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+If you also use Voxray's [S3 conversation recording](/build/recording), add `s3:PutObject` on your recording bucket to the same policy.
+
+## Full Example Config
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "transport": "both",
+
+  "stt_provider": "aws",
+  "llm_provider": "aws",
+  "tts_provider": "aws",
+
+  "model": "anthropic.claude-3-haiku-20240307-v1:0",
+  "tts_voice": "Joanna",
+
+  "api_keys": {
+    "aws_region": "us-east-1"
+  },
+
+  "webrtc_ice_servers": [
+    "stun:stun.l.google.com:19302"
+  ]
+}
+```
+
+Run with credentials resolved via IAM role (EC2/ECS) or environment variables (local development):
+
+```bash
+./voxray -config config.json
+```

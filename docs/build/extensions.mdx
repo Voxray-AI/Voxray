@@ -1,0 +1,274 @@
+---
+title: Extensions
+description: Drop-in pipeline extensions for IVR navigation and voicemail detection in outbound Voxray agents.
+---
+
+Extensions are optional pipeline components that address common outbound call challenges: navigating automated phone menus (IVR) and detecting whether a human or voicemail answered the call. Both are designed to slot into a standard Voxray pipeline with minimal wiring.
+
+---
+
+## IVR Extension
+
+### Use case
+
+When placing outbound calls to businesses or government services, your agent will often encounter an Interactive Voice Response (IVR) system before reaching a human — "Press 1 for billing, press 2 for support." The IVR extension automates this navigation: it listens to the IVR audio, uses an LLM to decide what to do, sends DTMF keypad tones, and hands off cleanly to normal conversation mode once a human is reached.
+
+### How it works
+
+The extension operates in two LLM modes managed by a single `IVRProcessor`:
+
+1. **Classifier mode** — active at call start. The LLM listens to audio and outputs one of two mode tags: `<mode>conversation</mode>` (human detected, hand off) or `<mode>ivr</mode>` (IVR system detected, enter navigation mode).
+
+2. **IVR navigation mode** — activated when the classifier fires `ivr`. The processor injects the IVR system prompt into the LLM context and adjusts VAD silence thresholds (shorter stop time so the agent doesn't wait long between IVR prompts). The LLM then outputs DTMF tags (`<dtmf>1</dtmf>`) and status tags (`<status>completed</status>`) as it navigates the menu.
+
+The processor sits **downstream of the LLM** and pushes control frames **upstream** to effect mode changes: `LLMMessagesUpdateFrame` to swap the system prompt, and `VADParamsUpdateFrame` to tighten the silence window during IVR navigation.
+
+### Key types
+
+**`IVRProcessor`** — the core frame processor:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `ClassifierPrompt` | string | System prompt for initial classification (conversation vs IVR). |
+| `IVRPrompt` | string | System prompt injected when IVR is detected; instructs navigation. |
+| `IVRVADStopSecs` | float64 | Silence duration (seconds) that triggers end-of-turn during IVR navigation. Default: `2.0`. |
+
+**`IVRStatus`** — reported via `OnIVRStatusChanged`:
+
+| Value | Meaning |
+|---|---|
+| `IVRStatusDetected` | IVR system identified; navigation mode activated. |
+| `IVRStatusCompleted` | Agent successfully navigated to the destination. |
+| `IVRStatusStuck` | Agent cannot proceed (unexpected menu, unrecognised options). |
+| `IVRStatusWait` | IVR is playing hold music or an extended prompt; agent is waiting. |
+
+### LLM command tags
+
+The IVR system prompt must instruct the LLM to wrap commands in XML tags. The processor pattern-matches these tags in the streaming LLM output:
+
+| Tag | Example | Effect |
+|---|---|---|
+| `<dtmf>` | `<dtmf>1</dtmf>` | Emits an `OutputDTMFUrgentFrame` with the keypad entry. Valid: `0–9`, `*`, `#`. |
+| `<status>` | `<status>completed</status>` | Fires `OnIVRStatusChanged` with the corresponding `IVRStatus`. |
+| `<mode>` | `<mode>conversation</mode>` | Fires `OnConversationDetected` with conversation history and exits IVR mode. |
+
+<Note>
+  Text outside the XML tags is forwarded downstream as normal `AggregatedTextFrame` content. The LLM can still speak to the IVR system between DTMF presses — useful for spoken menu options that require voice input rather than keypad input.
+</Note>
+
+### Pipeline position
+
+```
+Transport → Turn → STT → IVRNavigator → TTS → Sink
+```
+
+`IVRNavigator` wraps a `[LLM, IVRProcessor]` chain into a single pipeline node. The internal LLM context is automatically wired to `IVRProcessor.SetSavedMessages` so that when conversation mode is triggered, the full conversation history is available in the callback.
+
+### Setup
+
+<Steps>
+  <Step title="Import the extension package">
+    ```go
+    import (
+        "voxray-go/pkg/extensions/ivr"
+        "voxray-go/pkg/pipeline"
+    )
+    ```
+  </Step>
+  <Step title="Create the navigator">
+    ```go
+    llm := services.NewLLMService(cfg) // any LLMService
+
+    navigator := ivr.NewIVRNavigator(llm, "Reach the billing department", 2.0)
+    ```
+
+    The second argument is the navigation goal injected into the IVR system prompt. The third is `IVRVADStopSecs`.
+  </Step>
+  <Step title="Register callbacks">
+    ```go
+    navigator.OnConversationDetected(func(history []map[string]any) {
+        // A human answered. Hand off: swap to your main agent pipeline
+        // or push LLMMessagesUpdateFrame with the main system prompt.
+        log.Println("IVR: human detected, conversation history:", len(history), "turns")
+    })
+
+    navigator.OnIVRStatusChanged(func(status ivr.IVRStatus) {
+        switch status {
+        case ivr.IVRStatusCompleted:
+            log.Println("IVR: navigation complete")
+        case ivr.IVRStatusStuck:
+            log.Println("IVR: agent is stuck, may need fallback")
+        case ivr.IVRStatusWait:
+            log.Println("IVR: waiting on hold")
+        }
+    })
+    ```
+  </Step>
+  <Step title="Add to pipeline">
+    ```go
+    pl := pipeline.New()
+    pl.Add(turnProc)
+    pl.Add(sttProc)
+    pl.Add(navigator.Processor) // single node: [LLM → IVRProcessor]
+    pl.Add(ttsProc)
+    pl.Add(sink)
+    ```
+  </Step>
+</Steps>
+
+### Frames emitted
+
+| Frame | Direction | Purpose |
+|---|---|---|
+| `OutputDTMFUrgentFrame` | Downstream | Carries a single DTMF keypad entry to the transport layer. |
+| `VADParamsUpdateFrame` | Upstream | Updates `stop_secs` on the Turn processor when IVR mode activates. |
+| `LLMMessagesUpdateFrame` | Upstream | Replaces the LLM system prompt for classifier → IVR or IVR → conversation transitions. |
+| `AggregatedTextFrame` | Downstream | Non-tag text from the LLM forwarded to TTS. |
+
+---
+
+## Voicemail Detection Extension
+
+### Use case
+
+When placing outbound calls, you need to know whether a human or an answering machine picked up before your agent starts speaking. Delivering a full sales pitch to voicemail wastes the recording slot and sounds wrong. The voicemail detection extension holds the TTS output in a gate, classifies the audio using a fast LLM, and then either releases the buffered speech (human) or triggers a tailored voicemail response.
+
+### How it works
+
+The detector inserts a **parallel pipeline branch** after STT. Both branches receive the transcribed audio simultaneously:
+
+- **Conversation gate branch** — passes frames through normally, but closes if voicemail is detected, preventing the main LLM from wasting compute on a recording.
+- **Classifier branch** — runs a dedicated fast LLM with a classification prompt. Its output is monitored by `ClassificationProcessor`, which fires one of two notifiers when it sees `CONVERSATION` or `VOICEMAIL` in the LLM response.
+
+Downstream, a **TTS gate** buffers all TTS audio frames. When the classification notifier fires:
+
+- `CONVERSATION` → the gate opens and releases all buffered TTS frames. The caller hears the agent's greeting with minimal delay.
+- `VOICEMAIL` → the gate discards buffered frames. The `OnVoicemailDetected` callback fires so your code can push a custom TTS message (e.g. "Please call us back at 555-0100").
+
+### Components
+
+| Component | Package | Role |
+|---|---|---|
+| `VoicemailDetector` | `pkg/extensions/voicemail` | Builds the parallel pipeline and TTS gate; exposes `Detector()` and `Gate()`. |
+| `ClassificationProcessor` | `pkg/extensions/voicemail` | Aggregates LLM output tokens, fires notifiers on `CONVERSATION`/`VOICEMAIL`. |
+| `NotifierGate` | `pkg/extensions/voicemail` | One-shot gate that opens or closes based on a notifier signal. |
+| `TTSGate` | `pkg/extensions/voicemail` | Buffers TTS frames until a decision is made; releases or discards on signal. |
+
+### Pipeline position
+
+```
+Transport → Turn → STT → [Detector] → ContextAggregator → LLM → TTS → [Gate] → Transport
+```
+
+`det.Detector()` is the parallel pipeline node inserted after STT. `det.Gate()` is the TTS buffer inserted after TTS and before the transport sink.
+
+### Setup
+
+<Steps>
+  <Step title="Import the extension package">
+    ```go
+    import (
+        "voxray-go/pkg/extensions/voicemail"
+        "voxray-go/pkg/pipeline"
+    )
+    ```
+  </Step>
+  <Step title="Create the detector">
+    ```go
+    // A fast, cheap LLM is ideal for classification — latency matters here.
+    classifierLLM := services.NewLLMService(classifierCfg)
+
+    det := voicemail.NewVoicemailDetector(classifierLLM, 2.0)
+    // 2.0 = seconds of audio silence before the classifier runs
+    ```
+
+    To customise the classification prompt:
+
+    ```go
+    customPrompt := "Listen to the following audio transcript. " +
+        "Respond with exactly one word: CONVERSATION if a human answered, " +
+        "VOICEMAIL if an answering machine answered. " +
+        voicemail.ClassifierResponseInstruction
+
+    det := voicemail.NewVoicemailDetectorWithPrompt(classifierLLM, 2.0, customPrompt)
+    ```
+  </Step>
+  <Step title="Register callbacks">
+    ```go
+    det.OnConversationDetected(func() {
+        log.Println("voicemail: human answered, conversation starting")
+        // No action required — the TTS gate opens automatically.
+    })
+
+    det.OnVoicemailDetected(func() {
+        log.Println("voicemail: answering machine detected")
+        // Push a voicemail message or hang up.
+        pipeline.Push(frames.NewTTSSpeakFrame("Hi, this is Alex from Acme. Please call us back at 555-0100. Goodbye."))
+    })
+    ```
+  </Step>
+  <Step title="Add to pipeline">
+    ```go
+    pl := pipeline.New()
+    pl.Add(transportSource)
+    pl.Add(turnProc)
+    pl.Add(sttProc)
+    pl.Add(det.Detector())    // parallel: conversation gate + classifier LLM
+    pl.Add(contextAggregator)
+    pl.Add(mainLLM)
+    pl.Add(ttsProc)
+    pl.Add(det.Gate())        // TTS gate: buffers until classification fires
+    pl.Add(transportSink)
+    ```
+  </Step>
+</Steps>
+
+### Classifier prompt requirements
+
+The classifier LLM **must** respond with exactly `CONVERSATION` or `VOICEMAIL` as a complete response. Any other output is ignored and classification stalls until a valid token appears.
+
+<Warning>
+  Do not instruct the classifier to explain its reasoning or hedge its answer. A response like "Based on the audio, I believe this is a CONVERSATION" will not match. The prompt must produce a bare single-word response.
+</Warning>
+
+Append `voicemail.ClassifierResponseInstruction` to any custom prompt — it contains the exact constraint text Voxray expects.
+
+### Integration with IVR
+
+For outbound campaigns that encounter both voicemail screening and IVR systems, chain the two extensions: voicemail detection runs first, and on `OnConversationDetected` you start the IVR navigator:
+
+```go
+det.OnConversationDetected(func() {
+    // Human (or live transfer) answered. Begin IVR navigation.
+    navigator := ivr.NewIVRNavigator(llm, "Reach the billing department", 2.0)
+    navigator.OnConversationDetected(func(history []map[string]any) {
+        // IVR cleared; real human on the line. Hand off to main agent.
+    })
+    navigator.OnIVRStatusChanged(func(status ivr.IVRStatus) {
+        // Track IVR navigation progress.
+    })
+    // Insert navigator into the live pipeline or start a new sub-pipeline.
+})
+```
+
+---
+
+## Frames reference
+
+| Frame | Extension | Direction | Purpose |
+|---|---|---|---|
+| `OutputDTMFUrgentFrame` | IVR | Downstream | Emits a DTMF tone (0–9, *, #) to the telephony transport. |
+| `VADParamsUpdateFrame` | IVR | Upstream | Adjusts Turn processor silence thresholds for IVR pacing. |
+| `LLMMessagesUpdateFrame` | IVR | Upstream | Replaces LLM context and optionally triggers an immediate LLM run. |
+| `AggregatedTextFrame` | IVR | Downstream | Non-tag LLM text forwarded to TTS after pattern aggregation. |
+| `LLMFullResponseStartFrame` | Both | Downstream | Marks start of a full LLM response for aggregation by classifier. |
+| `LLMFullResponseEndFrame` | Both | Downstream | Marks end of full response; flushes remaining aggregated text. |
+
+## Event hooks reference
+
+| Extension | Hook | Signature | When it fires |
+|---|---|---|---|
+| IVR | `OnConversationDetected` | `func(history []map[string]any)` | Classifier output contains `conversation`; IVR mode exits. |
+| IVR | `OnIVRStatusChanged` | `func(status IVRStatus)` | Any IVR status tag seen: `detected`, `completed`, `stuck`, `wait`. |
+| Voicemail | `OnConversationDetected` | `func()` | Classifier output is `CONVERSATION`; TTS gate opens. |
+| Voicemail | `OnVoicemailDetected` | `func()` | Classifier output is `VOICEMAIL`; TTS gate discards buffer. |

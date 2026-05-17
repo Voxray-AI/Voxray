@@ -1,0 +1,89 @@
+---
+title: "Glossary"
+description: "Definitions of key terms used throughout the Voxray documentation"
+---
+
+This page defines the key terms used across the Voxray documentation. Terms are grouped by topic area. Where a concept has a dedicated page, a link is provided.
+
+---
+
+## Core Concepts
+
+| Term | Definition |
+|------|------------|
+| **Frame** | The fundamental unit of data that flows through a Voxray pipeline. Every object — raw audio bytes, transcribed text, LLM tokens, lifecycle signals — is a typed `Frame` value with a monotonically increasing `ID()` and a `FrameType()` string. See the [Architecture](/core-concepts/architecture) page for the full frame-type reference. |
+| **Processor** | A single stage in the pipeline. A `Processor` receives a `Frame`, optionally transforms it, and forwards one or more frames to its downstream or upstream neighbour. Processors own their own state (buffers, service clients, mutexes) and are never shared across sessions. See [Pipeline & Processors](/core-concepts/pipeline-processors). |
+| **Pipeline** | A linear, doubly-linked chain of `Processor` values. `Pipeline.Push` sends a frame through the chain left-to-right (downstream); frames can also travel right-to-left (upstream). Each session has exactly one pipeline, fully isolated from all other sessions. See [Pipeline & Processors](/core-concepts/pipeline-processors). |
+| **Runner** | The goroutine manager for a single session. The Runner owns a reader goroutine (reads from `Transport.Input` into a bounded queue) and a worker goroutine (drains the queue and drives `Pipeline.Push`). It also calls `Pipeline.Setup` on startup and `Pipeline.Cleanup` on teardown. See [Architecture](/core-concepts/architecture). |
+| **Transport** | The network boundary of a session. A `Transport` exposes two frame channels (`Input()` and `Output()`) plus `Start(ctx)` and `Close()`. All protocol details — framing, serialization, codec conversion — are encapsulated inside the transport implementation. The Pipeline never touches a network connection directly. See [Transport Layer](/core-concepts/transport-layer). |
+| **Session** | One complete lifecycle from the moment a client connection is accepted until the connection closes. Each session has exactly one Transport, one Runner, and one Pipeline. There is no shared mutable state across sessions. |
+| **BaseProcessor** | A concrete struct provided by Voxray that every custom processor embeds. It manages the doubly-linked chain (`next`/`prev` pointers), provides default no-op `Setup`/`Cleanup` implementations, and exposes `PushDownstream` and `PushUpstream` helpers. Override only the methods you need. See [Pipeline & Processors](/core-concepts/pipeline-processors). |
+| **Direction** | An enum (`Downstream = 1`, `Upstream = 2`) that controls which neighbour a frame is forwarded to. Downstream frames travel from the first processor toward the Sink (normal audio/text flow). Upstream frames travel from the Sink back toward the source — used for error propagation, VAD parameter updates, and barge-in signals. |
+| **Downstream** | Frame direction from the first processor toward the Sink. Normal voice data (audio, transcriptions, LLM tokens, synthesised speech) flows downstream. |
+| **Upstream** | Frame direction from the Sink back toward the first processor. Error frames, runtime VAD parameter updates, and interruption signals travel upstream so they do not pollute the forward audio path. |
+
+---
+
+## Audio & Voice
+
+| Term | Definition |
+|------|------------|
+| **VAD (Voice Activity Detection)** | A per-frame classifier that decides whether a given 10 ms audio window contains human speech. Voxray supports an energy-based VAD (default, no CGO required) and Silero VAD (neural network, requires CGO and ONNX Runtime). VAD gates STT calls so only speech segments are transcribed. See [Audio & VAD](/core-concepts/audio-vad). |
+| **Turn Detection** | The higher-level mechanism that determines when the user has finished speaking and the pipeline should trigger STT and an LLM response. Voxray's default mode (`silence`) waits for sustained silence (`turn_stop_secs`) after VAD exits the speaking state. An alternative `none` mode disables automatic detection for push-to-talk UIs. See [Audio & VAD](/core-concepts/audio-vad). |
+| **STT (Speech-to-Text)** | The process of converting raw audio into a text transcript. In Voxray, `STTProcessor` calls `STTService.Transcribe` on each completed audio turn and emits `TranscriptionFrame` values downstream. Provider implementations (OpenAI Whisper, Groq, Sarvam, AWS Transcribe, and others) satisfy the `STTService` interface. See [Providers & Services](/core-concepts/providers-services). |
+| **LLM (Large Language Model)** | A neural language model that generates text responses given a conversation history. In Voxray, `LLMProcessor` calls `LLMService.Chat` with streaming token callbacks. The conversation history is maintained internally across turns. Supported providers include OpenAI, Anthropic Claude, Groq, AWS Bedrock, and Ollama. See [Providers & Services](/core-concepts/providers-services). |
+| **TTS (Text-to-Speech)** | The process of synthesising spoken audio from text. `TTSProcessor` batches streamed LLM tokens into sentence-sized chunks and calls `TTSService.Speak`, emitting `TTSAudioRawFrame` values toward the Sink. Supported providers include OpenAI, ElevenLabs, Groq, Sarvam, and AWS Polly. See [Providers & Services](/core-concepts/providers-services). |
+| **Realtime** | A bidirectional provider session that merges STT, LLM, and TTS into a single persistent connection rather than three separate request/response calls. OpenAI Realtime API is the primary example. When a `RealtimeService` is configured, it replaces the `STTProcessor`+`LLMProcessor`+`TTSProcessor` chain. See [Providers & Services](/core-concepts/providers-services). |
+| **Opus** | A lossy audio codec optimised for real-time voice over IP. WebRTC clients send and receive Opus-encoded RTP packets. Voxray decodes incoming Opus to 16-bit PCM at the transport boundary before frames enter the pipeline, and re-encodes PCM to Opus for outbound RTP. Opus support requires CGO and the `gopus` library. See [Transport Layer](/core-concepts/transport-layer). |
+| **G.711** | The ITU standard codec family for telephone-quality audio. G.711 samples are 8-bit and logarithmically compressed at 8 kHz. Telephony providers (Twilio, Telnyx, Plivo, Exotel) deliver and accept G.711 audio. Voxray converts G.711 to and from 16-bit PCM at the telephony transport boundary. |
+| **A-law (PCMA)** | The European G.711 variant used by some SIP/VoIP providers. Voxray includes `audio.EncodeALaw` and `audio.DecodeALaw` for sample-by-sample conversion to and from 16-bit PCM. See [Audio & VAD](/core-concepts/audio-vad). |
+| **μ-law / mu-law (PCMU)** | The North American G.711 variant used by Twilio, Telnyx, Plivo, and Exotel. Voxray includes `audio.EncodeULaw` and `audio.DecodeULaw`. Telephony audio arrives as μ-law at 8 kHz and is decoded and upsampled to 16 kHz PCM before entering the pipeline. See [Audio & VAD](/core-concepts/audio-vad). |
+| **PCM (Pulse-Code Modulation)** | The raw, uncompressed audio format used internally throughout the Voxray pipeline. All pipeline stages operate on 16-bit little-endian mono PCM. The canonical input rate is 16,000 Hz (STT); the canonical output rate is 24,000 Hz (TTS). |
+| **Sample Rate** | The number of audio samples per second, measured in Hz. Voxray uses 16,000 Hz for STT input, 24,000 Hz for TTS output, 48,000 Hz for WebRTC (Opus), and 8,000 Hz for telephony (G.711). Mismatched sample rates cause audio that plays at the wrong speed and produce STT errors. |
+| **Resampling** | The process of converting audio between sample rates. `pkg/audio` provides `Resample16Mono` using linear interpolation for the moderate conversion ratios Voxray requires (2:1, 3:1, 6:1). Resampling happens at transport boundaries, not inside pipeline processors. See [Audio & VAD](/core-concepts/audio-vad). |
+
+---
+
+## Network & WebRTC
+
+| Term | Definition |
+|------|------------|
+| **ICE (Interactive Connectivity Establishment)** | The IETF protocol (RFC 8445) that WebRTC uses to discover and negotiate network paths between peers. ICE gathers candidates (host addresses, server-reflexive addresses via STUN, relay addresses via TURN) and tests them in priority order until a working path is found. Voxray's SmallWebRTC transport completes ICE negotiation after the SDP offer/answer exchange. |
+| **STUN (Session Traversal Utilities for NAT)** | A lightweight protocol that lets a WebRTC client discover its public IP address and port as seen by the internet, enabling peer-to-peer connectivity through NAT. Voxray defaults to `stun.l.google.com:19302` for non-localhost deployments. STUN alone is insufficient for clients behind symmetric NAT or corporate firewalls — add a TURN server for production. See [Transport Layer](/core-concepts/transport-layer). |
+| **TURN (Traversal Using Relays around NAT)** | A relay protocol that proxies WebRTC media through an intermediate server when direct peer-to-peer paths fail. Voxray accepts TURN server URLs in `webrtc_ice_servers` config. Adding a TURN server is strongly recommended for any production deployment where clients connect from mobile networks, corporate networks, or carrier-grade NAT environments. |
+| **SDP (Session Description Protocol)** | A text format that describes the capabilities of a WebRTC endpoint: supported codecs, media directions, ICE parameters, and DTLS fingerprints. In Voxray's WebRTC flow, the client sends an SDP offer to `POST /webrtc/offer`; Voxray responds with an SDP answer. After the offer/answer exchange, ICE proceeds to establish the media path. |
+| **WebRTC** | The browser and native API standard for real-time peer-to-peer audio, video, and data. Voxray's `smallwebrtc.Transport` implements the server side: it accepts SDP offers, completes ICE negotiation, and bridges incoming Opus-encoded RTP tracks to and from the frame pipeline. See [Transport Layer](/core-concepts/transport-layer). |
+| **WebSocket** | A full-duplex, low-latency protocol over a single TCP connection. Voxray's primary transport for browser and mobile clients. Supports JSON (default), binary Protobuf (`?format=protobuf`), and RTVI (`?rtvi=1`) wire formats. One WebSocket connection = one voice session. See [Transport Layer](/core-concepts/transport-layer). |
+| **Signaling** | The out-of-band exchange of SDP and ICE candidates required to establish a WebRTC connection. In Voxray, signaling is handled over HTTP: `POST /webrtc/offer` accepts the SDP offer and returns the SDP answer synchronously. No separate signaling channel is required. |
+
+---
+
+## Infrastructure
+
+| Term | Definition |
+|------|------------|
+| **SessionStore** | The key-value store that maps session IDs to pending WebRTC session state in runner mode. The default implementation is in-memory (single instance). Set `session_store: "redis"` and `redis_url` in config to use Redis for horizontal scaling across multiple Voxray instances. See [Architecture](/core-concepts/architecture). |
+| **Redis** | An in-memory data store used by Voxray as a distributed `SessionStore` when scaling horizontally. Without Redis, sessions created on one instance cannot be picked up by another, causing runner-mode connections to fail behind a load balancer. |
+| **S3** | Amazon S3 (or any S3-compatible store) used by Voxray's recording module. When recording is enabled, `pkg/recording` uploads audio segments to the configured S3 bucket. Credentials and bucket configuration are set in `config.json`. |
+| **DTMF (Dual-Tone Multi-Frequency)** | The audio signaling tones generated by telephone keypad presses. Voxray's `dtmf_aggregator` processor collects incoming `InputDTMFFrame` values (digit presses), accumulates them, and flushes them as a `TranscriptionFrame` on timeout, on `#`, or on End/Cancel. Primarily used in telephony IVR pipelines. |
+| **RTVI (Real-Time Voice Interaction)** | An open protocol standard for real-time voice AI clients, originated by Pipecat. Voxray supports RTVI over WebSocket (`?rtvi=1`). The serializer switches to `RTVISerializer`, which adds a handshake phase and RTVI-typed message envelopes. Compatible with `@pipecat-ai/client-js` and other RTVI-capable SDKs. |
+| **MCP (Model Context Protocol)** | An open standard for exposing tools and context to LLMs. Voxray's `pkg/mcp` module connects to an MCP server over stdio, converts tool schemas to the LLM provider's function-calling format, and registers them with the `LLMServiceWithTools` interface. This enables the voice agent to call external tools during a conversation without custom integration code. See [MCP Tools](/build/mcp-tools). |
+| **Plugin** | A config-driven extension point for assembling the pipeline without writing Go code that directly calls pipeline constructors. Plugins implement the `pkg/plugin.Plugin` interface and are registered in a `Registry`. When `config.plugins` is set (instead of `config.provider`), the factory resolves and instantiates processors by their registered names. See [Plugin System](/build/plugin-system). |
+| **Aggregator** | A processor that accumulates frames across multiple turns or time windows before emitting a single richer frame. Examples include `dtmf_aggregator` (keypad digits), `userresponse` (interim transcription segments), `llmfullresponse` (complete LLM response across tokens), and `llmcontextsummarizer` (history compression). See [Pipeline & Processors](/core-concepts/pipeline-processors). |
+| **Telephony** | PSTN and VoIP phone call integration. Voxray supports Twilio, Telnyx, Plivo, and Exotel via provider-specific WebSocket serializers and webhook handlers. Telephone audio arrives as G.711 μ-law at 8 kHz and is decoded and resampled before entering the pipeline. See [Transport Layer](/core-concepts/transport-layer). |
+
+---
+
+## Voxray-Specific
+
+| Term | Definition |
+|------|------------|
+| **IVR (Interactive Voice Response)** | A telephony pattern where the voice agent guides callers through a menu of choices using speech prompts and DTMF or spoken input. Voxray implements IVR as an extension in `pkg/extensions`, using `dtmf_aggregator` and `LLMProcessor.OnContextUpdate` to switch between menu states. |
+| **Voicemail** | A pipeline mode where the agent records and transcribes the caller's spoken message instead of conducting a live conversation. Voxray provides voicemail support as an extension in `pkg/extensions`, using `llmfullresponse` aggregator to capture the complete message before processing. |
+| **TurnProcessor** | The built-in pipeline processor (`pkg/processors/voice`) that combines VAD and turn-detection logic. It buffers raw audio chunks, runs the VAD classifier on each 10 ms window, and emits a single concatenated `AudioRawFrame` per completed user turn. It also emits `UserStartedSpeakingFrame`, `UserStoppedSpeakingFrame`, and `UserIdleFrame` signals. See [Pipeline & Processors](/core-concepts/pipeline-processors). |
+| **InterruptionController** | A processor (`pkg/processors/voice`) that detects barge-in — the user speaking while the bot is still synthesising a response — and cancels in-progress TTS synthesis. A configurable `min_words` strategy prevents accidental interruptions from short affirmations ("yeah", "ok"). See [Pipeline & Processors](/core-concepts/pipeline-processors). |
+| **ProxyHost** | A configuration field (`proxy_host`) that causes Voxray to route all outbound HTTP and WebSocket calls to AI provider APIs through a specified HTTP proxy. Useful in environments where direct egress is restricted. |
+| **CGO** | The Go mechanism for calling C or C++ libraries. Two Voxray features require CGO: Silero VAD (ONNX Runtime bindings for neural-network VAD) and WebRTC audio output (Opus encode/decode via `gopus`). Build with `CGO_ENABLED=0` for a smaller, more portable binary that supports only energy-based VAD and WebRTC input (no Opus encode for outbound TTS). |
+| **ServiceSwitcher** | A processor wrapper (`pkg/processors`) that allows the active `STTService`, `LLMService`, or `TTSService` to be swapped at runtime without stopping the pipeline. A typical use is switching the STT language mid-call based on detected input. Swaps are thread-safe and take effect on the next processed frame. See [Pipeline & Processors](/core-concepts/pipeline-processors). |
+| **ParallelPipeline** | A pipeline variant (`pkg/pipeline`) that wraps multiple child pipelines. When a frame is pushed in, it is cloned and delivered to every branch simultaneously. Lifecycle frames (`StartFrame`, `CancelFrame`, `EndFrame`) are synchronised across all branches before propagating downstream. Useful for feeding the same audio into both a voice pipeline and a recording/transcription branch. See [Pipeline & Processors](/core-concepts/pipeline-processors). |
+| **ExternalChain** | A framework processor (`pkg/processors/frameworks`) that forwards frames to an external HTTP sidecar service and receives transformed frames in response. This enables custom logic written in any language to participate in the Voxray pipeline without requiring a Go plugin. |

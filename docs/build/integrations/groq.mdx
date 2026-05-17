@@ -1,0 +1,140 @@
+---
+title: "Groq"
+description: "Ultra-low-latency STT, LLM, and TTS provider powered by Groq's custom LPU hardware. A strong default choice when minimizing pipeline latency is the primary objective."
+---
+
+import { CardGroup, Card, Tabs, Tab, Note } from "@mintlify/components";
+
+## Capabilities
+
+<CardGroup cols={4}>
+  <Card title="STT" icon="microphone" color="#22c55e">
+    Whisper models running on Groq LPU hardware
+  </Card>
+  <Card title="LLM" icon="brain" color="#22c55e">
+    Llama 3, Mixtral, and Gemma via Groq's OpenAI-compatible chat API
+  </Card>
+  <Card title="TTS" icon="volume-high" color="#22c55e">
+    Text-to-speech via the Groq audio API
+  </Card>
+  <Card title="Realtime" icon="bolt" color="#6b7280">
+    Not supported
+  </Card>
+</CardGroup>
+
+## API Key
+
+Set `GROQ_API_KEY` as an environment variable or pass it inline under `api_keys` in `config.json`.
+
+Get a free key at [console.groq.com](https://console.groq.com). The free tier includes a generous daily request quota — check the console for current rate limits.
+
+## Quick Config
+
+<Tabs>
+  <Tab title="config.json">
+    ```json
+    {
+      "stt_provider": "groq",
+      "llm_provider": "groq",
+      "tts_provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "stt_model": "whisper-large-v3-turbo",
+      "api_keys": {
+        "groq": "gsk_..."
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Environment variable">
+    ```bash
+    export GROQ_API_KEY="gsk_..."
+    ```
+
+    Then in `config.json`:
+
+    ```json
+    {
+      "stt_provider": "groq",
+      "llm_provider": "groq",
+      "tts_provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "stt_model": "whisper-large-v3-turbo"
+    }
+    ```
+
+    Voxray reads `GROQ_API_KEY` automatically when no inline key is present.
+  </Tab>
+</Tabs>
+
+## Available LLM Models
+
+| Model | Speed | Context | Description |
+|-------|-------|---------|-------------|
+| `llama-3.1-8b-instant` | Fastest | 128k | Default model; best latency for most voice agent workloads |
+| `llama-3.2-3b-preview` | Fastest | 128k | Smallest Llama 3.2 model; ultra-low latency, simple instructions only |
+| `llama-3.1-70b-versatile` | Fast | 128k | Larger Llama 3.1; meaningfully smarter than 8b for complex tasks |
+| `mixtral-8x7b-32768` | Fast | 32k | Sparse mixture-of-experts; strong reasoning at moderate inference cost |
+| `gemma2-9b-it` | Fast | 8k | Google Gemma 2 instruction-tuned; good at structured outputs |
+
+The default when `model` is empty is `llama-3.1-8b-instant` (defined as `DefaultLLMModel` in `pkg/services/groq/llm.go`).
+
+## Available STT Models
+
+| Model | Speed | Accuracy | Notes |
+|-------|-------|----------|-------|
+| `whisper-large-v3-turbo` | Fast | High | Recommended default; optimized for real-time transcription on Groq LPU |
+| `whisper-large-v3` | Moderate | Highest | Maximum accuracy; use when word-error-rate matters more than latency |
+
+Set via `stt_model` in config. The Groq STT service passes this model to the Groq transcription endpoint directly.
+
+## Why Groq Is Fast
+
+Groq's **Language Processing Unit (LPU)** is purpose-built silicon for sequential token generation. Unlike GPU inference, the LPU eliminates memory bandwidth bottlenecks that dominate transformer workloads. In practice, Groq inference is often **5–10x faster** than equivalent GPU-based providers for the same model size. For voice agents where STT → LLM → TTS must complete inside a natural conversational pause (~300–800 ms), this matters significantly.
+
+<Note>
+Groq's OpenAI-compatible chat API means the LLM service is implemented using the same `go-openai` client as the OpenAI provider, pointed at Groq's base URL. Token streaming works identically — each delta is delivered as an `LLMTextFrame` as it arrives, enabling TTS to begin synthesis before the full response is available.
+</Note>
+
+## Tool Calling
+
+The Groq LLM provider does **not** implement `LLMServiceWithTools`. MCP tool integration is not available when `llm_provider` is `"groq"`. To use MCP tools, switch to `"llm_provider": "openai"`.
+
+## Configuration Reference
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `stt_provider` | string | Set to `"groq"` for Groq STT |
+| `stt_model` | string | Whisper model (e.g. `"whisper-large-v3-turbo"`); required for STT |
+| `llm_provider` | string | Set to `"groq"` for Groq LLM |
+| `model` | string | Chat model (e.g. `"llama-3.1-8b-instant"`); defaults to `"llama-3.1-8b-instant"` |
+| `tts_provider` | string | Set to `"groq"` for Groq TTS |
+| `tts_model` | string | TTS model identifier (passed to `tts.NewGroq`) |
+| `tts_voice` | string | Voice name for TTS output |
+| `api_keys.groq` | string | Groq API key (falls back to `GROQ_API_KEY`) |
+
+## Mixed-Provider Example
+
+Groq LLM pairs well with OpenAI STT (for language breadth) or with ElevenLabs TTS (for voice quality):
+
+```json
+{
+  "stt_provider": "openai",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "llm_provider": "groq",
+  "model": "llama-3.1-70b-versatile",
+  "tts_provider": "elevenlabs",
+  "api_keys": {
+    "openai": "sk-...",
+    "groq": "gsk_...",
+    "elevenlabs": "..."
+  }
+}
+```
+
+## Notes and Limitations
+
+- The Groq LLM service uses streaming (`Stream: true`) via the OpenAI-compatible API. Tokens arrive incrementally, making it suitable for low-latency TTS pipelines.
+- Rate limits on the free tier are per-model and per-day. If you hit limits in production, upgrade to a paid Groq plan or add a fallback `llm_provider`.
+- `mixtral-8x7b-32768` has a 32k context window — shorter than the Llama 3.1 models. Avoid it for agents with long conversation histories.
+- Groq does not support Realtime mode. For bidirectional audio sessions, use `"provider": "openai"` with `gpt-4o-realtime-preview`.
+- The `gemma2-9b-it` model has an 8k context limit. It is not suitable for sessions with extended conversation history.
