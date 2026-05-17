@@ -1,0 +1,113 @@
+---
+title: "WebRTC Quickstart"
+description: "Build Voxray with Opus audio support and connect a browser client via WebRTC for real-time bidirectional voice."
+---
+
+<Warning>
+  WebRTC requires CGO (a C compiler) for the Opus audio codec encoder. The default `make build` command produces a **WebSocket-only binary** with CGO explicitly disabled. Use `make build-voice` to produce a binary with WebRTC support.
+</Warning>
+
+## Step 1: Install the CGO Toolchain
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    xcode-select --install
+    clang --version
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```bash
+    sudo apt-get update && sudo apt-get install -y build-essential
+    gcc --version
+    ```
+  </Tab>
+  <Tab title="Windows">
+    Install gcc via WinLibs:
+
+    ```powershell
+    winget install BrechtSanders.WinLibs.POSIX.UCRT --accept-package-agreements
+    gcc --version
+    ```
+  </Tab>
+</Tabs>
+
+## Step 2: Clone the Repository
+
+```bash
+git clone https://github.com/Voxray-AI/Voxray.git
+cd Voxray
+go mod tidy
+```
+
+## Step 3: Configure for WebRTC
+
+```json
+{
+  "transport": "both",
+  "host": "0.0.0.0",
+  "port": 8080,
+  "stt_provider": "openai",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "llm_provider": "openai",
+  "model": "gpt-4.1-mini",
+  "tts_provider": "openai",
+  "tts_voice": "alloy",
+  "api_keys": {
+    "openai": "YOUR_OPENAI_API_KEY"
+  },
+  "webrtc_ice_servers": [
+    "stun:stun.l.google.com:19302"
+  ]
+}
+```
+
+## Step 4: Build with Voice Support
+
+```bash
+make build-voice
+```
+
+## Step 5: Run the Server
+
+```bash
+./voxray -config config.json
+```
+
+Expected startup output:
+
+```text
+INFO  voxray starting  transport=both host=0.0.0.0 port=8080
+INFO  pipeline ready   stt=openai llm=openai tts=openai
+INFO  webrtc ready     opus=enabled ice_servers=1
+INFO  server listening addr=0.0.0.0:8080
+```
+
+## Step 6: Connect via Browser
+
+```bash
+cd tests/frontend && python -m http.server 3000
+```
+
+Open [http://localhost:3000/webrtc-voice.html](http://localhost:3000/webrtc-voice.html), set Server URL to `http://localhost:8080`, click **Start**, and speak.
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `cgo: C compiler not found` | Install gcc (Step 1) and rerun `make build-voice` |
+| ICE connection fails | Add a TURN server to `webrtc_ice_servers` |
+| `opus encoder unavailable` | Rebuild with `make build-voice` |
+| Browser microphone denied | Serve frontend over HTTPS or use localhost |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/get-started/installation">
+    Full installation guide including OS-specific Go setup and Docker.
+  </Card>
+
+  <Card title="Configuration Reference" icon="gear" href="/core-concepts/configuration">
+    All config fields for transports, ICE servers, providers, and more.
+  </Card>
+</CardGroup>

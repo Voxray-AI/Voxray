@@ -1,0 +1,150 @@
+---
+title: "Configuration Reference"
+description: "Complete reference for all Voxray configuration fields and environment variable overrides"
+---
+
+Voxray is configured through a JSON file combined with environment variable overrides.
+
+## Config Loading
+
+```bash
+./voxray -config /path/to/config.json
+# or
+export VOXRAY_CONFIG=/path/to/config.json
+./voxray
+```
+
+**Loading Order and Precedence:**
+
+1. **Environment variable** (highest priority)
+2. **config.json field**
+3. **Built-in default**
+
+---
+
+## config.json Field Reference
+
+### Server
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `host` | string | `"localhost"` | Server bind address. Use `"0.0.0.0"` for production. |
+| `port` | int | `3042` | Server listen port. |
+| `log_level` | string | `"info"` | Log verbosity: `"debug"`, `"info"`, or `"error"`. |
+| `json_logs` | bool | `false` | Enable one-JSON-object-per-line structured logging. |
+
+### Providers
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `provider` | string | — | Default provider for all tasks. |
+| `stt_provider` | string | — | STT provider key. Falls back to `provider`. |
+| `llm_provider` | string | — | LLM provider key. Falls back to `provider`. |
+| `tts_provider` | string | — | TTS provider key. Falls back to `provider`. |
+| `model` | string | `"gpt-3.5-turbo"` | LLM chat model name. |
+| `stt_model` | string | Provider default | STT model identifier. |
+| `stt_language` | string | — | BCP-47 language code for STT. |
+| `tts_model` | string | Provider default | TTS model identifier. |
+| `tts_voice` | string | Provider default | TTS speaker/voice name or ID. |
+
+### Transport
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `transport` | string | `"websocket"` | `"websocket"`, `"smallwebrtc"`, or `"both"`. |
+| `webrtc_ice_servers` | \[\]string | — | ICE server URLs for SmallWebRTC. |
+| `rtc_max_duration_secs` | float64 | `0` | Maximum voice session duration. `0` disables. |
+| `pipeline_input_queue_cap` | int | `256` | Buffer capacity between transport and pipeline. |
+| `ws_write_coalesce_ms` | int | `0` | WebSocket write coalescing window in milliseconds. |
+
+### Security
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `server_api_key` | string | — | Require `Authorization: Bearer <key>` on protected endpoints. |
+| `max_request_body_bytes` | int64 | `262144` | Maximum JSON request body size. |
+| `cors_allowed_origins` | \[\]string | `[]` | CORS allowed origins. |
+| `tls_enable` | bool | `false` | Enable HTTPS. |
+| `tls_cert_file` | string | — | Path to TLS certificate. |
+| `tls_key_file` | string | — | Path to TLS private key. |
+
+### VAD and Turn Detection
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `vad_type` | string | `"energy"` | `"energy"` or `"silero"`. |
+| `vad_threshold` | float64 | `0.02` | RMS threshold for energy VAD. |
+| `vad_confidence` | float64 | `0.7` | Confidence threshold for neural VAD. |
+| `vad_min_volume` | float64 | `0.6` | Minimum volume for VAD activation. |
+| `vad_start_secs_vad` | float64 | `0.2` | Minimum speech duration. |
+| `vad_stop_secs` | float64 | `0.2` | Trailing silence for speech end. |
+| `turn_detection` | string | `"none"` | `"none"` or `"silence"`. |
+| `turn_stop_secs` | float64 | `3.0` | Silence duration for end-of-turn. |
+| `turn_pre_speech_ms` | float64 | `500` | Pre-speech audio padding. |
+| `turn_max_duration_secs` | float64 | `8.0` | Maximum turn duration. |
+| `user_idle_timeout_secs` | float64 | `0` | Emit `UserIdleFrame` after this silence. |
+
+### Session Store
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `session_store` | string | `"memory"` | `"memory"` or `"redis"`. |
+| `redis_url` | string | — | Redis connection URL. |
+| `session_ttl_secs` | int | `3600` | Session TTL in seconds. |
+
+### Recording
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `recording.enable` | bool | `false` | Enable per-session audio recording. |
+| `recording.bucket` | string | — | S3 bucket name. |
+| `recording.base_path` | string | — | Key prefix within the S3 bucket. |
+| `recording.format` | string | — | File format (e.g. `"wav"`). |
+| `recording.worker_count` | int | — | Concurrent S3 upload workers. |
+
+### Transcripts
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `transcripts.enable` | bool | `false` | Enable transcript logging to SQL. |
+| `transcripts.driver` | string | — | `"postgres"` or `"mysql"`. |
+| `transcripts.dsn` | string | — | SQL connection string. |
+| `transcripts.table_name` | string | `"call_transcripts"` | Target SQL table. |
+
+---
+
+## Environment Variable Reference
+
+| Variable | Overrides | Notes |
+| --- | --- | --- |
+| `VOXRAY_CONFIG` | — | Config file path. |
+| `VOXRAY_HOST` / `HOST` | `host` |  |
+| `VOXRAY_PORT` / `PORT` | `port` |  |
+| `VOXRAY_LOG_LEVEL` | `log_level` |  |
+| `VOXRAY_JSON_LOGS` | `json_logs` |  |
+| `VOXRAY_SERVER_API_KEY` | `server_api_key` |  |
+| `VOXRAY_CORS_ORIGINS` | `cors_allowed_origins` | Comma-separated. |
+| `VOXRAY_TLS_ENABLE` | `tls_enable` |  |
+| `VOXRAY_TLS_CERT_FILE` | `tls_cert_file` |  |
+| `VOXRAY_TLS_KEY_FILE` | `tls_key_file` |  |
+| `VOXRAY_RECORDING_ENABLE` | `recording.enable` |  |
+| `VOXRAY_RECORDING_BUCKET` | `recording.bucket` |  |
+| `VOXRAY_TRANSCRIPTS_ENABLE` | `transcripts.enable` |  |
+| `VOXRAY_TRANSCRIPTS_DSN` | `transcripts.dsn` |  |
+
+### API Key Environment Variables
+
+| Provider | Environment Variable |
+| --- | --- |
+| OpenAI | `OPENAI_API_KEY` |
+| Groq | `GROQ_API_KEY` |
+| Anthropic | `ANTHROPIC_API_KEY` |
+| ElevenLabs | `ELEVENLABS_API_KEY` |
+| Sarvam | `SARVAM_API_KEY` |
+| AWS | `AWS_SECRET_ACCESS_KEY` |
+| Google | `GOOGLE_API_KEY` |
+| Ollama | `OLLAMA_API_KEY` (optional) |
+
+<Tip>
+  In production, omit all `api_keys` entries from `config.json` and set the corresponding environment variables instead.
+</Tip>

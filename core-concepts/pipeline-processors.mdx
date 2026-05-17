@@ -1,0 +1,92 @@
+---
+title: "Pipeline & Processors"
+description: "How the linear processor chain works, the Processor interface, built-in voice processors, and how to write a custom processor."
+---
+
+The pipeline is the core runtime of every Voxray session. It is a linear chain of **Processors** that transform frames as they flow left to right (downstream) or right to left (upstream).
+
+## The Processor Interface
+
+```go
+type Processor interface {
+    ProcessFrame(ctx context.Context, f frames.Frame, dir Direction) error
+    SetNext(p Processor)
+    SetPrev(p Processor)
+    Setup(ctx context.Context) error
+    Cleanup(ctx context.Context) error
+    Name() string
+}
+```
+
+## Direction: Downstream and Upstream
+
+| Direction | Flow | When it is used |
+| --- | --- | --- |
+| `Downstream` | Left → Right | Normal data flow: audio in, transcription, LLM tokens, TTS audio out |
+| `Upstream` | Right ← Left | Error propagation, VAD parameter updates, barge-in signals |
+
+## Built-in Voice Processors
+
+### TurnProcessor
+
+VAD-based turn detection. Buffers raw audio chunks, runs a Voice Activity Detector on each chunk, and emits one `AudioRawFrame` containing the full turn only when end-of-speech is confirmed.
+
+**Emits:**
+
+- `AudioRawFrame` — one per complete turn
+- `UserStartedSpeakingFrame` — when VAD transitions to speech
+- `UserStoppedSpeakingFrame` — after silence threshold is exceeded
+- `UserIdleFrame` — when user has been silent beyond the idle timeout
+
+### STTProcessor
+
+Transcribes audio to text. Buffers incoming `AudioRawFrame` bytes until a minimum threshold is reached (default 500 ms), then calls `STTService.Transcribe`.
+
+### LLMProcessor
+
+Runs a language model on the accumulated conversation history and streams response tokens downstream. Maintains an internal message list that grows across turns.
+
+### TTSProcessor
+
+Synthesises text to speech. Batches streamed `LLMTextFrame` tokens until a sentence boundary or 120 runes, then calls `TTSService.Speak`.
+
+## Writing a Custom Processor
+
+```go
+type UppercaseTranscriptionProcessor struct {
+    *processors.BaseProcessor
+}
+
+func (p *UppercaseTranscriptionProcessor) ProcessFrame(
+    ctx context.Context,
+    f frames.Frame,
+    dir processors.Direction,
+) error {
+    if dir == processors.Upstream {
+        return p.PushUpstream(ctx, f)
+    }
+
+    tf, ok := f.(*frames.TranscriptionFrame)
+    if !ok {
+        return p.PushDownstream(ctx, f)
+    }
+
+    modified := *tf
+    modified.Text = strings.ToUpper(tf.Text)
+    return p.PushDownstream(ctx, &modified)
+}
+```
+
+## Aggregators
+
+| Processor | Purpose |
+| --- | --- |
+| `dtmf_aggregator` | Accumulates DTMF digits; flushes as `TranscriptionFrame` |
+| `gated` | Buffers frames when gate is closed; releases when open |
+| `llmfullresponse` | Aggregates LLM tokens between start/end frames |
+| `userresponse` | Buffers `TranscriptionFrame` segments; emits on `UserStoppedSpeakingFrame` |
+| `llmcontextsummarizer` | Compresses conversation history when thresholds exceeded |
+
+## ParallelPipeline
+
+Wraps multiple child `Pipeline` instances. Frames are cloned and delivered to every branch simultaneously. Useful for feeding audio into both a voice pipeline and a recording branch.

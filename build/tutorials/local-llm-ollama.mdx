@@ -1,0 +1,61 @@
+---
+title: "Local LLM with Ollama"
+description: "Run a voice agent entirely on your own hardware — no cloud APIs, no data leaves your machine."
+---
+
+## Prerequisites
+
+- Voxray built and working
+- Groq API key (free tier at [console.groq.com](https://console.groq.com))
+- Machine with at least 8 GB RAM
+
+## Steps
+
+<Steps>
+  <Step title="Install Ollama">
+    ```bash
+    curl -fsSL https://ollama.ai/install.sh | sh
+    ollama serve
+    ollama pull llama3.1:8b
+    ```
+  </Step>
+  <Step title="Create config">
+    ```json ollama-config.json
+    {
+      "host": "0.0.0.0",
+      "port": 3042,
+      "transport": "websocket",
+      "stt_provider": "groq",
+      "stt_model": "whisper-large-v3-turbo",
+      "llm_provider": "ollama",
+      "model": "llama3.1:8b",
+      "tts_provider": "groq",
+      "turn_detection": "silence",
+      "turn_stop_secs": 1.5,
+      "api_keys": { "groq": "gsk_..." }
+    }
+    ```
+  </Step>
+  <Step title="Start the server">
+    ```bash
+    ./voxray -config ollama-config.json
+    ```
+  </Step>
+</Steps>
+
+## Popular models
+
+| Model | Size | Recommended VRAM | Latency |
+| --- | --- | --- | --- |
+| `llama3.2:3b` | ~2 GB | 4 GB | Lowest |
+| `llama3.1:8b` | ~4.7 GB | 8 GB | Balanced |
+| `mistral:7b` | ~4.1 GB | 8 GB | Fast |
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `connection refused` | Run `ollama serve` |
+| Model not found | Run `ollama pull <model>` |
+| High latency | Use `llama3.2:3b` or enable GPU |
+| Remote server | Set `OLLAMA_BASE_URL=http://host:11434/v1` |

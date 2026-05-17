@@ -1,0 +1,130 @@
+---
+title: "Your First Voice Agent"
+description: "Build a working voice agent that greets users and answers questions — from a blank config to a live conversation in under 10 minutes."
+---
+
+By the end of this page you will have a Voxray server running locally, connected to real STT, LLM, and TTS providers, and able to hold a spoken conversation in your browser.
+
+## Minimal working config
+
+```json config.json
+{
+  "host": "localhost",
+  "port": 3042,
+
+  "transport": "websocket",
+
+  "provider": "openai",
+  "stt_provider": "openai",
+  "llm_provider": "openai",
+  "tts_provider": "openai",
+
+  "model": "gpt-4o-mini",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "tts_voice": "alloy",
+
+  "api_keys": {
+    "openai": "YOUR_OPENAI_API_KEY"
+  },
+
+  "turn_detection": "silence",
+  "turn_stop_secs": 3.0,
+
+  "vad_min_volume": 0.2,
+
+  "plugins": []
+}
+```
+
+<Note>
+  Replace `YOUR_OPENAI_API_KEY` with a real key before starting the server. Alternatively, set the `OPENAI_API_KEY` environment variable and omit the `api_keys` block entirely.
+</Note>
+
+## Config field walkthrough
+
+### Transport: `websocket` to start simple
+
+| Value | What it enables |
+| --- | --- |
+| `"websocket"` | WebSocket only (`/ws`) — no CGO, no C compiler needed |
+| `"smallwebrtc"` | WebRTC only (`/webrtc/offer`) — requires CGO \+ gcc for Opus |
+| `"both"` | Both transports on the same HTTP server |
+
+### Provider selection
+
+`provider` is a fallback default. Task-specific keys (`stt_provider`, `llm_provider`, `tts_provider`) take precedence. For example, to use Groq for STT but keep OpenAI for LLM and TTS:
+
+```json
+"provider": "openai",
+"stt_provider": "groq"
+```
+
+### Turn detection
+
+- `"none"` — no automatic turn detection; client signals turn end explicitly.
+- `"silence"` — waits for `turn_stop_secs` seconds of silence, then flushes to STT.
+
+`turn_stop_secs: 3.0` means 3 seconds of silence triggers end-of-turn. Lower values (1.0–1.5s) feel snappier but may cut off users mid-sentence.
+
+### VAD: `vad_min_volume`
+
+Sets the noise floor gate. If the agent triggers on ambient noise, raise this (try 0.3–0.4). If it misses quiet speech, lower it (try 0.1–0.15).
+
+## Starting and testing your agent
+
+<Steps>
+  <Step title="Build the binary">
+    ```bash
+    go build -o voxray ./cmd/voxray
+    ```
+  </Step>
+  <Step title="Start the server">
+    ```bash
+    ./voxray -config config.json
+    ```
+
+    You should see: `INFO  listening on :3042`
+  </Step>
+  <Step title="Open the browser client">
+    ```bash
+    open web/index.html   # macOS
+    xdg-open web/index.html  # Linux
+    ```
+
+    Set the server URL to `ws://localhost:3042/ws`.
+  </Step>
+  <Step title="Say hello">
+    Click the microphone button and say **"Hello"** clearly. Pause for at least `turn_stop_secs` (3 seconds). The agent should respond within 2–3 seconds.
+  </Step>
+  <Step title="Verify the full round-trip">
+    Confirm each stage completed in server logs:
+
+    ```text
+    INFO  vad speech_detected
+    INFO  stt transcript="Hello"
+    INFO  llm response_started
+    INFO  tts audio_chunk_sent
+    INFO  turn complete
+    ```
+  </Step>
+</Steps>
+
+## Common first-time issues
+
+**Agent does not respond after you speak** — Make sure `turn_detection` is `"silence"` and you paused for the full `turn_stop_secs`. Try raising `vad_min_volume` to 0.3–0.4 if background noise is triggering false speech starts.
+
+**No audio from the agent** — Check browser speaker permissions and verify the TTS API key is valid.
+
+**Server exits with "invalid config format"** — Validate with `cat config.json | python3 -m json.tool`.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book-open" href="/core-concepts/architecture">
+    Understand how the STT → LLM → TTS pipeline works.
+  </Card>
+
+  <Card title="Tutorials" icon="graduation-cap" href="/build/tutorials/overview">
+    Step-by-step tutorials from echo bot to production pipeline.
+  </Card>
+</CardGroup>

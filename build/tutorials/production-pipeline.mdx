@@ -1,0 +1,71 @@
+---
+title: "Production Voice Agent Pipeline"
+description: "Build a production-grade voice agent using Groq STT, Anthropic Claude, and ElevenLabs TTS — with interruptions, S3 recording, and transcript persistence."
+---
+
+## Overview
+
+| Stage | Provider | Model | Why |
+| --- | --- | --- | --- |
+| STT | Groq | `whisper-large-v3-turbo` | Lowest latency STT |
+| LLM | Anthropic | `claude-haiku-4-5-20251001` | Best reasoning quality |
+| TTS | ElevenLabs | Custom voice ID | Most natural voice synthesis |
+
+## Prerequisites
+
+- Groq API key
+- Anthropic API key
+- ElevenLabs API key \+ Voice ID
+- Redis instance
+- PostgreSQL instance
+- S3-compatible bucket with credentials
+
+## Full Production Config
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "transport": "both",
+  "stt_provider": "groq",
+  "llm_provider": "anthropic",
+  "tts_provider": "elevenlabs",
+  "model": "claude-haiku-4-5-20251001",
+  "stt_model": "whisper-large-v3-turbo",
+  "tts_voice": "<elevenlabs-voice-id>",
+  "api_keys": {
+    "groq": "gsk_...",
+    "anthropic": "sk-ant-...",
+    "elevenlabs": "..."
+  },
+  "allow_interruptions": true,
+  "interruption_strategy": "min_words",
+  "min_words": 3,
+  "turn_detection": "silence",
+  "turn_stop_secs": 2.5,
+  "vad_min_volume": 0.25,
+  "server_api_key": "your-secret-key",
+  "cors_allowed_origins": ["https://yourapp.com"],
+  "json_logs": true,
+  "log_level": "info",
+  "session_store": "redis",
+  "redis_url": "redis://localhost:6379/0",
+  "recording": {
+    "enable": true,
+    "bucket": "your-s3-bucket",
+    "base_path": "recordings/",
+    "format": "wav",
+    "worker_count": 4
+  },
+  "transcripts": {
+    "enable": true,
+    "driver": "postgres",
+    "dsn": "postgres://user:pass@db:5432/voxray?sslmode=require"
+  }
+}
+```
+
+## Production Checklist
+
+<Steps>
+</Steps>

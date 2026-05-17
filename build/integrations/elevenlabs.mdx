@@ -1,0 +1,53 @@
+---
+title: "ElevenLabs"
+description: "Use ElevenLabs for industry-leading TTS voice quality and Scribe-powered STT."
+---
+
+## Capabilities
+
+STT (via Scribe) and TTS. No LLM support — pair with OpenAI, Anthropic, or Groq.
+
+## Quick Config
+
+```json
+{
+  "stt_provider": "elevenlabs",
+  "tts_provider": "elevenlabs",
+  "tts_voice": "<voice-id-from-elevenlabs>",
+  "llm_provider": "openai",
+  "model": "gpt-4.1-mini",
+  "api_keys": {
+    "elevenlabs": "your_elevenlabs_api_key",
+    "openai": "sk-..."
+  }
+}
+```
+
+## Finding Voice IDs
+
+1. Log in to [elevenlabs.io](https://elevenlabs.io)
+2. Go to **Voices** in the left sidebar
+3. Click any voice → **Copy Voice ID**
+
+## TTS Models
+
+| Model | Latency | Notes |
+| --- | --- | --- |
+| `eleven_turbo_v2_5` | Lowest | Recommended for real-time agents |
+| `eleven_multilingual_v2` | Medium | 29 languages, best naturalness |
+
+```json
+{
+  "tts_provider": "elevenlabs",
+  "tts_voice": "21m00Tcm4TlvDq8ikWAM",
+  "tts_model": "eleven_turbo_v2_5"
+}
+```
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `401 Unauthorized` | Verify `ELEVENLABS_API_KEY` |
+| `404 Not Found` | Invalid voice ID — copy from dashboard |
+| High TTS latency | Switch to `eleven_turbo_v2_5` |

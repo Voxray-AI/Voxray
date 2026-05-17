@@ -1,0 +1,91 @@
+---
+title: "Integrations Overview"
+description: "Voxray supports 30+ STT, LLM, TTS, and realtime providers. Mix and match across pipeline stages."
+---
+
+## Provider Matrix
+
+| Provider | STT | LLM | TTS | Realtime | API Key Env Var |
+| --- | :-: | :-: | :-: | :-: | --- |
+| OpenAI | ✓ | ✓ | ✓ | ✓ | `OPENAI_API_KEY` |
+| Anthropic |  | ✓ |  |  | `ANTHROPIC_API_KEY` |
+| Groq | ✓ | ✓ | ✓ |  | `GROQ_API_KEY` |
+| Grok (xAI) |  | ✓ |  |  | `XAI_API_KEY` |
+| Cerebras |  | ✓ |  |  | `CEREBRAS_API_KEY` |
+| Mistral |  | ✓ |  |  | `MISTRAL_API_KEY` |
+| DeepSeek |  | ✓ |  |  | `DEEPSEEK_API_KEY` |
+| AWS | ✓ | ✓ | ✓ |  | AWS SDK credential chain |
+| Google (Gemini) | ✓ | ✓ | ✓ |  | `GOOGLE_API_KEY` |
+| Google Vertex AI |  | ✓ |  |  | Application Default Credentials |
+| Ollama |  | ✓ |  |  | `OLLAMA_API_KEY` (optional) |
+| ElevenLabs | ✓ |  | ✓ |  | `ELEVENLABS_API_KEY` |
+| Sarvam | ✓ |  | ✓ |  | `SARVAM_API_KEY` |
+| Hume |  |  | ✓ | ✓ | `HUME_API_KEY` |
+| Neuphonic |  |  | ✓ |  | `NEUPHONIC_API_KEY` |
+| XTTS |  |  | ✓ |  | `XTTS_API_KEY` |
+| Whisper | ✓ |  |  |  | `WHISPER_API_KEY` |
+
+## Setting API Keys
+
+```json
+{
+  "api_keys": {
+    "openai": "sk-...",
+    "groq": "gsk_...",
+    "elevenlabs": "el_..."
+  }
+}
+```
+
+Or via environment variables:
+
+```bash
+export OPENAI_API_KEY=sk-...
+export GROQ_API_KEY=gsk_...
+export ELEVENLABS_API_KEY=el_...
+```
+
+## Recommended Combinations
+
+<AccordionGroup>
+  <Accordion title="Budget — Groq across the board">
+    ```json
+    {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "stt_model": "whisper-large-v3-turbo",
+      "api_keys": { "groq": "gsk_..." }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Quality — Groq STT + Anthropic LLM + ElevenLabs TTS">
+    ```json
+    {
+      "stt_provider": "groq",
+      "llm_provider": "anthropic",
+      "tts_provider": "elevenlabs",
+      "model": "claude-3-5-sonnet-20241022",
+      "tts_voice": "Rachel"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Indian languages — Sarvam STT + Groq LLM + Sarvam TTS">
+    ```json
+    {
+      "stt_provider": "sarvam",
+      "llm_provider": "groq",
+      "tts_provider": "sarvam",
+      "stt_model": "saarika:v2.5",
+      "stt_language": "hi-IN",
+      "tts_model": "bulbul:v2",
+      "tts_voice": "anushka"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<CardGroup cols={3}>
+        
+</CardGroup>

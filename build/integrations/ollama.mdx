@@ -1,0 +1,48 @@
+---
+title: "Ollama"
+description: "Run open-source LLMs locally with Ollama as the LLM provider. No API key required."
+---
+
+Ollama is a local LLM inference server with an OpenAI-compatible REST API. LLM only — pair with cloud STT and TTS.
+
+## Prerequisites
+
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama serve
+ollama pull llama3.1:8b
+```
+
+## Quick Config
+
+```json
+{
+  "llm_provider": "ollama",
+  "model": "llama3.1:8b",
+  "stt_provider": "groq",
+  "tts_provider": "groq",
+  "api_keys": { "groq": "gsk_..." }
+}
+```
+
+## Custom Ollama URL
+
+```bash
+export OLLAMA_BASE_URL=http://192.168.1.50:11434/v1
+```
+
+## Popular Models
+
+| Model | Size | VRAM | Best For |
+| --- | --- | --- | --- |
+| `llama3.2:3b` | ~2 GB | 4 GB | Lowest latency |
+| `llama3.1:8b` | ~4.7 GB | 8 GB | Balanced |
+| `mistral:7b` | ~4.1 GB | 8 GB | Strong reasoning |
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `connection refused` | Run `ollama serve` |
+| Model not found | Run `ollama pull <model>` |
+| High latency | Use smaller model or enable GPU |

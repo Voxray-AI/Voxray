@@ -1,0 +1,116 @@
+---
+title: "Quickstart: WebSocket"
+description: "Run a real-time AI voice agent over WebSocket in under 5 minutes — no CGO or C compiler required."
+---
+
+<Note>
+  **Prerequisites before you begin:**
+
+  - **Go 1.25\+** — verify with `go version`. The default WebSocket build has no other system dependencies; no C compiler or CGO needed.
+  - **A provider API key** — the fastest path is a **Groq API key** (`GROQ_API_KEY`), which has a free tier and covers STT, LLM, and TTS in a single account. Get one at [console.groq.com](https://console.groq.com).
+</Note>
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash title="Terminal"
+    git clone https://github.com/Voxray-AI/Voxray.git
+    cd Voxray
+    ```
+
+    The repository includes `config.example.json`, a `web/` directory with a browser client, and a `Makefile` with common build targets.
+  </Step>
+  <Step title="Configure your providers">
+    Copy the example config and open it for editing:
+
+    ```bash title="Terminal"
+    cp config.example.json config.json
+    ```
+
+    Then set at minimum these four fields. The example below uses Groq for all three pipeline stages — STT, LLM, and TTS — which requires only one API key:
+
+    ```json title="config.json"
+    {
+      "host": "0.0.0.0",
+      "port": 3042,
+      "transport": "websocket",
+    
+      "provider": "groq",
+      "stt_provider": "groq",
+      "llm_provider": "groq",
+      "tts_provider": "groq",
+    
+      "model": "llama-3.1-8b-instant",
+    
+      "turn_detection": "silence",
+      "turn_stop_secs": 3.0,
+    
+      "api_keys": {
+        "groq": "gsk_YOUR_GROQ_API_KEY_HERE"
+      }
+    }
+    ```
+  </Step>
+  <Step title="Build and run">
+    <Tabs>
+      <Tab title="Using Make (recommended)">
+        ```bash title="Terminal"
+        make build
+        ./voxray -config config.json
+        ```
+      </Tab>
+      <Tab title="Using go run (no build step)">
+        ```bash title="Terminal"
+        go run ./cmd/voxray -config config.json
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  <Step title="Connect and speak">
+    Open `web/index.html` directly in your browser, click **Connect**, then speak. You will hear the agent respond in real time.
+
+    **Available endpoints once running:**
+
+    | Endpoint | Description |
+    | --- | --- |
+    | `GET /ws` | WebSocket transport (upgrade) |
+    | `GET /health` | Liveness check — returns `200 OK` |
+    | `GET /ready` | Readiness check |
+    | `GET /metrics` | Prometheus metrics scrape endpoint |
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    Change the port in `config.json` or override at startup:
+
+    ```bash
+    ./voxray -config config.json -port 8080
+    ```
+  </Accordion>
+
+  <Accordion title="Missing API key — 401 error">
+    Set the key in `config.json` under `api_keys` or export it as an environment variable:
+
+    ```bash
+    export GROQ_API_KEY=gsk_YOUR_KEY_HERE
+    ```
+  </Accordion>
+
+  <Accordion title="No response from agent">
+    Make sure `turn_detection` is set to `"silence"` and `turn_stop_secs` is at least `2.0`. Speak for at least 1–2 seconds, then pause for the full `turn_stop_secs` duration.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/core-concepts/architecture">
+    Understand the pipeline internals: runner, transport, processors, VAD, and how frames flow between stages.
+  </Card>
+
+  <Card title="WebRTC Quickstart" icon="broadcast-tower" href="/get-started/quickstart-webrtc">
+    Add WebRTC transport for browser-native audio with Opus encoding and lower latency.
+  </Card>
+</CardGroup>

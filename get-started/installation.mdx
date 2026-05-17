@@ -1,0 +1,126 @@
+---
+title: "Installation"
+description: "Install Voxray, set up your Go environment, and choose the right build for your transport needs."
+---
+
+## Prerequisites
+
+| Requirement | Command | Notes |
+| --- | --- | --- |
+| Go 1.25\+ | `go version` | Required for all builds |
+| Git | `git --version` | Required to clone the repository |
+| C compiler (gcc or clang) | `gcc --version` | Required only for WebRTC builds with Opus audio |
+
+## Install Go and System Dependencies
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    brew install go
+    xcode-select --install
+    go version
+    clang --version
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y golang-go build-essential
+    ```
+
+    <Warning>
+      The `golang-go` package in Debian/Ubuntu often lags behind. For Go 1.25\+, download from [golang.org/dl](https://golang.org/dl/).
+    </Warning>
+  </Tab>
+  <Tab title="Windows">
+    Download the MSI installer from [golang.org/dl](https://golang.org/dl/). For CGO (WebRTC builds), install WinLibs:
+
+    ```powershell
+    winget install BrechtSanders.WinLibs.POSIX.UCRT --accept-package-agreements
+    ```
+  </Tab>
+</Tabs>
+
+## Clone the Repository
+
+```bash
+git clone https://github.com/Voxray-AI/Voxray.git
+cd Voxray
+go mod tidy
+```
+
+## Build Variants
+
+| Command | CGO | Transport Support | Binary Size |
+| --- | --- | --- | --- |
+| `make build` | Disabled | WebSocket only | ~15 MB |
+| `make build-voice` | Enabled | WebSocket \+ WebRTC (Opus) | ~20 MB |
+
+### Default build — WebSocket only
+
+```bash
+make build
+```
+
+### Voice build — WebSocket and WebRTC with Opus
+
+```bash
+make build-voice
+```
+
+<Warning>
+  If you run a binary built without CGO and a client connects via WebRTC, the server returns HTTP 503 and logs `opus encoder unavailable (build without cgo)`.
+</Warning>
+
+## Docker
+
+```bash
+docker build -t voxray .
+docker run -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json \
+  voxray
+```
+
+## Environment Setup
+
+```bash
+cp config.example.json config.json
+```
+
+Minimal working config:
+
+```json
+{
+  "transport": "websocket",
+  "host": "0.0.0.0",
+  "port": 8080,
+  "stt_provider": "openai",
+  "stt_model": "gpt-4o-mini-transcribe",
+  "llm_provider": "openai",
+  "model": "gpt-4.1-mini",
+  "tts_provider": "openai",
+  "tts_voice": "alloy",
+  "api_keys": {
+    "openai": "YOUR_OPENAI_API_KEY"
+  }
+}
+```
+
+## Verify the Installation
+
+```bash
+./voxray -config config.json
+curl http://localhost:8080/health
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="WebSocket Quickstart" icon="plug" href="/get-started/quickstart-websocket">
+    Connect a client to the WebSocket endpoint and make your first voice call.
+  </Card>
+
+  <Card title="WebRTC Quickstart" icon="microphone" href="/get-started/quickstart-webrtc">
+    Build with CGO and connect a browser client via WebRTC for real-time audio.
+  </Card>
+</CardGroup>

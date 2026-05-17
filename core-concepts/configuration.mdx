@@ -1,0 +1,150 @@
+---
+title: "Configuration"
+description: "Complete reference for Voxray's JSON configuration file and environment variable overrides."
+---
+
+## Loading configuration
+
+```bash
+./voxray -config config.json
+# or
+VOXRAY_CONFIG=/etc/voxray/config.json ./voxray
+```
+
+**Loading precedence (highest to lowest):**
+
+1. Environment variable (e.g. `VOXRAY_PORT`)
+2. `config.json` field value
+3. Internal Go default
+
+<Warning>
+  Never commit `config.json` with real API keys to a git repository. Set secrets via environment variables or a secrets manager.
+</Warning>
+
+## Server settings
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `host` | string | `"0.0.0.0"` | Bind address |
+| `port` | int | `8080` | TCP port. Overridden by `VOXRAY_PORT` or `PORT` |
+| `transport` | string | `"websocket"` | `"websocket"`, `"smallwebrtc"`, or `"both"` |
+
+## Provider selection
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `provider` | string | Global fallback when task-specific keys are absent |
+| `stt_provider` | string | Provider for speech-to-text |
+| `llm_provider` | string | Provider for chat/completion |
+| `tts_provider` | string | Provider for text-to-speech |
+| `model` | string | Chat model name |
+| `stt_model` | string | STT model |
+| `stt_language` | string | BCP-47 language tag (e.g. `"hi-IN"`) |
+| `tts_model` | string | TTS model |
+| `tts_voice` | string | Voice identifier |
+
+## VAD and turn detection
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `vad_type` | string | `"energy"` | `"energy"` or `"silero"` |
+| `vad_confidence` | float | `0.7` | Confidence threshold |
+| `vad_threshold` | float | `0.02` | RMS energy threshold |
+| `vad_min_volume` | float | `0.6` | Minimum volume for speech detection |
+| `turn_detection` | string | `"none"` | `"none"` or `"silence"` |
+| `turn_stop_secs` | float | `3.0` | Seconds of silence to trigger end-of-turn |
+| `turn_max_duration_secs` | float | `8.0` | Maximum turn duration |
+| `user_idle_timeout_secs` | float | `0` | Emit `UserIdleFrame` after this many seconds of silence |
+
+## Interruptions
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `allow_interruptions` | bool | `false` | Enable barge-in |
+| `interruption_strategy` | string | `""` | `"keyword"` or `"min_words"` |
+| `min_words` | int | `0` | Minimum words before interruption fires |
+
+## Session store
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `session_store` | string | `"memory"` | `"memory"` or `"redis"` |
+| `redis_url` | string | — | Redis connection URL |
+| `session_ttl_secs` | int | `3600` | Session TTL in seconds |
+
+## Recording
+
+```json
+{
+  "recording": {
+    "enable": true,
+    "bucket": "your-recordings-bucket",
+    "base_path": "recordings/",
+    "format": "wav",
+    "worker_count": 4
+  }
+}
+```
+
+## Transcripts
+
+```json
+{
+  "transcripts": {
+    "enable": true,
+    "driver": "postgres",
+    "dsn": "postgres://user:pass@localhost:5432/voxray?sslmode=disable",
+    "table_name": "call_transcripts"
+  }
+}
+```
+
+## Security
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `server_api_key` | string | `""` | Require `Authorization: Bearer <key>` on protected endpoints |
+| `cors_allowed_origins` | array | `[]` | Allowed CORS origins |
+| `max_request_body_bytes` | int64 | `0` | Max request body size |
+| `tls_enable` | bool | `false` | Enable on-server TLS |
+| `tls_cert_file` | string | — | TLS certificate PEM path |
+| `tls_key_file` | string | — | TLS private key PEM path |
+
+## Observability
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `log_level` | string | `"info"` | `"debug"`, `"info"`, or `"error"` |
+| `json_logs` | bool | `false` | JSON structured logging |
+| `metrics_enabled` | bool | `true` | Prometheus metrics at `/metrics` |
+
+## MCP
+
+```json
+{
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/data"],
+    "tools_filter": ["read_file", "list_directory"]
+  }
+}
+```
+
+## Environment variable reference
+
+| Variable | Overrides |
+| --- | --- |
+| `VOXRAY_CONFIG` | Config file path |
+| `VOXRAY_HOST` / `HOST` | `host` |
+| `VOXRAY_PORT` / `PORT` | `port` |
+| `VOXRAY_LOG_LEVEL` | `log_level` |
+| `VOXRAY_JSON_LOGS` | `json_logs` |
+| `VOXRAY_SERVER_API_KEY` | `server_api_key` |
+| `VOXRAY_CORS_ORIGINS` | `cors_allowed_origins` |
+| `VOXRAY_TLS_ENABLE` | `tls_enable` |
+| `VOXRAY_TLS_CERT_FILE` | `tls_cert_file` |
+| `VOXRAY_TLS_KEY_FILE` | `tls_key_file` |
+| `VOXRAY_RECORDING_ENABLE` | `recording.enable` |
+| `VOXRAY_RECORDING_BUCKET` | `recording.bucket` |
+| `VOXRAY_TRANSCRIPTS_ENABLE` | `transcripts.enable` |
+| `VOXRAY_TRANSCRIPTS_DSN` | `transcripts.dsn` |

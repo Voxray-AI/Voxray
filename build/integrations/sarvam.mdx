@@ -1,0 +1,58 @@
+---
+title: "Sarvam"
+description: "Sarvam STT and TTS integration for Indian language voice agents."
+---
+
+## Capabilities
+
+STT and TTS optimized for Hindi and other Indian languages. No LLM support.
+
+## Quick Config
+
+```json
+{
+  "stt_provider": "sarvam",
+  "llm_provider": "groq",
+  "tts_provider": "sarvam",
+  "model": "llama-3.1-8b-instant",
+  "stt_model": "saarika:v2.5",
+  "stt_language": "hi-IN",
+  "tts_model": "bulbul:v2",
+  "tts_voice": "anushka",
+  "api_keys": {
+    "sarvam": "your_sarvam_api_key",
+    "groq": "gsk_..."
+  }
+}
+```
+
+## Supported Languages
+
+| Code | Language |
+| --- | --- |
+| `hi-IN` | Hindi (default) |
+| `en-IN` | English (India) |
+| `ta-IN` | Tamil |
+| `te-IN` | Telugu |
+| `kn-IN` | Kannada |
+| `ml-IN` | Malayalam |
+| `bn-IN` | Bengali |
+
+Leave `stt_language` empty for auto-detect.
+
+## Available Voices
+
+| Voice | Gender | Character |
+| --- | --- | --- |
+| `anushka` | Female | Default; professional Hindi |
+| `manisha` | Female | Warm, conversational |
+| `arjun` | Male | Natural male voice |
+| `abhilash` | Male | Expressive, energetic |
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `401 Unauthorized` | Verify `SARVAM_API_KEY` |
+| Poor transcription | Set `stt_language` explicitly |
+| TTS audio distorted | Check sample rate handling |

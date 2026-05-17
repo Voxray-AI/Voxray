@@ -1,0 +1,55 @@
+---
+title: "Adding Providers"
+description: "Step-by-step guide to adding a new STT, LLM, or TTS provider to Voxray"
+---
+
+Voxray selects providers at startup from `config.json`. Adding a new provider means creating a Go package under `pkg/services/`, implementing the correct interface, and registering the provider in the factory.
+
+<Note>
+  Before starting, read `pkg/services/interfaces.go` and `pkg/services/factory.go`.
+</Note>
+
+## Service Interfaces
+
+### LLMService
+
+```go
+type LLMService interface {
+    Chat(ctx context.Context, messages []map[string]any, onToken func(*frames.LLMTextFrame)) error
+}
+```
+
+`Chat` must stream tokens incrementally by calling `onToken` for each delta.
+
+### STTService
+
+```go
+type STTService interface {
+    Transcribe(ctx context.Context, audio []byte, sampleRate, numChannels int) ([]*frames.TranscriptionFrame, error)
+}
+```
+
+### TTSService
+
+```go
+type TTSService interface {
+    Speak(ctx context.Context, text string, sampleRate int) ([]*frames.TTSAudioRawFrame, error)
+}
+```
+
+## Steps
+
+<Steps>
+</Steps>
+
+## Provider Checklist
+
+- No hardcoded API keys anywhere
+- API key wired through `apiKeyForProvider` with env var fallback
+- All config fields documented
+- `context.Context` passed to every network call
+- All errors wrapped with provider context
+- Unit tests cover success, context cancellation, and upstream error
+- Provider constant added to `factory.go`
+- `case` added in all applicable factory switch statements
+- Documentation added at `docs/build/integrations/<provider>.mdx`

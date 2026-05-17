@@ -1,0 +1,46 @@
+---
+title: "Anthropic"
+description: "Claude LLM provider for Voxray. Supports the full Claude 3 and Claude 4 model families."
+---
+
+## Capabilities
+
+Anthropic provides LLM capability only. Pair it with a supported STT provider (e.g. `"groq"`) and TTS provider (e.g. `"elevenlabs"`).
+
+## Quick Config
+
+```json
+{
+  "stt_provider": "groq",
+  "llm_provider": "anthropic",
+  "tts_provider": "elevenlabs",
+  "model": "claude-haiku-4-5-20251001",
+  "api_keys": {
+    "anthropic": "sk-ant-...",
+    "groq": "gsk_...",
+    "elevenlabs": "..."
+  }
+}
+```
+
+## Available Models
+
+| Model | Speed | Best For |
+| --- | --- | --- |
+| `claude-haiku-4-5-20251001` | Fastest | High-throughput, latency-sensitive |
+| `claude-sonnet-4-6` | Balanced | General-purpose voice agents |
+| `claude-opus-4-6` | Slowest | Complex multi-step reasoning |
+
+## Latency Consideration
+
+<Warning>
+  The Anthropic provider returns **full responses** (non-streaming). TTS does not receive text incrementally — the first audio chunk has higher latency than streaming providers like OpenAI or Groq.
+
+  To mitigate: use `claude-haiku-4-5-20251001` and keep system prompts short.
+</Warning>
+
+## Limitations
+
+- No STT or TTS support
+- No tool calling (MCP) — use OpenAI for tool support
+- `max_tokens` hardcoded to 1024

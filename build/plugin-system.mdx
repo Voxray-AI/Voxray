@@ -1,0 +1,116 @@
+---
+title: "Plugin System"
+description: "How Voxray's processor registry works, every built-in plugin, and how to write and register a custom processor."
+---
+
+## Overview
+
+Processors are registered by name in a global registry and instantiated at startup from `config.json`. No recompilation required to swap or reorder processors.
+
+## Built-in Plugins
+
+| Plugin Name | Description |
+| --- | --- |
+| `echo` | Echoes received text frames back to the sender. Useful for testing without AI credentials. |
+| `logger` | Logs every frame that passes through. |
+| `frame_filter` | Passes or blocks frames by type. |
+| `wake_check_filter` | Holds pipeline in dormant state until a wake phrase is detected. |
+| `stt_mute_filter` | Mutes STT input while the bot is speaking. |
+| `audio_filter` | Applies audio transforms (gain, noise reduction). |
+| `interruption_controller` | Handles user barge-in with configurable strategy. |
+| `external_chain` | Forwards to an HTTP sidecar (Python LangChain, etc.) and streams response back. |
+| `rtvi` | Real-Time Voice Interface protocol processor for Pipecat-compatible frontends. |
+
+## Wiring Plugins in Config
+
+```json
+{
+  "plugins": ["stt_mute_filter", "interruption_controller", "rtvi"],
+  "plugin_options": {
+    "interruption_controller": {
+      "strategy": "min_words",
+      "min_words": 3
+    },
+    "rtvi": {}
+  }
+}
+```
+
+Order in `plugins` matters: frames flow through processors in declaration order.
+
+## RTVI Protocol
+
+Enable RTVI:
+
+1. Connect with `?rtvi=1` query parameter
+2. Add `"rtvi"` to `plugins`
+
+```json
+{
+  "plugins": ["rtvi"],
+  "plugin_options": { "rtvi": { "protocol_version": "1.2.0" } }
+}
+```
+
+## External Chain (Python Sidecar)
+
+```json
+{
+  "plugins": ["external_chain"],
+  "plugin_options": {
+    "external_chain": {
+      "url": "http://localhost:8001/invoke",
+      "stream": true,
+      "timeout_sec": 45,
+      "transcript_key": "input"
+    }
+  }
+}
+```
+
+## Writing a Custom Processor
+
+<Steps>
+  <Step title="Create a Go package">
+    ```bash
+    mkdir -p pkg/processors/myprocessor
+    ```
+  </Step>
+  <Step title="Define the struct">
+    ```go
+    type MyProcessor struct {
+        *processors.BaseProcessor
+        cfg MyConfig
+    }
+    ```
+  </Step>
+  <Step title="Implement ProcessFrame">
+    ```go
+    func (p *MyProcessor) ProcessFrame(ctx context.Context, frame frames.Frame, dir processors.FrameDirection) error {
+        // Transform or inspect frame
+        return p.PushDownstream(ctx, frame)
+    }
+    ```
+  </Step>
+  <Step title="Register with init()">
+    ```go
+    func init() {
+        pipeline.RegisterProcessor("my_processor",
+            func(name string, opts json.RawMessage) processors.Processor {
+                return &MyProcessor{BaseProcessor: processors.NewBaseProcessor(name)}
+            },
+        )
+    }
+    ```
+  </Step>
+  <Step title="Blank-import in main.go">
+    ```go
+    import _ "voxray-go/pkg/processors/myprocessor"
+    ```
+  </Step>
+  <Step title="Add to config">
+    ```json
+    { "plugins": ["my_processor"], "plugin_options": { "my_processor": {} } }
+    ```
+  </Step>
+</Steps>

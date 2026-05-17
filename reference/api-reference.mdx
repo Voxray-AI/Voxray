@@ -1,0 +1,172 @@
+---
+title: "API Reference"
+description: "Complete HTTP and WebSocket API reference for the Voxray voice pipeline server."
+---
+
+## Overview
+
+The Voxray server exposes a JSON/HTTP REST API for health, WebRTC signaling, session management, and Prometheus metrics, plus WebSocket and telephony transports for real-time voice pipelines.
+
+### Base URL
+
+```text
+http://localhost:3042
+```
+
+### Versioned paths
+
+| Versioned | Legacy |
+| --- | --- |
+| `GET /api/v1/health` | `GET /health` |
+| `GET /api/v1/ready` | `GET /ready` |
+| `POST /api/v1/webrtc/offer` | `POST /webrtc/offer` |
+| `POST /api/v1/start` | `POST /start` |
+| `POST /api/v1/sessions/{id}/offer` | `POST /sessions/{id}/api/offer` |
+
+---
+
+## Authentication
+
+When `server_api_key` is configured, protected endpoints require:
+
+```http
+Authorization: Bearer <key>
+```
+
+or
+
+```http
+X-API-Key: <key>
+```
+
+**On failure:** `401 Unauthorized`.
+
+---
+
+## Request and Response Format
+
+### Success envelope
+
+```json
+{
+  "data": { "<payload fields>" },
+  "meta": { "requestId": "550e8400-e29b-41d4-a716-446655440000" }
+}
+```
+
+### Error envelope
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Missing or empty offer",
+    "requestId": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
+```
+
+### HTTP status codes
+
+| Status | Meaning |
+| --- | --- |
+| 200 | Success |
+| 201 | Resource created |
+| 204 | No content |
+| 400 | Invalid JSON or malformed request |
+| 401 | Missing or invalid API key |
+| 404 | Route or session not found |
+| 422 | Required field missing or empty |
+| 500 | Internal server error |
+| 503 | Dependency unavailable (Redis, Opus encoder) |
+
+---
+
+## Endpoints Overview
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/health` | No | Liveness probe |
+| `GET` | `/ready` | No | Readiness probe |
+| `GET` | `/metrics` | No | Prometheus metrics |
+| `GET` | `/swagger/` | No | Swagger UI |
+| `POST` | `/webrtc/offer` | Yes\* | WebRTC SDP offer/answer |
+| `POST` | `/start` | Yes\* | Create runner session |
+| `POST` | `/sessions/{id}/api/offer` | Yes\* | Session WebRTC SDP offer |
+| `PATCH` | `/sessions/{id}/api/offer` | Yes\* | ICE trickle acknowledgment |
+| `GET` | `/ws` | Yes\* | WebSocket upgrade for voice pipeline |
+| `POST` | `/` | No | Telephony provider webhook |
+| `GET` | `/telephony/ws` | No | Telephony media WebSocket |
+
+\* When `server_api_key` is configured.
+
+---
+
+## Endpoint Details
+
+### POST /webrtc/offer
+
+```bash
+curl -X POST http://localhost:3042/api/v1/webrtc/offer \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"offer":"v=0\r\n..."}'
+```
+
+**Success (200):**
+
+```json
+{
+  "data": { "answer": "v=0\r\n..." },
+  "meta": { "requestId": "550e8400-e29b-41d4-a716-446655440000" }
+}
+```
+
+### POST /start
+
+Create a runner session. Returns a `sessionId`.
+
+```bash
+curl -X POST http://localhost:3042/api/v1/start \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"enableDefaultIceServers":true}'
+```
+
+**Success (201):**
+
+```json
+{
+  "data": {
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+    "iceConfig": {
+      "iceServers": [{ "urls": ["stun:stun.l.google.com:19302"] }]
+    }
+  }
+}
+```
+
+### GET /ws
+
+WebSocket upgrade for the real-time voice pipeline.
+
+**Query parameters:**
+
+| Parameter | Value | Description |
+| --- | --- | --- |
+| `rtvi` | `1` | Use RTVI protocol framing |
+| `format` | `protobuf` | Binary protobuf frames |
+
+### GET /health
+
+```bash
+curl http://localhost:3042/api/v1/health
+```
+
+```json
+{"data": {"status": "ok"}, "meta": {"requestId": "..."}}
+```
+
+### GET /ready
+
+Returns `503` when Redis is unreachable (when `session_store=redis`).
