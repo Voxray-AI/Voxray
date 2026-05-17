@@ -5,6 +5,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/Voxray-AI/Voxray.svg)](https://pkg.go.dev/github.com/Voxray-AI/Voxray)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Voxray-AI/Voxray)](https://goreportcard.com/report/github.com/Voxray-AI/Voxray)
 [![codecov](https://codecov.io/gh/Voxray-AI/Voxray/branch/main/graph/badge.svg)](https://codecov.io/gh/Voxray-AI/Voxray)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://voxray-cac3ed72.mintlify.app/get-started/introduction)
 > Build production-ready AI voice agents with a single JSON config.
 > WebSocket & WebRTC · STT → LLM → TTS · Low-latency · Self-hostable
 
