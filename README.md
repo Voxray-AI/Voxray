@@ -150,19 +150,6 @@ Add `C:\msys64\ucrt64\bin` to PATH and verify with `gcc --version`.
 
 > Without CGO, WebRTC TTS reports *opus encoder unavailable (build without cgo)* and the server returns **503** on WebRTC offers.
 
-### API Keys
-
-You will need API keys for whichever providers you configure:
-
-| Provider   | Where to get it                          |
-| :--------- | :--------------------------------------- |
-| OpenAI     | https://platform.openai.com/api-keys     |
-| Anthropic  | https://console.anthropic.com/           |
-| Groq       | https://console.groq.com/keys            |
-| Sarvam     | https://dashboard.sarvam.ai/             |
-| ElevenLabs | https://elevenlabs.io/app/settings/api-keys |
-| Google     | https://aistudio.google.com/apikey       |
-| AWS        | IAM credentials via standard AWS SDK chain |
 
 ---
 
